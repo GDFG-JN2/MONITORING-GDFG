@@ -1,351 +1,3 @@
-    // =============================================
-    // STOCK OPNAME
-    // =============================================
-    var _opnameStdMap   = {};
-    var _opnameNamaMap  = {};
-    var _opnameInitDone = false;
-    var _opSel = {r1:-1,c1:-1,r2:-1,c2:-1};
-    var _opDragging = false;
-
-    // Kolom per tipe
-    var OP_COLS_LOKAL   = ['sku','item','sap','fisik','sel_awal','pgr','pgi','salah_kirim','adj','sel_akhir','ket','std','palet'];
-    var OP_EDIT_LOKAL   = ['sku','item','sap','fisik','pgr','pgi','salah_kirim','adj','std','ket'];
-    var OP_COLS_EKSPOR  = ['sku','item','buyer','quotation','exp_date','fisik','sap_detail','sap_total','pgr','pgi','sel_akhir','ket','std','palet'];
-    var OP_EDIT_EKSPOR  = ['sku','item','buyer','quotation','exp_date','fisik','sap_detail','sap_total','pgr','pgi','std','ket'];
-
-    var OP_COLS_ORDER = OP_COLS_LOKAL.slice();
-    var OP_EDITABLE   = OP_EDIT_LOKAL.slice();
-    var _opCurrentTipe = 'LOKAL';
-    var _opActiveTab = 'input';
-
-
-    // Mapping nama per plant + tipe
-    var _NAMA_MAP = {
-      '1111|LOKAL':       ['Faisal'],
-      '1111|EKSPOR':      ['Ade'],
-      '1112|LOKAL':       ['Dimas','Apri'],
-      '1112|EKSPOR':      ['Aldy'],
-      '1113|LOKAL':       ['Dimas'],
-      '1113|EKSPOR':      ['Aldy'],
-      // GDFG ikut plant yg sama (lokal)
-      '1111|GDFG':        ['Faisal'],
-      '1112|GDFG':        ['Dimas','Apri'],
-      '1113|GDFG':        ['Dimas'],
-      '1111|GDFG-EKSPOR': ['Ade'],
-      '1112|GDFG-EKSPOR': ['Aldy'],
-      '1113|GDFG-EKSPOR': ['Aldy'],
-      // FIFO
-      '1111|FIFO':        ['Faishal'],
-      '1112|FIFO':        ['Dimas','Apri'],
-      '1113|FIFO':        ['Dimas'],
-      // FIFO EKSPOR
-      '1111|FIFO-EKSPOR': ['Ade'],
-      '1112|FIFO-EKSPOR': ['Aldy'],
-      '1113|FIFO-EKSPOR': ['Aldy'],
-      // QT READY (sama dengan EKSPOR)
-      '1111|QT_READY':    ['Ade'],
-      '1112|QT_READY':    ['Aldy'],
-      '1113|QT_READY':    ['Aldy'],
-    };
-
-    // Mapping terbalik: nama → [{plant, tipe}]
-    var _NAMA_TO_PT = (function(){
-      var map = {};
-      Object.keys(_NAMA_MAP).forEach(function(key){
-        var parts = key.split('|'), plant=parts[0], tipe=parts[1];
-        // Hanya lokal/ekspor untuk filter riwayat (bukan GDFG)
-        if(tipe==='GDFG'||tipe==='GDFG-EKSPOR') return;
-        _NAMA_MAP[key].forEach(function(nama){
-          if(!map[nama]) map[nama]=[];
-          map[nama].push({plant:plant, tipe:tipe});
-        });
-      });
-      return map;
-    })();
-
-    function _initViewNamaOptions(){
-      var sel = document.getElementById('opViewNama');
-      if(!sel) return;
-      var allNames = Object.keys(_NAMA_TO_PT).sort();
-      sel.innerHTML = '<option value="">Semua Nama</option>';
-      allNames.forEach(function(n){
-        var opt = document.createElement('option');
-        opt.value = n; opt.textContent = n;
-        sel.appendChild(opt);
-      });
-    }
-
-    function _onViewNamaChange(){
-      var nama  = (document.getElementById('opViewNama')||{}).value||'';
-      var plantSel = document.getElementById('opViewPlant');
-      var tipeSel  = document.getElementById('opViewTipe');
-      if(!nama){
-        // Kosong → reset plant & tipe
-        if(plantSel) plantSel.value='';
-        if(tipeSel)  tipeSel.value='';
-        return;
-      }
-      var pts = _NAMA_TO_PT[nama]||[];
-      var _plantsSeen={}, plants=[];
-      pts.forEach(function(x){ if(!_plantsSeen[x.plant]){ _plantsSeen[x.plant]=1; plants.push(x.plant); } });
-      var _tipesSeen={}, tipes=[];
-      pts.forEach(function(x){ if(!_tipesSeen[x.tipe]){ _tipesSeen[x.tipe]=1; tipes.push(x.tipe); } });
-      // Selalu auto-set saat nama dipilih (bisa diubah manual setelahnya)
-      if(plantSel) plantSel.value = plants.length===1 ? plants[0] : '';
-      if(tipeSel)  tipeSel.value  = tipes.length===1  ? tipes[0]  : '';
-    }
-
-    function _onViewPlantChange(){
-      // Plant berubah manual — biarkan nama tetap terpilih
-    }
-
-    function _updateNamaOptions(){
-      var plant = (document.getElementById('opPlant')||{}).value || '';
-      var tipe  = _opCurrentTipe || 'LOKAL';
-      // FIFO bisa punya sub-tipe EKSPOR → key berbeda
-      var key = (tipe==='FIFO' && _fifoSubTipe==='EKSPOR')
-                ? plant + '|FIFO-EKSPOR'
-                : plant + '|' + tipe;
-      var names = _NAMA_MAP[key] || [];
-      var sel   = document.getElementById('opNama');
-      if(!sel) return;
-      var prev  = sel.value;
-      sel.innerHTML = '<option value="">— Pilih Nama —</option>';
-      names.forEach(function(n){
-        var opt = document.createElement('option');
-        opt.value = n; opt.textContent = n;
-        if(n === prev) opt.selected = true;
-        sel.appendChild(opt);
-      });
-      if(names.length === 1) sel.value = names[0];
-    }
-    // Cache data tabel per tipe agar tidak hilang saat switch
-    var _opTipeCache = { LOKAL: null, EKSPOR: null };
-    var _opGdfgTipeCache = { LOKAL: null, EKSPOR: null };
-
-    function _opSaveCacheFor(tipe){
-      if(!tipe) return;
-      var rows = [];
-      document.getElementById('opnameTbody').querySelectorAll('tr').forEach(function(tr){
-        var rowData = {};
-        tr.querySelectorAll('td[data-col]').forEach(function(td){
-          rowData[td.dataset.col] = td.textContent.trim();
-        });
-        rows.push(rowData);
-      });
-      _opTipeCache[tipe] = rows;
-      var gRows = [];
-      document.getElementById('opnameTbodyGdfg').querySelectorAll('tr').forEach(function(tr){
-        var rowData = {};
-        tr.querySelectorAll('td[data-col]').forEach(function(td){
-          rowData[td.dataset.col] = td.textContent.trim();
-        });
-        gRows.push(rowData);
-      });
-      _opGdfgTipeCache[tipe] = gRows;
-    }
-
-    function _opRestoreCache(tipe){
-      var cached = _opTipeCache[tipe];
-      if(!cached || !cached.length) return;
-      var trs = Array.from(document.getElementById('opnameTbody').querySelectorAll('tr'));
-      cached.forEach(function(rowData, i){
-        var tr = trs[i];
-        if(!tr) return;
-        Object.keys(rowData).forEach(function(col){
-          var td = tr.querySelector('[data-col="'+col+'"]');
-          if(td && rowData[col]) td.textContent = rowData[col];
-        });
-        _calcOpRow(tr);
-      });
-      _updateOpTotals();
-      // GDFG
-      var gCached = _opGdfgTipeCache[tipe];
-      if(gCached && gCached.length){
-        var gTrs = Array.from(document.getElementById('opnameTbodyGdfg').querySelectorAll('tr'));
-        gCached.forEach(function(rowData, i){
-          var tr = gTrs[i];
-          if(!tr) return;
-          Object.keys(rowData).forEach(function(col){
-            var td = tr.querySelector('[data-col="'+col+'"]');
-            if(td && rowData[col]) td.textContent = rowData[col];
-          });
-          _calcOpGdfgRow(tr);
-        });
-        _updateOpGdfgTotals();
-      }
-    }
-
-        function opSetTipe(val){
-      var prevTipe = _opCurrentTipe; // simpan sebelum update
-      _opSaveCacheFor(prevTipe);     // simpan data tabel lama
-      _opCurrentTipe = val;
-      var sel = document.getElementById('opTipe');
-      var strip = document.getElementById('opTipeStrip');
-      var badge = document.getElementById('opTipeBadge');
-      var labelMain = document.getElementById('opCardLabelMain');
-      var labelTbl  = document.getElementById('opCardLabelTbl');
-      var isEkspor  = val==='EKSPOR';
-      var isFifo    = val==='FIFO';
-      var isQtReady = val==='QT_READY';
-
-      // CSS class untuk warna
-      var cls = isFifo ? 'fifo' : (isEkspor ? 'ekspor' : (isQtReady ? 'qtready' : 'lokal'));
-      if(sel){ sel.className = 'op-tipe-select '+cls; }
-      if(strip){ strip.className = 'op-tipe-strip '+cls; }
-      if(badge){ badge.textContent = val; }
-
-      var cardMain = document.querySelector('#opnamePage .op-card-section:not(.op-card-gdfg):not(.op-card-fifo):not(.op-card-qtready)');
-      var cardGdfg = document.querySelector('.op-card-gdfg');
-      var cardFifo = document.getElementById('opCardFifo');
-      var cardQt   = document.getElementById('opCardQtReady');
-      var saveBarMain = document.getElementById('opSaveBarMain');
-
-      // Sembunyikan semua card dulu
-      if(cardMain)    cardMain.style.display='none';
-      if(cardGdfg)    cardGdfg.style.display='none';
-      if(saveBarMain) saveBarMain.style.display='none';
-      if(cardFifo){   cardFifo.style.display='none'; cardFifo.classList.remove('active'); }
-      if(cardQt){     cardQt.style.display='none';   cardQt.classList.remove('active'); }
-
-      if(isFifo){
-        if(cardFifo){ cardFifo.style.display=''; cardFifo.classList.add('active'); }
-        _initFifoIfNeeded();
-        _updateFifoStats();
-      } else if(isQtReady){
-        if(cardQt){ cardQt.style.display=''; cardQt.classList.add('active'); }
-        _initQtIfNeeded();
-        _updateQtStats();
-        // Update judul tabel dengan tanggal
-        _qtUpdateTitle();
-      } else {
-        if(cardMain)    cardMain.style.display='';
-        if(cardGdfg)    cardGdfg.style.display='';
-        if(saveBarMain) saveBarMain.style.display='';
-        if(labelMain){ labelMain.textContent = isEkspor ? '🚢 EKSPOR' : '🏭 LOKAL'; }
-        if(labelTbl) { labelTbl.textContent  = isEkspor ? 'Ekspor'   : 'Lokal';   }
-        if(isEkspor){
-          OP_COLS_ORDER = OP_COLS_EKSPOR.slice();
-          OP_EDITABLE   = OP_EDIT_EKSPOR.slice();
-        } else {
-          OP_COLS_ORDER = OP_COLS_LOKAL.slice();
-          OP_EDITABLE   = OP_EDIT_LOKAL.slice();
-        }
-        // Update STOK cols agar navigate/paste ikut kolom baru
-        var opTbl=document.getElementById('opnameTbl');
-        if(opTbl&&opTbl._stokUpdateCols) opTbl._stokUpdateCols(OP_COLS_ORDER);
-        var opTblG=document.getElementById('opnameTblGdfg');
-        if(opTblG&&opTblG._stokUpdateCols) opTblG._stokUpdateCols(OP_COLS_ORDER);
-        _renderOpThead();
-        _renderOpTheadGdfg();
-        _updateNamaOptions();
-        initOpnameRows(30);
-        initOpnameGdfgRows(30);
-        _opRestoreCache(val);
-      }
-    }
-
-    function _renderOpThead(){
-      var thead = document.getElementById('opnameThead');
-      if(!thead) return;
-      if(_opCurrentTipe === 'EKSPOR'){
-        thead.innerHTML =
-          '<tr>' +
-            '<th class="row-no" rowspan="2">#</th>' +
-            '<th style="min-width:90px" rowspan="2">SKU</th>' +
-            '<th style="min-width:200px" rowspan="2">NAMA BARANG</th>' +
-            '<th style="min-width:110px" rowspan="2">BUYER</th>' +
-            '<th style="min-width:110px" rowspan="2">QUOTATION</th>' +
-            '<th style="min-width:105px" rowspan="2">PROD / EXP DATE</th>' +
-            '<th style="min-width:80px;text-align:right" rowspan="2">FISIK</th>' +
-            '<th colspan="2" style="text-align:center;background:rgba(66,153,225,.12)">SAP</th>' +
-            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GR</th>' +
-            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GI</th>' +
-            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.15)" rowspan="2">SELISIH AKHIR</th>' +
-            '<th style="min-width:120px" rowspan="2">KETERANGAN</th>' +
-            '<th style="min-width:70px;text-align:right;background:rgba(246,224,94,.06)" rowspan="2">STD PALLET</th>' +
-            '<th style="min-width:80px;text-align:right;background:rgba(246,224,94,.1)" rowspan="2">JML PALLET</th>' +
-            '<th style="width:28px" rowspan="2"></th>' +
-          '</tr>' +
-          '<tr>' +
-            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.08)">Detail QT</th>' +
-            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.12)">TOTAL</th>' +
-          '</tr>';
-      } else {
-        thead.innerHTML =
-          '<tr>' +
-            '<th class="row-no">#</th>' +
-            '<th style="min-width:90px">SKU</th>' +
-            '<th style="min-width:220px">NAMA BARANG</th>' +
-            '<th style="min-width:75px;text-align:right">SAP</th>' +
-            '<th style="min-width:75px;text-align:right">FISIK</th>' +
-            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AWAL</th>' +
-            '<th style="min-width:75px;text-align:right">PEND. GR</th>' +
-            '<th style="min-width:75px;text-align:right">PEND. GI</th>' +
-            '<th style="min-width:85px;text-align:right">SALAH KIRIM</th>' +
-            '<th style="min-width:65px;text-align:right">ADJ</th>' +
-            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AKHIR</th>' +
-            '<th style="min-width:110px">KET</th>' +
-            '<th style="min-width:60px;text-align:right;background:rgba(246,224,94,.06)">STD</th>' +
-            '<th style="min-width:75px;text-align:right;background:rgba(246,224,94,.1)">PALET</th>' +
-            '<th style="width:28px"></th>' +
-          '</tr>';
-      }
-    }
-
-    // ── Opname Zoom ──────────────────────────────
-    var _opZoom = 100; // percent
-    // opZoom dan opZoomReset: lihat definisi di bawah (support parameter tbl)
-
-    function _renderOpTheadGdfg(){
-      var thead = document.getElementById('opnameTheadGdfg');
-      if(!thead) return;
-      // GDFG pakai kolom yang sama dengan tipe aktif (lokal/ekspor)
-      if(_opCurrentTipe === 'EKSPOR'){
-        thead.innerHTML =
-          '<tr>' +
-            '<th class="row-no" rowspan="2">#</th>' +
-            '<th style="min-width:90px" rowspan="2">SKU</th>' +
-            '<th style="min-width:200px" rowspan="2">NAMA BARANG</th>' +
-            '<th style="min-width:110px" rowspan="2">BUYER</th>' +
-            '<th style="min-width:110px" rowspan="2">QUOTATION</th>' +
-            '<th style="min-width:105px" rowspan="2">PROD / EXP DATE</th>' +
-            '<th style="min-width:80px;text-align:right" rowspan="2">FISIK</th>' +
-            '<th colspan="2" style="text-align:center;background:rgba(66,153,225,.12)">SAP</th>' +
-            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GR</th>' +
-            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GI</th>' +
-            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.15)" rowspan="2">SELISIH AKHIR</th>' +
-            '<th style="min-width:120px" rowspan="2">KETERANGAN</th>' +
-            '<th style="min-width:70px;text-align:right;background:rgba(246,224,94,.06)" rowspan="2">STD PALLET</th>' +
-            '<th style="min-width:80px;text-align:right;background:rgba(246,224,94,.1)" rowspan="2">JML PALLET</th>' +
-            '<th style="width:28px" rowspan="2"></th>' +
-          '</tr>' +
-          '<tr>' +
-            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.08)">Detail QT</th>' +
-            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.12)">TOTAL</th>' +
-          '</tr>';
-      } else {
-        thead.innerHTML =
-          '<tr>' +
-            '<th class="row-no">#</th>' +
-            '<th style="min-width:90px">SKU</th>' +
-            '<th style="min-width:220px">NAMA BARANG</th>' +
-            '<th style="min-width:75px;text-align:right">SAP</th>' +
-            '<th style="min-width:75px;text-align:right">FISIK</th>' +
-            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AWAL</th>' +
-            '<th style="min-width:75px;text-align:right">PEND. GR</th>' +
-            '<th style="min-width:75px;text-align:right">PEND. GI</th>' +
-            '<th style="min-width:85px;text-align:right">SALAH KIRIM</th>' +
-            '<th style="min-width:65px;text-align:right">ADJ</th>' +
-            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AKHIR</th>' +
-            '<th style="min-width:110px">KET</th>' +
-            '<th style="min-width:60px;text-align:right;background:rgba(246,224,94,.06)">STD</th>' +
-            '<th style="min-width:75px;text-align:right;background:rgba(246,224,94,.1)">PALET</th>' +
-            '<th style="width:28px"></th>' +
-          '</tr>';
-      }
-    }
-
     function initOpnamePage(){
       _preloadSkuNames(); // pastikan SKU map terisi sebelum user mulai input
       _renderOpThead();     // render header tabel utama
@@ -360,7 +12,8 @@
       document.getElementById('fifoViewTo').value=ts;
       _initViewNamaOptions();
       if(!_opnameInitDone){
-        API.getStandarPalet(function(res){
+        google.script.run
+          .withSuccessHandler(function(res){
             if(res&&res.success&&res.data){
               _opnameStdMap={};
               _opnameNamaMap={};
@@ -375,8 +28,9 @@
             _opnameInitDone=true;
             if(!document.getElementById('opnameTbody').children.length) initOpnameRows(30);
             if(!document.getElementById('opnameTbodyGdfg').children.length) initOpnameGdfgRows(30);
-          },
-          function(){ _opnameInitDone=true; if(!document.getElementById('opnameTbody').children.length) initOpnameRows(30); if(!document.getElementById('opnameTbodyGdfg').children.length) initOpnameGdfgRows(30); });
+          })
+          .withFailureHandler(function(){ _opnameInitDone=true; if(!document.getElementById('opnameTbody').children.length) initOpnameRows(30); if(!document.getElementById('opnameTbodyGdfg').children.length) initOpnameGdfgRows(30); })
+          .getStandarPalet();
       } else {
         if(!document.getElementById('opnameTbody').children.length) initOpnameRows(30);
         if(!document.getElementById('opnameTbodyGdfg').children.length) initOpnameGdfgRows(30);
@@ -1387,8 +1041,8 @@
 
       if(!rows.length){ showToast('Tidak ada data untuk disimpan','error'); return; }
       showToast('Menyimpan '+rows.length+' baris...','info');
-      API.saveOpnameData(rows,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           if(res.success){
             showToast('\u2705 '+rows.length+' baris tersimpan!','success');
             // Clear tabel setelah save berhasil
@@ -1399,8 +1053,9 @@
           } else {
             showToast('\u274c '+(res.message||'Error'),'error');
           }
-        },
-        function(e){ showToast('\u274c Gagal: '+e,'error'); });
+        })
+        .withFailureHandler(function(e){ showToast('\u274c Gagal: '+e,'error'); })
+        .saveOpnameData(rows);
     }
 
 
@@ -1414,8 +1069,8 @@
     // Load STD map dari getStandarPalet (sudah ada di GAS)
     function _loadFifoSkuMap(cb){
       if(Object.keys(_fifoSkuMap).length > 0){ if(cb) cb(); return; }
-      if(typeof google === 'undefined' || !google.script){ if(cb) cb(); return; }
-      google.script.run.withSuccessHandler(function(res){ /* TODO: manual replace google.script.run */
+      if(false){ if(cb) cb(); return; }
+      google.script.run.withSuccessHandler(function(res){
         if(res && res.data){
           res.data.forEach(function(d){
             _fifoSkuMap[String(d.sku).trim()] = {nama: d.nama||'', std: Number(d.std)||0};
@@ -1932,10 +1587,10 @@
       var btn = document.querySelector('#opCardFifo .op-btn-save');
       if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Menyimpan...'; }
 
-      if(typeof google === 'undefined' || !google.script){ showToast('Tidak bisa connect ke server','error'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan FIFO';} return; }
+      if(false){ showToast('Tidak bisa connect ke server','error'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan FIFO';} return; }
 
       var fn = isEks ? 'saveFifoEksporData' : 'saveFifoData';
-      google.script.run /* TODO: manual replace google.script.run */
+      google.script.run
         .withSuccessHandler(function(res){
           if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Simpan FIFO'; }
           if(res && res.success){
@@ -2307,8 +1962,8 @@
       if(rows.length===0){ showToast('Tidak ada data QT Ready untuk disimpan','error'); return; }
       var btn=document.querySelector('#opCardQtReady .op-btn-save');
       if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Menyimpan...'; }
-      API.saveQtReadyData(rows,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Simpan QT Ready'; }
           if(res&&res.success){
             showToast('\u2705 '+rows.length+' baris QT Ready tersimpan','success');
@@ -2319,11 +1974,12 @@
               _updateQtStats();
             });
           } else { showToast('\u274c Gagal: '+(res&&res.message||'unknown'),'error'); }
-        },
-        function(e){
+        })
+        .withFailureHandler(function(e){
           if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Simpan QT Ready'; }
           showToast('\u274c Koneksi gagal','error');
-        });
+        })
+        .saveQtReadyData(rows);
     }
 
 
@@ -2340,9 +1996,9 @@
       var subTipe = (document.getElementById('fifoViewSubTipe')||{}).value||'LOKAL';
       if(!from||!to){ showToast('Pilih rentang tanggal','error'); return; }
       document.getElementById('fifoViewBody').innerHTML = "<div class='spinner' style='margin:20px auto;'></div>";
-      if(typeof google === 'undefined' || !google.script){ showToast('Tidak bisa connect ke server','error'); return; }
+      if(false){ showToast('Tidak bisa connect ke server','error'); return; }
       var fn = subTipe==='EKSPOR' ? 'getFifoEksporData' : 'getFifoData';
-      google.script.run /* TODO: manual replace google.script.run */
+      google.script.run
         .withSuccessHandler(function(res){ renderFifoView(res, nama, plant, subTipe); })
         .withFailureHandler(function(e){ showToast('❌ Gagal load data FIFO','error'); })
         [fn](from, to);
@@ -2835,9 +2491,10 @@
       document.getElementById('qtViewBody').innerHTML="<div class='spinner' style='margin:20px auto;'></div>";
       var allBtn=document.getElementById('qtDownloadAllBtn');
       if(allBtn) allBtn.style.display='none';
-      API.getQtReadyData(from, to,
-        function(res){ renderQtView(res, nama, plant); },
-        function(){ showToast('\u274c Gagal load data QT Ready','error'); });
+      google.script.run
+        .withSuccessHandler(function(res){ renderQtView(res, nama, plant); })
+        .withFailureHandler(function(){ showToast('\u274c Gagal load data QT Ready','error'); })
+        .getQtReadyData(from, to);
     }
 
     function renderQtView(res, namaFilter, plantFilter){
@@ -3091,13 +2748,14 @@
       if(!from||!to){ showToast('Pilih rentang tanggal','error'); return; }
       document.getElementById('opnameViewBody').innerHTML="<div class='spinner' style='margin:20px auto;'></div>";
       console.log('loadOpnameView: from='+from+' to='+to+' nama='+nama+' plant='+plant+' tipe='+tipe);
-      API.getOpnameData(from,to,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           console.log('getOpnameData result: success='+res.success+' total='+(res.data?res.data.length:0));
           if(res.data && res.data.length>0) console.log('first row: '+JSON.stringify(res.data[0].slice(0,5)));
           renderOpnameView(res, nama, plant, tipe);
-        },
-        function(e){ showToast('\u274c Gagal load data opname','error'); console.log('FAIL:'+e); });
+        })
+        .withFailureHandler(function(e){ showToast('\u274c Gagal load data opname','error'); console.log('FAIL:'+e); })
+        .getOpnameData(from,to);
     }
 
     function renderOpnameView(res, namaFilter, plantFilter, tipeFilter){
@@ -3471,3 +3129,74 @@
     }
 
     // =============================================
+    // SIDEBAR
+    // =============================================
+    function toggleSidebar(){
+      document.getElementById("sidebar").classList.toggle("active");
+      document.getElementById("sidebarOverlay").classList.toggle("active");
+    }
+    function closeSidebar(){
+      document.getElementById("sidebar").classList.remove("active");
+      document.getElementById("sidebarOverlay").classList.remove("active");
+    }
+
+    function showPage(page){
+      // Reset state opname agar tidak bocor ke halaman lain
+      _opDragging = false;
+      if(page !== 'opnamePage') _opClearSel();
+      if(page !== 'inputPage') _inResetSel();
+      var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage'];
+      pages.forEach(function(p){
+        var el = document.getElementById(p);
+        el.style.display = 'none';
+        el.classList.remove('page-enter');
+      });
+      // Sembunyikan floating footer saat ganti halaman (kecuali realisasiPage)
+      if(page !== 'realisasiPage') hideStickyFooter();
+      var target = document.getElementById(page);
+      target.style.display = 'block';
+      requestAnimationFrame(function(){ target.classList.add('page-enter'); });
+      closeSidebar();
+      document.getElementById('menuDashboard').classList.toggle('active-page',  page === 'dashboard');
+      document.getElementById('menuRealisasi').classList.toggle('active-page',  page === 'realisasiPage');
+      document.getElementById('menuOpname').classList.toggle('active-page',     page === 'opnamePage');
+      document.getElementById('menuRdc').classList.toggle('active-page',        page === 'rdcPage');
+      document.getElementById('menuStockJalur').classList.toggle('active-page', page === 'stockJalurPage');
+      document.getElementById('menuBinLoc').classList.toggle('active-page',     page === 'binLocPage');
+      if(page === 'dashboard'){
+        updateLastRefresh();
+        loadTanggalHistory();
+        loadKapasitasHariIni();
+      }
+      if(page === 'inputPage')   initEmptyRows(30);
+      if(page === 'opnamePage'){ initOpnamePage(); switchOpnameTab('input'); }
+      if(page === 'rdcPage'){ rdcInitPage(); }
+      if(page === 'stockJalurPage'){ sjInitPage(); }
+      if(page === 'binLocPage'){ blInitPage(); }
+      if(page === 'realisasiPage'){
+        initRealForm();
+        // Reset filter ke hari ini saat buka halaman
+        var today = new Date();
+        var yyyy = today.getFullYear();
+        var mm   = String(today.getMonth()+1).padStart(2,'0');
+        var dd   = String(today.getDate()).padStart(2,'0');
+        var todayStr = yyyy+'-'+mm+'-'+dd;
+        document.getElementById('filterFrom').value = todayStr;
+        document.getElementById('filterTo').value   = todayStr;
+        // Reset filter mode ke Tanggal
+        switchFilterMode('date');
+        loadSummaryReal();
+      }
+    }
+
+    // =============================================
+    // INPUT TABLE — MODERN
+    // =============================================
+
+    function showToast(msg, type){
+      var t = document.getElementById('toast');
+      t.innerText  = msg;
+      t.className  = 'toast ' + (type||'');
+      t.classList.add('show');
+      setTimeout(function(){ t.classList.remove('show'); }, 3000);
+    }

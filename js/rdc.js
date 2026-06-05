@@ -1,566 +1,3 @@
-    // =============================================
-    // REVISI RIWAYAT OPNAME
-    // =============================================
-    var _rvPending = null; // {tr, rowData, changedCols}
-
-    function _rvEdit(btn){
-      var tr = btn.closest('tr');
-      if(tr.classList.contains('tr-editing')) return;
-
-      // Cancel any existing edit first
-      _rvCancelActive();
-
-      var rowData = JSON.parse(decodeURIComponent(tr.dataset.row));
-      var isEk    = tr.dataset.isek === '1';
-
-      tr.classList.add('tr-editing');
-
-      // Make each data-col cell editable
-      tr.querySelectorAll('td[data-col]').forEach(function(td){
-        var col = td.dataset.col;
-        var raw = rowData[col];
-        if(raw === undefined || raw === null) raw = '';
-        td.classList.add('td-editable');
-        var inp = document.createElement('input');
-        inp.value = raw;
-        inp.dataset.origVal = raw;
-        inp.dataset.col = col;
-        td.textContent = '';
-        td.appendChild(inp);
-      });
-
-      // Replace edit pencil with save/cancel buttons
-      var editTd = tr.querySelector('.td-edit-btn');
-      editTd.innerHTML =
-        '<button class="opv-edit-save" onclick="_rvSave(this)" title="Simpan"><i class="fas fa-check"></i></button>' +
-        '<button class="opv-edit-cancel" onclick="_rvCancelActive()" title="Batal"><i class="fas fa-times"></i></button>';
-    }
-
-    function _rvCancelActive(){
-      var editing = document.querySelectorAll('.tr-editing');
-      editing.forEach(function(tr){
-        tr.classList.remove('tr-editing');
-        // Restore cells from input values
-        tr.querySelectorAll('td.td-editable').forEach(function(td){
-          var inp = td.querySelector('input');
-          td.classList.remove('td-editable');
-          td.textContent = inp ? inp.dataset.origVal : '';
-        });
-        // Restore edit button
-        var editTd = tr.querySelector('.td-edit-btn');
-        if(editTd) editTd.innerHTML = '<button class="opv-edit-btn" onclick="_rvEdit(this)" title="Edit baris ini"><i class="fas fa-pencil-alt"></i></button>';
-      });
-      _rvPending = null;
-    }
-
-    function _rvSave(btn){
-      var tr = btn.closest('tr');
-      var rowData = JSON.parse(decodeURIComponent(tr.dataset.row));
-
-      // Collect changed columns
-      var changedCols = [];
-      tr.querySelectorAll('td.td-editable input').forEach(function(inp){
-        var newVal = inp.value.trim();
-        var origVal = String(inp.dataset.origVal).trim();
-        changedCols.push({col: Number(inp.dataset.col), value: newVal, orig: origVal});
-      });
-
-      var hasChange = changedCols.some(function(c){ return String(c.value) !== String(c.orig); });
-      if(!hasChange){
-        _rvCancelActive();
-        return;
-      }
-
-      _rvPending = {tr: tr, rowData: rowData, changedCols: changedCols};
-
-      // Show popup
-      document.getElementById('revisiAlasan').value = '';
-      var modal = document.getElementById('revisiModal');
-      modal.classList.add('show');
-      setTimeout(function(){ document.getElementById('revisiAlasan').focus(); }, 100);
-    }
-
-    function _revisiCancel(){
-      document.getElementById('revisiModal').classList.remove('show');
-      _rvCancelActive();
-      _rvPending = null;
-    }
-
-    function _revisiConfirm(){
-      var alasan = document.getElementById('revisiAlasan').value.trim();
-      if(!alasan){
-        document.getElementById('revisiAlasan').style.borderColor='#e53e3e';
-        document.getElementById('revisiAlasan').focus();
-        return;
-      }
-      document.getElementById('revisiAlasan').style.borderColor='';
-      document.getElementById('revisiModal').classList.remove('show');
-
-      if(!_rvPending) return;
-      var pending   = _rvPending;
-      _rvPending    = null;
-      var rowData   = pending.rowData;
-      var tr        = pending.tr;
-
-      // Bangun full row array dengan nilai terbaru dari edit
-      var isEkPay = (String(rowData[3]||'').toUpperCase()==='EKSPOR'||String(rowData[3]||'').toUpperCase()==='GDFG-EKSPOR');
-      var hdLen   = isEkPay ? 18 : 16;
-      var newRow  = [];
-      for(var ci=0; ci<hdLen; ci++) newRow.push(rowData[ci]!==undefined?rowData[ci]:'');
-      // Timpa dengan nilai yang diedit
-      pending.changedCols.forEach(function(c){ newRow[Number(c.col)] = c.value; });
-
-      var payload = {
-        area    : rowData[3],
-        key     : {
-          tanggal   : rowData[0],
-          nama      : rowData[1],
-          plant     : rowData[2],
-          sku       : rowData[4],
-          quotation : isEkPay ? rowData[7] : ''
-        },
-        data    : newRow,
-        alasan  : alasan
-      };
-
-      // Show saving state
-      var editTd = tr.querySelector('.td-edit-btn');
-      if(editTd) editTd.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#718096;font-size:13px;"></i>';
-
-      google.script.run /* TODO: manual replace google.script.run */
-        .withSuccessHandler(function(res){
-          if(res && res.success){
-            // Update display cells with new values
-            pending.changedCols.forEach(function(c){
-              var td = tr.querySelector('td[data-col="'+c.col+'"]');
-              if(td){
-                td.classList.remove('td-editable');
-                td.textContent = c.value;
-              }
-            });
-            tr.classList.remove('tr-editing');
-            // Flash green
-            tr.style.background='#c6f6d5';
-            setTimeout(function(){ tr.style.background=''; }, 1200);
-            // Restore edit button
-            if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEdit(this)" title="Edit baris ini"><i class="fas fa-pencil-alt"></i></button>';
-            // Update rowData in dataset
-            pending.changedCols.forEach(function(c){ rowData[c.col]=c.value; });
-            tr.dataset.row = encodeURIComponent(JSON.stringify(rowData));
-          } else {
-            alert('Gagal menyimpan: '+(res&&res.message?res.message:'Unknown error'));
-            _rvCancelActive();
-          }
-        })
-        .withFailureHandler(function(e){
-          alert('Error: '+e.message);
-          _rvCancelActive();
-        })
-        .updateOpnameRow(payload);
-    }
-
-    // ── Generic Edit untuk FIFO, QT Ready, SJ Rekap ──────────────
-    var _rvGenericPending = null;
-
-    function _rvEditGeneric(btn, tipe){
-      var tr = btn.closest('tr');
-      if(tr.classList.contains('tr-editing')) return;
-      _rvCancelGeneric();
-      tr.classList.add('tr-editing');
-      tr.querySelectorAll('td[data-col]').forEach(function(td){
-        var col = td.dataset.col;
-        if(col==='idx') return; // nomor urut, skip
-        var raw = td.textContent.trim();
-        td.classList.add('td-editable');
-        td._origText = raw;
-        var inp = document.createElement('input');
-        inp.value = raw;
-        inp.dataset.col = col;
-        inp.dataset.origVal = raw;
-        td.textContent = '';
-        td.appendChild(inp);
-      });
-      var editTd = tr.querySelector('.td-edit-btn');
-      if(editTd) editTd.innerHTML =
-        '<button class="opv-edit-save" onclick="_rvSaveGeneric(this,\''+tipe+'\')" title="Simpan"><i class="fas fa-check"></i></button>'+
-        '<button class="opv-edit-cancel" onclick="_rvCancelGeneric()" title="Batal"><i class="fas fa-times"></i></button>';
-    }
-
-    function _rvCancelGeneric(){
-      document.querySelectorAll('.tr-editing').forEach(function(tr){
-        // Skip opname rows yang punya handler sendiri
-        if(tr.closest('#opnameViewBody')) return;
-        tr.classList.remove('tr-editing');
-        tr.querySelectorAll('td.td-editable').forEach(function(td){
-          var inp = td.querySelector('input');
-          td.classList.remove('td-editable');
-          td.textContent = inp ? inp.dataset.origVal : (td._origText||'');
-        });
-        var editTd = tr.querySelector('.td-edit-btn');
-        if(editTd){
-          var tipe = tr.dataset.subtipe !== undefined ? 'fifo' : 'qt';
-          if(tr.closest('#qtViewBody')) tipe='qt';
-          if(tr.closest('#fifoViewBody')) tipe='fifo';
-          if(tr.closest('#srTable')) tipe='sj';
-          editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
-        }
-      });
-      _rvGenericPending = null;
-    }
-
-    function _rvSaveGeneric(btn, tipe){
-      var tr = btn.closest('tr');
-      var rowData = tr.dataset.row ? JSON.parse(decodeURIComponent(tr.dataset.row)) : null;
-      var changedCols = [];
-      tr.querySelectorAll('td.td-editable input').forEach(function(inp){
-        var newVal = inp.value.trim();
-        var origVal = String(inp.dataset.origVal||'').trim();
-        changedCols.push({col: inp.dataset.col, value: newVal, orig: origVal});
-      });
-      var hasChange = changedCols.some(function(c){ return c.value !== c.orig; });
-      if(!hasChange){ _rvCancelGeneric(); return; }
-      _rvGenericPending = {tr:tr, rowData:rowData, changedCols:changedCols, tipe:tipe};
-      // Tampilkan modal alasan revisi
-      document.getElementById('revisiAlasan').value = '';
-      var modal = document.getElementById('revisiModal');
-      // Override confirm button untuk generic
-      document.getElementById('revisiConfirmBtn').onclick = _rvGenericConfirm;
-      modal.classList.add('show');
-      setTimeout(function(){ document.getElementById('revisiAlasan').focus(); }, 100);
-    }
-
-    function _rvGenericConfirm(){
-      var alasan = document.getElementById('revisiAlasan').value.trim();
-      if(!alasan){
-        document.getElementById('revisiAlasan').style.borderColor='#e53e3e';
-        document.getElementById('revisiAlasan').focus();
-        return;
-      }
-      document.getElementById('revisiAlasan').style.borderColor='';
-      document.getElementById('revisiModal').classList.remove('show');
-      // Restore confirm button ke handler asli
-      document.getElementById('revisiConfirmBtn').onclick = _revisiConfirm;
-      if(!_rvGenericPending) return;
-
-      var pending = _rvGenericPending; _rvGenericPending = null;
-      var tr = pending.tr, rowData = pending.rowData, tipe = pending.tipe;
-
-      // Bangun newRow dari rowData + perubahan
-      var newRow = rowData ? rowData.slice() : [];
-      pending.changedCols.forEach(function(c){
-        var idx = parseInt(c.col);
-        if(!isNaN(idx)) newRow[idx] = c.value;
-      });
-
-      var editTd = tr.querySelector('.td-edit-btn');
-      if(editTd) editTd.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#718096;font-size:13px;"></i>';
-
-      var gasFn = tipe==='fifo' ? (tr.dataset.subtipe==='EKSPOR'?'updateFifoEksporRow':'updateFifoRow')
-                : tipe==='qt'   ? 'updateQtReadyRow'
-                : 'updateSjRekapRow';
-
-      google.script.run /* TODO: manual replace google.script.run */
-        .withSuccessHandler(function(res){
-          if(res&&res.success){
-            pending.changedCols.forEach(function(c){
-              var td = tr.querySelector('td[data-col="'+c.col+'"]');
-              if(td){ td.classList.remove('td-editable'); td.textContent = c.value; }
-            });
-            tr.classList.remove('tr-editing');
-            tr.style.background='#c6f6d5';
-            setTimeout(function(){ tr.style.background=''; },1200);
-            if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
-            // Update dataset
-            tr.dataset.row = encodeURIComponent(JSON.stringify(newRow));
-          } else {
-            alert('Gagal: '+(res&&res.message||'unknown'));
-            _rvCancelGeneric();
-            if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
-          }
-        })
-        .withFailureHandler(function(e){
-          alert('Error: '+e.message);
-          _rvCancelGeneric();
-          if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
-        })
-        [gasFn]({row: newRow, alasan: alasan});
-    } // end _rvGenericConfirm
-
-    // =============================================
-    // STD EDIT — Dashboard tab Lokal/Ekspor/GDFG
-    // =============================================
-    var _stdPending = null; // {tr, rowData, headers, changedCells}
-    var _stdSelectedPlant = '';
-
-    function _stdEdit(btn){
-      var tr = btn.closest('tr');
-      if(tr.classList.contains('tr-std-editing')) return;
-
-      // Cancel existing edit
-      _stdCancelActive();
-
-      tr.classList.add('tr-std-editing');
-
-      // Make editable cells into inputs
-      tr.querySelectorAll('td[data-stdcol]').forEach(function(td){
-        var origVal = td.textContent.trim();
-        // Strip badge text if any
-        var badge = td.querySelector('.std-kosong-badge');
-        if(badge) badge.remove();
-        td.classList.add('td-std-editable');
-        var inp = document.createElement('input');
-        inp.value = origVal;
-        inp.dataset.origVal = origVal;
-        inp.dataset.stdcol = td.dataset.stdcol;
-        inp.dataset.stdkey = td.dataset.stdkey;
-        td.textContent = '';
-        td.appendChild(inp);
-      });
-
-      // Replace pencil with save/cancel
-      var editTd = tr.querySelector('.td-std-edit-btn');
-      editTd.innerHTML =
-        '<button class="std-save-btn" onclick="_stdSave(this)"><i class="fas fa-check"></i></button>' +
-        '<button class="std-cancel-btn" onclick="_stdCancelActive()"><i class="fas fa-times"></i></button>';
-    }
-
-    function _stdCancelActive(){
-      document.querySelectorAll('.tr-std-editing').forEach(function(tr){
-        tr.classList.remove('tr-std-editing');
-        tr.querySelectorAll('td.td-std-editable').forEach(function(td){
-          var inp = td.querySelector('input');
-          td.classList.remove('td-std-editable');
-          td.textContent = inp ? inp.dataset.origVal : '';
-        });
-        var editTd = tr.querySelector('.td-std-edit-btn');
-        if(editTd) editTd.innerHTML = '<button class="std-edit-btn" onclick="_stdEdit(this)" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
-      });
-      _stdPending = null;
-      _stdSelectedPlant = '';
-    }
-
-    function _stdSave(btn){
-      var tr = btn.closest('tr');
-      var rowData  = JSON.parse(decodeURIComponent(tr.dataset.stdrow));
-      var headers  = JSON.parse(decodeURIComponent(tr.dataset.stdhdr));
-
-      var changedCells = [];
-      tr.querySelectorAll('td.td-std-editable input').forEach(function(inp){
-        changedCells.push({
-          col: Number(inp.dataset.stdcol),
-          key: inp.dataset.stdkey,
-          value: inp.value.trim(),
-          orig: inp.dataset.origVal.trim()
-        });
-      });
-
-      var hasChange = changedCells.some(function(c){ return c.value !== c.orig; });
-      if(!hasChange){ _stdCancelActive(); return; }
-
-      _stdPending = {tr: tr, rowData: rowData, headers: headers, changedCells: changedCells};
-      _stdSelectedPlant = '';
-
-      // Reset plant selection and show modal
-      document.querySelectorAll('.std-plant-opt').forEach(function(el){ el.classList.remove('selected'); });
-      document.getElementById('stdPlantModal').classList.add('show');
-    }
-
-    function _stdPlantSelect(el, plant){
-      document.querySelectorAll('.std-plant-opt').forEach(function(o){ o.classList.remove('selected'); });
-      el.classList.add('selected');
-      _stdSelectedPlant = plant;
-    }
-
-    function _stdPlantCancel(){
-      document.getElementById('stdPlantModal').classList.remove('show');
-      _stdCancelActive();
-      _stdPending = null;
-      _stdSelectedPlant = '';
-    }
-
-    function _stdPlantConfirm(){
-      if(!_stdSelectedPlant){
-        // Shake effect via inline style (GAS CSP safe)
-        var box = document.getElementById('stdPlantModalBox');
-        box.style.transform = 'translateX(-8px)';
-        setTimeout(function(){ box.style.transform='translateX(8px)'; }, 80);
-        setTimeout(function(){ box.style.transform='translateX(-5px)'; }, 160);
-        setTimeout(function(){ box.style.transform='translateX(0)'; }, 240);
-        return;
-      }
-      document.getElementById('stdPlantModal').classList.remove('show');
-
-      if(!_stdPending) return;
-      var pending  = _stdPending;
-      _stdPending  = null;
-      var tr       = pending.tr;
-      var rowData  = pending.rowData;
-      var headers  = pending.headers;
-      var changed  = pending.changedCells;
-
-      // Build payload: ambil nilai dari rowData + timpa dengan nilai baru
-      // Header mapping: [0]=SKU/MatCode, [1]=Nama, [2]=QTY, [3]=STD, [4]=JmlPallet, [5]=Divisi
-      var getValue = function(keyIdx){
-        var c = changed.find(function(x){ return x.col === keyIdx; });
-        return c ? c.value : (rowData[headers[keyIdx]]||'');
-      };
-
-      var payload = {
-        sku   : getValue(0),
-        nama  : getValue(1),
-        std   : Number(getValue(3)) || 0,
-        divisi: getValue(5),
-        plant : _stdSelectedPlant
-      };
-      _stdSelectedPlant = '';
-
-      // Show spinner
-      var editTd = tr.querySelector('.td-std-edit-btn');
-      if(editTd) editTd.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#718096;font-size:12px;"></i>';
-
-      google.script.run /* TODO: manual replace google.script.run */
-        .withSuccessHandler(function(res){
-          if(res && res.success){
-            // Update display with new values
-            changed.forEach(function(c){
-              var td = tr.querySelector('td[data-stdcol="'+c.col+'"]');
-              if(td){ td.classList.remove('td-std-editable'); td.textContent = c.value; }
-            });
-            tr.classList.remove('tr-std-editing');
-            tr.style.background = '#c6f6d5';
-            // Refresh section setelah 1.4 detik (setelah flash hijau)
-            var contentEl = tr.closest('[id$="Content"]');
-            var section   = contentEl ? contentEl.id.replace('Content','') : null;
-            setTimeout(function(){
-              tr.style.background = '';
-              if(section && typeof loadSection === 'function') loadSection(section);
-            }, 1400);
-            if(editTd) editTd.innerHTML = '<button class="std-edit-btn" onclick="_stdEdit(this)" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
-            // Update rowData dataset
-            changed.forEach(function(c){ rowData[headers[c.col]] = c.value; });
-            tr.dataset.stdrow = encodeURIComponent(JSON.stringify(rowData));
-          } else {
-            alert('Gagal menyimpan: ' + (res&&res.message?res.message:'Unknown error'));
-            _stdCancelActive();
-          }
-        })
-        .withFailureHandler(function(e){
-          alert('Error: ' + e.message);
-          _stdCancelActive();
-        })
-        .saveStdEdit(payload);
-    }
-
-
-  // MONITORING RDC — JS
-  // =============================================
-
-  // ── State ──
-  var _rdcZoom   = 100;
-  var _rdcSel    = {r1:-1,c1:-1,r2:-1,c2:-1};
-  var _rdcDrag   = false;
-
-  // Urutan kolom editable (sesuai urutan td di baris)
-  // Index 0 = td pertama setelah td-no
-  var RDC_COLS = [
-    {key:'plant',      grpSep:false},
-    {key:'docno',      grpSep:false},
-    {key:'no_do_sap',  grpSep:false},
-    {key:'no_spe_sap', grpSep:false},
-    {key:'ship_to',    grpSep:false},
-    {key:'ekspedisi',  grpSep:false},
-    {key:'no_pol',     grpSep:false},
-    {key:'route',      grpSep:false},
-    {key:'jenis_mob',  grpSep:false},
-    {key:'sch_muat',   grpSep:true},
-    {key:'sch_selesai',grpSep:false},
-    {key:'std_durasi', grpSep:true},
-    {key:'in_dt',      grpSep:true},
-    {key:'sl_dt',      grpSep:false},
-    {key:'fl_dt',      grpSep:false},
-    {key:'out_dt',     grpSep:false}
-  ];
-  var RDC_NCOLS = RDC_COLS.length; // 16 kolom editable (plant,docno,no_do_sap,no_spe_sap,ship_to,ekspedisi,no_pol,route,jenis_mob,sch_muat,sch_selesai,std_durasi,in_dt,sl_dt,fl_dt,out_dt)
-
-  // ── Helpers ──
-  function _rdcTbody(){ return document.getElementById('rdcInputTbody'); }
-  function _rdcTbl()  { return document.getElementById('rdcInputTbl'); }
-
-  function _rdcAllTds(){
-    // Returns 2D array [rowIdx][colIdx] of editable tds only
-    var trs = Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr'));
-    return trs.map(function(tr){
-      return RDC_COLS.map(function(col){
-        return tr.querySelector('[data-key="'+col.key+'"]');
-      });
-    });
-  }
-
-  function _rdcTrIdx(tr){
-    return Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr')).indexOf(tr);
-  }
-  function _rdcTcIdx(td){
-    var k = td.getAttribute('data-key');
-    for(var i=0;i<RDC_COLS.length;i++){ if(RDC_COLS[i].key===k) return i; }
-    return -1;
-  }
-
-  function _rdcFocus(ri,ci){
-    var grid=_rdcAllTds(), nRows=grid.length;
-    ri=Math.max(0,Math.min(nRows-1,ri));
-    ci=Math.max(0,Math.min(RDC_NCOLS-1,ci));
-    var td=grid[ri]&&grid[ri][ci];
-    if(td&&td.contentEditable==='true'){ td.focus(); td.scrollIntoView&&td.scrollIntoView({block:'nearest',inline:'nearest'}); }
-  }
-
-  function _rdcClearSel(){
-    document.querySelectorAll('#rdcInputTbl .rdc-sel').forEach(function(el){ el.classList.remove('rdc-sel'); });
-    _rdcSel={r1:-1,c1:-1,r2:-1,c2:-1};
-  }
-
-  function _rdcApplySel(){
-    document.querySelectorAll('#rdcInputTbl .rdc-sel').forEach(function(el){ el.classList.remove('rdc-sel'); });
-    if(_rdcSel.r1<0) return;
-    var trs=Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr'));
-    var r1=Math.min(_rdcSel.r1,_rdcSel.r2), r2=Math.max(_rdcSel.r1,_rdcSel.r2);
-    var c1=Math.min(_rdcSel.c1,_rdcSel.c2), c2=Math.max(_rdcSel.c1,_rdcSel.c2);
-    for(var r=r1;r<=r2;r++){
-      if(!trs[r]) continue;
-      for(var ci=c1;ci<=c2;ci++){
-        var td=trs[r].querySelector('[data-key="'+RDC_COLS[ci].key+'"]');
-        if(td) td.classList.add('rdc-sel');
-      }
-    }
-  }
-
-  function _rdcCopyBlock(){
-    var trs=Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr'));
-    var r1=Math.min(_rdcSel.r1,_rdcSel.r2), r2=Math.max(_rdcSel.r1,_rdcSel.r2);
-    var c1=Math.min(_rdcSel.c1,_rdcSel.c2), c2=Math.max(_rdcSel.c1,_rdcSel.c2);
-    var lines=[];
-    for(var r=r1;r<=r2;r++){
-      if(!trs[r]) continue;
-      var cells=[];
-      for(var ci=c1;ci<=c2;ci++){
-        var td=trs[r].querySelector('[data-key="'+RDC_COLS[ci].key+'"]');
-        cells.push(td?td.textContent.trim():'');
-      }
-      lines.push(cells.join('\t'));
-    }
-    var text=lines.join('\n');
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text);
-    } else {
-      var ta=document.createElement('textarea');
-      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
-    }
-    var nr=r2-r1+1, nc=c2-c1+1;
-    showToast('&#128203; Copied '+nr+'R \u00d7 '+nc+'K','');
-  }
-
-  // ── Build table ──
   function rdcInitPage(){
     var today=new Date();
     var yyyy=today.getFullYear();
@@ -970,8 +407,9 @@
 
     var payload={tanggal:tgl, rows:data};
 
-    API.saveRdcData(payload,
-      function(res){
+    if(typeof google!=='undefined'&&google.script&&google.script.run){
+      google.script.run
+        .withSuccessHandler(function(res){
           if(btnSave){ btnSave.disabled=false; btnSave.innerHTML='<i class="fas fa-save" style="margin-right:5px;"></i>Simpan Data'; }
           if(res&&res.success){
             showToast('✓ '+res.message,'');
@@ -979,11 +417,12 @@
           } else {
             showToast('✖ '+(res?res.message:'Gagal menyimpan'),'err');
           }
-        },
-      function(err){
+        })
+        .withFailureHandler(function(err){
           if(btnSave){ btnSave.disabled=false; btnSave.innerHTML='<i class="fas fa-save" style="margin-right:5px;"></i>Simpan Data'; }
           showToast('✖ Error: '+err.message,'err');
-        });
+        })
+        .saveRdcData(payload);
     } else {
       // Preview mode
       if(btnSave){ btnSave.disabled=false; btnSave.innerHTML='<i class="fas fa-save" style="margin-right:5px;"></i>Simpan Data'; }
@@ -1184,16 +623,18 @@
     function resetBtn(){ if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-search"></i> Tampilkan'; } }
 
     // Ambil semua data lalu filter sl_dt (Start Loading) di frontend
-    API.getRdcData(function(res){
+    google.script.run
+      .withSuccessHandler(function(res){
         resetBtn();
         _rdcData = (res && res.success) ? (res.data || []) : [];
         _rdcRenderSummary(fP, fST, fd, ft);
-      },
-      function(){
+      })
+      .withFailureHandler(function(){
         resetBtn();
         _rdcData = [];
         _rdcRenderSummary(fP, fST, fd, ft);
-      });
+      })
+      .getRdcData('', ''); // kirim kosong → ambil semua, filter di frontend
   }
 
   function _rdcRenderSummary(fP, fST, fd, ft){
@@ -1829,8 +1270,9 @@
     overlay.classList.add('show');
 
     // Ambil TIM dari GAS
-    API.getRdcTim(r.sl_dt, '',
-      function(res){
+    if(true){
+      google.script.run
+        .withSuccessHandler(function(res){
           if(res && res.success){
             document.getElementById('rdcPopupTim').textContent = res.tim || '-';
             var shiftLabel = res.shift==='1'?'Shift 1 (07:00-14:59)':
@@ -1841,11 +1283,12 @@
             document.getElementById('rdcPopupTim').textContent = '-';
             document.getElementById('rdcPopupShiftInfo').textContent = 'Data tidak ditemukan';
           }
-        },
-      function(){
+        })
+        .withFailureHandler(function(){
           document.getElementById('rdcPopupTim').textContent = '-';
           document.getElementById('rdcPopupShiftInfo').textContent = 'Gagal memuat';
-        });
+        })
+        .getRdcTim(r.sl_dt, '');
     } else {
       // Preview mode — ekstrak jam dari sl_dt untuk hitung shift lokal
       var shift = '-';
@@ -1874,8 +1317,9 @@
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px;"></i>Menyimpan...';
 
-    API.saveRdcCatatan({docno:_rdcPopupRow.docno, no_pol:_rdcPopupRow.no_pol, catatan:catatan},
-      function(res){
+    if(true){
+      google.script.run
+        .withSuccessHandler(function(res){
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-save" style="margin-right:5px;"></i>Simpan Catatan';
           if(res && res.success){
@@ -1885,12 +1329,13 @@
           } else {
             showToast('\u2716 '+(res?res.message:'Gagal'),'err');
           }
-        },
-      function(err){
+        })
+        .withFailureHandler(function(err){
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-save" style="margin-right:5px;"></i>Simpan Catatan';
           showToast('\u2716 Error: '+err.message,'err');
-        });
+        })
+        .saveRdcCatatan({docno:_rdcPopupRow.docno, no_pol:_rdcPopupRow.no_pol, catatan:catatan});
     } else {
       // Preview
       btn.disabled = false;
@@ -1921,7 +1366,7 @@
     var str = seq.join(',');
     _patternCache = seq.slice();
     _patternLoaded = true;
-    if(typeof google !== 'undefined' && google.script && google.script.run){ /* TODO: manual replace google.script.run */
+    if(true){
       API.saveOpnamePattern(_currentUser, str);
     } else {
       try{ sessionStorage.setItem(_PATTERN_KEY+'_'+_currentUser, str); }catch(e){}
@@ -1931,7 +1376,7 @@
   function _patternClear(){
     _patternCache = null;
     _patternLoaded = true;
-    if(typeof google !== 'undefined' && google.script && google.script.run){ /* TODO: manual replace google.script.run */
+    if(true){
       API.saveOpnamePattern(_currentUser, '');
     } else {
       try{ sessionStorage.removeItem(_PATTERN_KEY+'_'+_currentUser); }catch(e){}
@@ -1944,8 +1389,9 @@
       cb(_patternCache);
       return;
     }
-    API.loadOpnamePattern(_currentUser,
-      function(res){
+    if(true){
+      google.script.run
+        .withSuccessHandler(function(res){
           if(res && res.success && res.pattern){
             _patternCache = res.pattern.split(',').map(Number);
           } else {
@@ -1953,12 +1399,13 @@
           }
           _patternLoaded = true;
           cb(_patternCache);
-        },
-      function(){
+        })
+        .withFailureHandler(function(){
           _patternCache = null;
           _patternLoaded = true;
           cb(null);
-        });
+        })
+        .loadOpnamePattern(_currentUser);
     } else {
       // Preview mode: pakai sessionStorage per user
       try{
@@ -1968,4 +1415,426 @@
       _patternLoaded = true;
       cb(_patternCache);
     }
+  }
+
+  // ── Buka overlay pattern lock ──
+  function _patternOpen(onSuccess){
+    _patternLoadAsync(function(saved){
+      if(!saved){
+        // Belum ada pola — langsung masuk
+        onSuccess && onSuccess();
+        return;
+      }
+      _patternSuccess = onSuccess;
+      _patternSeq = [];
+      _patternReset();
+      document.getElementById('patternSubtitle').textContent = 'Masukkan pola untuk melanjutkan';
+      document.getElementById('patternOverlay').classList.add('show');
+    });
+  }
+
+  function _patternCancel(){
+    document.getElementById('patternOverlay').classList.remove('show');
+    _patternSeq = [];
+    _patternSuccess = null;
+  }
+
+  function _patternReset(){ _patternSeq=[]; _patternDrawLines([]); document.querySelectorAll('.pdot').forEach(function(d){ d.classList.remove('active','error','success'); }); }
+
+  function _patternGetDotCenter(i){
+    var dots = document.getElementById('patternDots');
+    var wrap = document.getElementById('patternDotsWrap');
+    var dot  = dots.querySelectorAll('.pdot')[i];
+    if(!dot||!wrap) return {x:0,y:0};
+    var wr = wrap.getBoundingClientRect();
+    var dr = dot.getBoundingClientRect();
+    return { x: dr.left+dr.width/2 - wr.left, y: dr.top+dr.height/2 - wr.top };
+  }
+
+  function _patternDrawLines(seq, curX, curY){
+    var svg = document.getElementById('patternSvg');
+    var wrap= document.getElementById('patternDotsWrap');
+    if(!svg||!wrap) return;
+    svg.style.width  = wrap.offsetWidth  + 'px';
+    svg.style.height = wrap.offsetHeight + 'px';
+    var lines = '';
+    for(var i=1;i<seq.length;i++){
+      var a=_patternGetDotCenter(seq[i-1]), b=_patternGetDotCenter(seq[i]);
+      lines += '<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>';
+    }
+    if(seq.length && curX !== undefined){
+      var last=_patternGetDotCenter(seq[seq.length-1]);
+      var wr=wrap.getBoundingClientRect();
+      lines += '<line x1="'+last.x+'" y1="'+last.y+'" x2="'+(curX-wr.left)+'" y2="'+(curY-wr.top)+'" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" opacity=".4" stroke-dasharray="4"/>';
+    }
+    svg.innerHTML = lines;
+  }
+
+  function _patternBindEvents(){
+    var dots = document.querySelectorAll('#patternDots .pdot');
+    var wrap = document.getElementById('patternDotsWrap');
+
+    function startDot(i){
+      if(_patternSeq.indexOf(i)<0){
+        _patternSeq.push(i);
+        dots[i].classList.add('active');
+        _patternDrawLines(_patternSeq);
+      }
+    }
+
+    function hitTest(clientX, clientY){
+      dots.forEach(function(d){
+        var r=d.getBoundingClientRect();
+        var i=parseInt(d.dataset.i);
+        if(clientX>=r.left&&clientX<=r.right&&clientY>=r.top&&clientY<=r.bottom && _patternSeq.indexOf(i)<0){
+          _patternSeq.push(i);
+          d.classList.add('active');
+        }
+      });
+      _patternDrawLines(_patternSeq, clientX, clientY);
+    }
+
+    dots.forEach(function(d){
+      d.addEventListener('mousedown',function(e){ e.preventDefault(); _patternDragging=true; startDot(parseInt(d.dataset.i)); });
+      d.addEventListener('touchstart',function(e){ e.preventDefault(); _patternDragging=true; startDot(parseInt(d.dataset.i)); },{passive:false});
+    });
+    wrap.addEventListener('mousemove',function(e){ if(!_patternDragging) return; hitTest(e.clientX,e.clientY); });
+    wrap.addEventListener('touchmove',function(e){ e.preventDefault(); if(!_patternDragging) return; var t=e.touches[0]; hitTest(t.clientX,t.clientY); },{passive:false});
+
+    function endDraw(){
+      if(!_patternDragging) return;
+      _patternDragging=false;
+      if(_patternSeq.length >= 4) _patternCheck();
+      else { _patternFlash('error','Min. 4 titik'); }
+    }
+    document.addEventListener('mouseup', endDraw);
+    document.addEventListener('touchend', endDraw);
+  }
+
+  function _patternCheck(){
+    var saved = _patternCache;
+    if(!saved){ _patternCancel(); _patternSuccess&&_patternSuccess(); return; }
+    var ok = (JSON.stringify(_patternSeq) === JSON.stringify(saved));
+    if(ok){
+      _patternFlash('success','✓ Pola benar', function(){
+        document.getElementById('patternOverlay').classList.remove('show');
+        _patternSuccess && _patternSuccess();
+        _patternSuccess = null;
+      });
+    } else {
+      _patternFlash('error','✗ Pola salah, coba lagi');
+    }
+  }
+
+  function _patternFlash(type, msg, cb){
+    document.querySelectorAll('#patternDots .pdot').forEach(function(d){ d.classList.remove('active'); d.classList.add(type); });
+    _patternDrawLines([]);
+    document.getElementById('patternSubtitle').textContent = msg;
+    setTimeout(function(){
+      document.querySelectorAll('#patternDots .pdot').forEach(function(d){ d.classList.remove(type,'active'); });
+      _patternSeq=[];
+      if(cb) cb();
+      else document.getElementById('patternSubtitle').textContent='Masukkan pola untuk melanjutkan';
+    }, 700);
+  }
+
+  // ── Setting Pola ──
+  function _psOpen(){
+    document.getElementById('patternSettingOverlay').classList.add('show');
+    document.getElementById('psettingPwInput').value='';
+    document.getElementById('psettingErr').textContent='';
+    ['psStep1','psStep2','psStep3'].forEach(function(s){ document.getElementById(s).classList.remove('active'); });
+    document.getElementById('psStep1').classList.add('active');
+    setTimeout(function(){ document.getElementById('psettingPwInput').focus(); }, 300);
+  }
+
+  function _psClose(){
+    document.getElementById('patternSettingOverlay').classList.remove('show');
+    _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1;
+    _psNewReset();
+  }
+
+  function _psCheckPassword(){
+    var pw = document.getElementById('psettingPwInput').value;
+    if(pw === _PATTERN_PW){
+      document.getElementById('psettingErr').textContent='';
+      document.getElementById('psStep1').classList.remove('active');
+      document.getElementById('psStep2').classList.add('active');
+    } else {
+      document.getElementById('psettingErr').textContent='Password salah.';
+      document.getElementById('psettingPwInput').select();
+    }
+  }
+
+  function _psGoSetNew(){
+    document.getElementById('psStep2').classList.remove('active');
+    document.getElementById('psStep3').classList.add('active');
+    _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1;
+    _psNewReset();
+    document.getElementById('psStep3Hint').textContent='Gambar pola baru Anda (min. 4 titik)';
+    document.getElementById('psettingHint').textContent='Gambar pola di atas';
+    _psBindNewDots();
+  }
+
+  function _psRemovePattern(){
+    _patternClear();
+    _psClose();
+    showToast('✓ Pola dihapus — Riwayat tidak terkunci','');
+  }
+
+  var _psNewDragging = false;
+  var _psNewSeqCurrent = [];
+
+  function _psNewReset(){
+    _psNewSeqCurrent=[];
+    document.querySelectorAll('#psettingNewDots .psnewdot').forEach(function(d){ d.classList.remove('active'); });
+    document.getElementById('psNewSvg').innerHTML='';
+  }
+
+  function _psNewGetCenter(i){
+    var wrap = document.getElementById('psNewDotsWrap');
+    var dot  = document.querySelectorAll('#psettingNewDots .psnewdot')[i];
+    if(!dot||!wrap) return {x:0,y:0};
+    var wr=wrap.getBoundingClientRect(), dr=dot.getBoundingClientRect();
+    return {x:dr.left+dr.width/2-wr.left, y:dr.top+dr.height/2-wr.top};
+  }
+
+  function _psNewDrawLines(seq, curX, curY){
+    var svg = document.getElementById('psNewSvg');
+    var wrap= document.getElementById('psNewDotsWrap');
+    if(!svg||!wrap) return;
+    svg.style.width=wrap.offsetWidth+'px'; svg.style.height=wrap.offsetHeight+'px';
+    var lines='';
+    for(var i=1;i<seq.length;i++){
+      var a=_psNewGetCenter(seq[i-1]),b=_psNewGetCenter(seq[i]);
+      lines+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#3182ce" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>';
+    }
+    if(seq.length&&curX!==undefined){
+      var last=_psNewGetCenter(seq[seq.length-1]);
+      var wr=wrap.getBoundingClientRect();
+      lines+='<line x1="'+last.x+'" y1="'+last.y+'" x2="'+(curX-wr.left)+'" y2="'+(curY-wr.top)+'" stroke="#3182ce" stroke-width="2" stroke-linecap="round" opacity=".4" stroke-dasharray="4"/>';
+    }
+    svg.innerHTML=lines;
+  }
+
+  function _psBindNewDots(){
+    var dots = document.querySelectorAll('#psettingNewDots .psnewdot');
+    var wrap = document.getElementById('psNewDotsWrap');
+
+    function startDot(i){ if(_psNewSeqCurrent.indexOf(i)<0){ _psNewSeqCurrent.push(i); dots[i].classList.add('active'); _psNewDrawLines(_psNewSeqCurrent); } }
+    function hitTest(cx,cy){
+      dots.forEach(function(d){
+        var r=d.getBoundingClientRect(), i=parseInt(d.dataset.i);
+        if(cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom&&_psNewSeqCurrent.indexOf(i)<0){ _psNewSeqCurrent.push(i); d.classList.add('active'); }
+      });
+      _psNewDrawLines(_psNewSeqCurrent,cx,cy);
+    }
+
+    dots.forEach(function(d){
+      d.addEventListener('mousedown',function(e){ e.preventDefault(); _psNewDragging=true; startDot(parseInt(d.dataset.i)); });
+      d.addEventListener('touchstart',function(e){ e.preventDefault(); _psNewDragging=true; startDot(parseInt(d.dataset.i)); },{passive:false});
+    });
+    wrap.addEventListener('mousemove',function(e){ if(!_psNewDragging)return; hitTest(e.clientX,e.clientY); });
+    wrap.addEventListener('touchmove',function(e){ e.preventDefault(); if(!_psNewDragging)return; var t=e.touches[0]; hitTest(t.clientX,t.clientY); },{passive:false});
+
+    function endDraw(){
+      if(!_psNewDragging)return; _psNewDragging=false;
+      if(_psNewSeqCurrent.length<4){ document.getElementById('psettingHint').textContent='Min. 4 titik, ulangi'; _psNewReset(); return; }
+      if(_psNewPhase===1){
+        _psNewSeq1 = _psNewSeqCurrent.slice();
+        _psNewPhase = 2;
+        _psNewReset();
+        document.getElementById('psStep3Hint').textContent='Konfirmasi pola';
+        document.getElementById('psettingHint').textContent='Gambar ulang pola yang sama';
+      } else {
+        _psNewSeq2 = _psNewSeqCurrent.slice();
+        if(JSON.stringify(_psNewSeq1)===JSON.stringify(_psNewSeq2)){
+          _patternSave(_psNewSeq1);
+          _psClose();
+          showToast('✓ Pola berhasil disimpan','');
+        } else {
+          document.getElementById('psettingHint').textContent='✗ Pola tidak cocok, mulai ulang';
+          _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1;
+          setTimeout(function(){ _psNewReset(); document.getElementById('psStep3Hint').textContent='Gambar pola baru Anda (min. 4 titik)'; document.getElementById('psettingHint').textContent='Gambar pola di atas'; }, 800);
+        }
+      }
+    }
+    document.addEventListener('mouseup',endDraw);
+    document.addEventListener('touchend',endDraw);
+  }
+
+  function _psResetNew(){ _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1; _psNewReset(); document.getElementById('psStep3Hint').textContent='Gambar pola baru Anda (min. 4 titik)'; document.getElementById('psettingHint').textContent='Gambar pola di atas'; }
+
+  // Init pattern events on load
+  function sjToggleSSMenu(){
+    var menu=document.getElementById('sjSSMenu');
+    if(!menu)return;
+    var isOpen=menu.style.display!=='none';
+    menu.style.display=isOpen?'none':'block';
+  }
+  // Tutup dropdown saat klik di luar
+  document.addEventListener('click',function(e){
+    var wrap=document.getElementById('sjSSDropWrap');
+    var menu=document.getElementById('sjSSMenu');
+    if(menu&&wrap&&!wrap.contains(e.target)) menu.style.display='none';
+  });
+
+  window.addEventListener('load', function(){ _patternBindEvents(); });
+
+  // =============================================
+  // STOCK JALUR PAGE
+  // =============================================
+  var _sjZoom=100, _soZoom=100, _sjActiveTab='input';
+  var _sjSel={r1:-1,c1:-1,r2:-1,c2:-1}, _sjDragging=false;
+  var _soSel={r1:-1,c1:-1,r2:-1,c2:-1}, _soDragging=false;
+  var _sjInitDone=false;
+  var _srCurrentSheet=''; // sheet name aktif untuk edit rekap
+  var _srCurrentSsUrl=''; // ssUrl aktif untuk edit rekap
+
+  var SJ_COLS=['prodate','sku','nama','qty','shift','plant','catatan','status'];
+  var SO_COLS=['prodate','sku','nama','qty','tglkeluar','nomobil','nodo','tujuan','plant','catatan','status'];
+  // STATUS saja yang auto (tidak bisa diedit) — NAMA BARANG bisa diedit
+  var SJ_AUTO={'status':true};
+  var SO_AUTO={'status':true};
+
+  function _sjFallbackCopy(text){
+    var ta=document.createElement('textarea');
+    ta.value=text; ta.style.cssText='position:fixed;top:0;left:0;width:2px;height:2px;opacity:0;';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try{ document.execCommand('copy'); }catch(ex){}
+    document.body.removeChild(ta);
+  }
+  function _sjRawText(td){ return td?(td.textContent||'').trim():''; }
+
+  function _sjApplyShiftBadge(td){
+    var v=_sjRawText(td); td.innerHTML=''; if(!v)return;
+    var cls={'1':'sj-shift-1','2':'sj-shift-2','3':'sj-shift-3'}[v];
+    if(cls){var s=document.createElement('span');s.className=cls;s.textContent='Shift '+v;td.appendChild(s);}else td.textContent=v;
+  }
+  function _sjApplyPlantBadge(td,pfx){
+    var v=_sjRawText(td); td.innerHTML=''; if(!v)return;
+    var p=pfx||'sj';
+    var cls={'1111':p+'-plant-1111','1112':p+'-plant-1112','1113':p+'-plant-1113'}[v];
+    if(cls){var s=document.createElement('span');s.className=cls;s.textContent=v;td.appendChild(s);}else td.textContent=v;
+  }
+  function _sjApplyStatusBadge(td,pfx){
+    var v=_sjRawText(td); td.innerHTML=''; if(!v)return;
+    var p=pfx||'sj';
+    var cls=v==='DONE'?p+'-status-done':(v.indexOf('Error')>=0||v.indexOf('kurang')>=0?p+'-status-error':'so-status-warn');
+    var s=document.createElement('span');s.className=cls;s.textContent=v;td.appendChild(s);
+  }
+
+  // Lookup nama — pakai _opnameNamaMap (shared), hanya auto-fill jika sel masih kosong
+  function _sjGetNama(sku){
+    if(typeof _opnameNamaMap!=='undefined'&&_opnameNamaMap[sku]) return _opnameNamaMap[sku];
+    if(typeof _skuNamaMap!=='undefined'&&_skuNamaMap[sku]) return _skuNamaMap[sku];
+    return null;
+  }
+  var _sjStdLoading = false;   // sedang load STD
+  var _sjStdLoaded  = false;   // sudah selesai load
+  var _sjPendingLookup = [];   // [{tr, namaCol}] yang menunggu data
+
+  function _sjLookupSku(tr, namaCol){
+    var st=tr.querySelector('[data-col="sku"]');
+    var nt=tr.querySelector('[data-col="'+(namaCol||'nama')+'"]');
+    if(!st||!nt) return;
+    var sku=_sjRawText(st);
+    if(!sku){ nt.textContent=''; nt.style.color=''; return; }
+    // Hanya auto-fill jika sel nama masih kosong
+    if(_sjRawText(nt)) return;
+
+    var nama=_sjGetNama(sku);
+    if(nama){
+      nt.textContent=nama; nt.style.color='#2d3748'; return;
+    }
+
+    // Nama tidak ditemukan di map lokal
+    if(_sjStdLoaded){
+      // Data sudah ada tapi SKU benar-benar tidak ada
+      nt.textContent='\u26a0\ufe0f Tidak terdaftar'; nt.style.color='#e53e3e';
+      return;
+    }
+
+    // Data belum ada — queue dan load kalau belum loading
+    nt.textContent='\u23f3 Mencari...'; nt.style.color='#a0aec0';
+    _sjPendingLookup.push({tr:tr, namaCol:namaCol||'nama'});
+
+    if(!_sjStdLoading){
+      _sjStdLoading=true;
+      google.script.run
+        .withSuccessHandler(function(res){
+          _sjStdLoading=false;
+          _sjStdLoaded=true;
+          if(res&&res.success&&res.data) res.data.forEach(function(r){
+            if(r.sku){
+              var sk=String(r.sku).trim();
+              if(typeof _opnameNamaMap!=='undefined') _opnameNamaMap[sk]=_opnameNamaMap[sk]||r.nama||'';
+              if(typeof _skuNamaMap!=='undefined')    _skuNamaMap[sk]   =_skuNamaMap[sk]   ||r.nama||'';
+            }
+          });
+          // Retry semua yang pending
+          var pending=_sjPendingLookup.splice(0);
+          pending.forEach(function(p){
+            var st2=p.tr.querySelector('[data-col="sku"]');
+            var nt2=p.tr.querySelector('[data-col="'+p.namaCol+'"]');
+            if(!st2||!nt2) return;
+            var sku2=_sjRawText(st2);
+            var nama2=_sjGetNama(sku2);
+            if(nama2){ nt2.textContent=nama2; nt2.style.color='#2d3748'; }
+            else { nt2.textContent='\u26a0\ufe0f Tidak terdaftar'; nt2.style.color='#e53e3e'; }
+          });
+        })
+        .withFailureHandler(function(){
+          _sjStdLoading=false; _sjStdLoaded=true;
+          var pending=_sjPendingLookup.splice(0);
+          pending.forEach(function(p){
+            var nt2=p.tr.querySelector('[data-col="'+p.namaCol+'"]');
+            if(nt2){ nt2.textContent='\u26a0\ufe0f Tidak terdaftar'; nt2.style.color='#e53e3e'; }
+          });
+        })
+        .getStandarPalet();
+    }
+  }
+
+  function _sjTrIdx(tbody,tr){ return Array.from(tbody.querySelectorAll('tr')).indexOf(tr); }
+  function _sjTcIdx(cols,td){ return cols.indexOf(td.dataset.col||''); }
+
+  function sjSwitchTab(tab){
+    if(_sjActiveTab===tab)return; _sjActiveTab=tab;
+    var panes={input:'sjInputPane',output:'sjOutputPane',rekap:'sjRekapPane'};
+    var btns={input:'btnSjInput',output:'btnSjOutput',rekap:'btnSjRekap'};
+    // Sembunyikan semua pane dengan animasi fade
+    var curPane=document.getElementById(panes[_sjActiveTab==='input'?'input':_sjActiveTab]);
+    // Cari pane yang sedang tampil
+    var curId=null;
+    ['input','output','rekap'].forEach(function(t){
+      var p=document.getElementById(panes[t]);
+      if(p&&p.style.display!=='none')curId=panes[t];
+    });
+    var cur=curId?document.getElementById(curId):null;
+    var tgt=document.getElementById(panes[tab]);
+    if(!tgt)return;
+    _sjActiveTab=tab;
+    // Update tombol aktif
+    Object.keys(btns).forEach(function(t){
+      var b=document.getElementById(btns[t]);
+      if(b)b.style.background=t===tab?'rgba(255,255,255,.38)':'rgba(255,255,255,.18)';
+    });
+    if(cur&&cur!==tgt){
+      cur.style.transition='opacity .18s ease,transform .18s ease';
+      cur.style.opacity='0'; cur.style.transform='translateX(-24px)';
+      setTimeout(function(){
+        cur.style.display='none'; cur.style.transition=cur.style.opacity=cur.style.transform='';
+        _sjShowPane(tgt);
+      },180);
+    } else {
+      _sjShowPane(tgt);
+    }
+  }
+  function _sjShowPane(tgt){
+    tgt.style.display=''; tgt.style.opacity='0'; tgt.style.transform='translateX(24px)';
+    void tgt.offsetWidth;
+    tgt.style.transition='opacity .18s ease,transform .18s ease';
+    tgt.style.opacity='1'; tgt.style.transform='translateX(0)';
+    setTimeout(function(){tgt.style.transition='';},200);
   }

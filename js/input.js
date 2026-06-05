@@ -1,3 +1,6 @@
+    function updateRowCount(){
+      var n = document.querySelectorAll("#tbodyInput tr").length;
+      var el = document.getElementById('rowCount');
       if(el) el.innerText = n + ' baris';
       var empty = document.getElementById('emptyState');
       if(empty) empty.style.display = n === 0 ? 'block' : 'none';
@@ -78,7 +81,9 @@
           return;
         }
         // Fetch dari server
-        API.getStandarPalet(function(res){
+        if(true){
+          google.script.run
+            .withSuccessHandler(function(res){
               if(res && res.success){
                 res.data.forEach(function(d){
                   _stdLookupMap[d.sku] = {std: Number(d.std)||0, divisi: d.divisi||'', plant: d.plant||''};
@@ -91,7 +96,8 @@
                   calcJml();
                 }
               }
-            });
+            })
+            .getStandarPalet();
         }
       });
 
@@ -134,13 +140,16 @@
     // Pre-load semua STD ke cache saat halaman input dibuka
     function _preloadStdCache(){
       if(Object.keys(_stdLookupMap).length > 0) return;
-      API.getStandarPalet(function(res){
+      if(true){
+        google.script.run
+          .withSuccessHandler(function(res){
             if(res && res.success){
               res.data.forEach(function(d){
                 _stdLookupMap[d.sku] = {std: Number(d.std)||0, divisi: d.divisi||'', plant: d.plant||''};
               });
             }
-          });
+          })
+          .getStandarPalet();
       }
     }
 
@@ -329,8 +338,8 @@
         var isNew=!cached||!cached.std;
         if(isNew) newSkus.push({sku:sku, nama:r[1]||'', std:std, divisi:divisi, plant:plant});
       });
-      API.saveGudangData(gudang, rowsNorm, (document.getElementById('inputDataTanggal')||{}).value||'', newSkus,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           showToast('✅ ' + res.message + (newSkus.length?' (+'+newSkus.length+' SKU baru disimpan ke STD)':''), 'success');
           var _g = document.getElementById('gudangAktif').innerText;
           if(_gudangCache[_g]) delete _gudangCache[_g];
@@ -341,12 +350,13 @@
           newSkus.forEach(function(s){
             _stdLookupMap[s.sku]={std:Number(s.std)||0,divisi:s.divisi,plant:s.plant};
           });
-        },
-        function(){
+        })
+        .withFailureHandler(function(){
           showToast('❌ Gagal menyimpan data', 'error');
           btn.disabled  = false;
           btn.innerHTML = '<i class="fas fa-save"></i> Save';
-        });
+        })
+        .saveGudangData(gudang, rowsNorm, (document.getElementById('inputDataTanggal')||{}).value||'', newSkus);
     }
 
     function initEmptyRows(n){
@@ -835,7 +845,9 @@
       rows.forEach(applyToRow);
 
       // Ada SKU yang belum dicache — fetch sekali lalu apply semua
-      API.getStandarPalet(function(res){
+      if(needFetch && true){
+        google.script.run
+          .withSuccessHandler(function(res){
             if(res && res.success){
               res.data.forEach(function(d){
                 _stdLookupMap[d.sku] = {std: Number(d.std)||0, divisi: d.divisi||'', plant: d.plant||''};
@@ -843,7 +855,8 @@
             }
             // Apply ulang semua baris setelah cache terisi
             rows.forEach(applyToRow);
-          });
+          })
+          .getStandarPalet();
       }
     }
 
@@ -901,3 +914,5 @@
     // =============================================
     // REALISASI
     // =============================================
+    var realSummaryView = 'tabel';
+    var realSummaryData = [];

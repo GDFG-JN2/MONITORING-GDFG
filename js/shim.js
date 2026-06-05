@@ -1,20 +1,17 @@
+// ============================================================
+// shim.js — google.script.run compatibility layer
+// Proxy semua panggilan google.script.run ke API
+// ============================================================
+(function() {
+  var _s = null, _f = null;
 
-// ============================================================
-// COMPATIBILITY SHIM — google.script.run → API
-// Untuk handler multiline yang tidak bisa di-auto-replace
-// ============================================================
-var google = window.google || {};
-google.script = google.script || {};
-google.script.run = (function() {
-  var _successFn = null;
-  var _failureFn = null;
   var handler = {
-    withSuccessHandler: function(fn) { _successFn = fn; return handler; },
-    withFailureHandler: function(fn) { _failureFn = fn; return handler; },
-    withUserObject: function() { return handler; }
+    withSuccessHandler: function(fn) { _s = fn; return handler; },
+    withFailureHandler: function(fn) { _f = fn; return handler; },
+    withUserObject:     function()   { return handler; }
   };
-  // Proxy semua fungsi ke API
-  var funcNames = [
+
+  var GAS_FUNCS = [
     'verifyLogin','getData','getSummaryLokal','getSummaryEkspor','getTotalPallet',
     'getLastUpdate','getSummaryDivisi','getHistoryKapasitas','saveGudangData',
     'saveStandarPallet','getStandarPalet','saveStdEdit','saveRekapHistory',
@@ -28,20 +25,21 @@ google.script.run = (function() {
     'rekapOutputJalur','updateSrShiftCell','updateSrKirimCell',
     'getBinSkuList','getBinSkuStdList','saveBinMovement','getBinCurrent','getBinMovement'
   ];
-  funcNames.forEach(function(fn) {
+
+  GAS_FUNCS.forEach(function(fn) {
     handler[fn] = function() {
-      var args   = Array.prototype.slice.call(arguments);
-      var onSucc = _successFn;
-      var onFail = _failureFn;
-      _successFn = null;
-      _failureFn = null;
-      if (typeof API !== 'undefined' && typeof API[fn] === 'function') {
-        API.run(fn, args[0] || {}, onSucc, onFail);
-      } else {
-        console.warn('[SHIM] API.' + fn + ' tidak ditemukan');
-      }
+      var args = Array.prototype.slice.call(arguments);
+      var onS  = _s, onF = _f;
+      _s = null; _f = null;
+      var payload = args[0];
+      // Jika arg pertama bukan object/array, wrap jadi {value: arg}
+      if (payload === undefined) payload = {};
+      API.run(fn, payload, onS, onF);
     };
   });
-  return handler;
-})();
 
+  // Expose ke window
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  window.google.script.run = handler;
+})();

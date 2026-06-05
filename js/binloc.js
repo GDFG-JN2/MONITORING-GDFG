@@ -26,16 +26,19 @@
       _blCountdown = _blInterval;
     }
 
-    API.getBinCurrent(null,
-      function(rows) { binRows = rows || []; binDone = true; tryRender(); },
-      function() { binDone = true; tryRender(); });
+    google.script.run
+      .withSuccessHandler(function(rows) { binRows = rows || []; binDone = true; tryRender(); })
+      .withFailureHandler(function() { binDone = true; tryRender(); })
+      .getBinCurrent(null);
 
-    API.getBinSkuStdList(function(list) {
+    google.script.run
+      .withSuccessHandler(function(list) {
         stdMap = {};
         (list || []).forEach(function(s) { stdMap[s.kode] = s.std; });
         stdDone = true; tryRender();
-      },
-      function() { stdDone = true; tryRender(); });
+      })
+      .withFailureHandler(function() { stdDone = true; tryRender(); })
+      .getBinSkuStdList();
   }
 
   function blStartAutoRefresh() {
@@ -477,9 +480,10 @@
     var wrap = document.getElementById('blMovTblWrap');
     wrap.innerHTML = '<div class="bl-empty" style="padding:60px 20px;text-align:center;color:#a0aec0"><i class="fas fa-spinner fa-spin" style="font-size:30px;margin-bottom:12px;display:block"></i>Memuat...</div>';
     document.getElementById('blMovRowCount').textContent = '';
-    API.getBinMovement(filters,
-      function(rows) { blMovRender(rows || []); },
-      function(e)    { wrap.innerHTML = '<div class="bl-empty" style="padding:40px;text-align:center;color:#e53e3e">❌ Gagal memuat: ' + (e.message||'error') + '</div>'; });
+    google.script.run
+      .withSuccessHandler(function(rows) { blMovRender(rows || []); })
+      .withFailureHandler(function(e)    { wrap.innerHTML = '<div class="bl-empty" style="padding:40px;text-align:center;color:#e53e3e">❌ Gagal memuat: ' + (e.message||'error') + '</div>'; })
+      .getBinMovement(filters);
   }
 
   function blMovRender(rows) {
@@ -559,4 +563,3 @@
   }
 
   function _blEsc(v){ return v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;') : '—'; }
-

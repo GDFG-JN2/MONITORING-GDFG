@@ -1,6 +1,3 @@
-    var realSummaryView = 'tabel';
-    var realSummaryData = [];
-
     function initRealForm(){
       // Set tanggal hari ini jika kosong
       if(!document.getElementById('realTanggal').value){
@@ -121,8 +118,8 @@
         d.cLK_do, d.cLK_ket, d.cSub_do, d.cSub_ket,
         d.cEkspor_do, d.cEkspor_ket
       ];
-      API.saveRealisasiData(row, true,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           if(res.duplicate){
             resetBtn();
             if(confirm('Data Shift '+d.shiftNo+' (Tim '+d.shiftTim+') tanggal '+d.tanggal+' sudah ada. Overwrite?')){
@@ -132,8 +129,9 @@
                   resetBtn();
                   showToast('✅ '+r2.message, 'success');
                   resetRealForm(); initRealForm();
-                },
-        function(){ resetBtn(); showToast('❌ Gagal menyimpan', 'error'); });
+                })
+                .withFailureHandler(function(){ resetBtn(); showToast('❌ Gagal menyimpan', 'error'); })
+                .saveRealisasiData(row, true);
             }
           } else {
             resetBtn();
@@ -264,14 +262,15 @@
         document.getElementById('filterTo').value = to;
       }
       document.getElementById('realSummaryBody').innerHTML = "<div class='spinner' style='margin:20px auto;'></div>";
-      API.getRealisasiData(from, to,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           window.realSummaryData = res.data || [];
           renderSummaryReal(window.realSummaryData);
-        },
-        function(){
+        })
+        .withFailureHandler(function(){
           document.getElementById('realSummaryBody').innerHTML = "<p style='text-align:center;color:#e53e3e;padding:20px'>Gagal memuat data.</p>";
-        });
+        })
+        .getRealisasiData(from, to);
     }
 
     var currentSumView = 'realisasi'; // 'realisasi'|'detail'|'direct'|'directdetail'
@@ -1882,8 +1881,8 @@
         rows:          rows
       };
 
-      API.saveFdosData(payload,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-save"></i> Save';
           if(res && res.success){
@@ -1891,12 +1890,13 @@
           } else {
             showToast('❌ ' + (res ? res.message : 'Gagal'), 'error');
           }
-        },
-        function(err){
+        })
+        .withFailureHandler(function(err){
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-save"></i> Save';
           showToast('❌ Gagal menyimpan ke FDOS', 'error');
-        });
+        })
+        .saveFdosData(payload);
     }
 
 
@@ -2449,8 +2449,8 @@
         rows:          rows
       };
 
-      API.saveMdcData(payload,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-save"></i> Save';
           if(res && res.success){
@@ -2458,12 +2458,13 @@
           } else {
             showToast('❌ ' + (res ? res.message : 'Gagal'), 'error');
           }
-        },
-        function(err){
+        })
+        .withFailureHandler(function(err){
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-save"></i> Save';
           showToast('❌ Gagal menyimpan ke PLANNING_MDC', 'error');
-        });
+        })
+        .saveMdcData(payload);
     }
 
 
@@ -2519,17 +2520,18 @@
 
       body.innerHTML = "<div class='spinner' style='margin:30px auto;'></div>";
       if(typeof google === 'undefined'){ body.innerHTML='<p style="text-align:center;color:#a0aec0;padding:20px;">Tidak ada data.</p>'; return; }
-      API.getMdcPlanningData(from, to,
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           if(!res||!res.success||!res.weeks||!res.weeks.length){
             body.innerHTML="<p style='text-align:center;color:#a0aec0;padding:30px;font-size:13px;'><i class='fas fa-inbox' style='font-size:28px;display:block;margin-bottom:8px;'></i>Belum ada data Planning MDC untuk periode ini.</p>";
             return;
           }
           renderPlanningMdcTables(res.weeks);
-        },
-        function(){
+        })
+        .withFailureHandler(function(){
           body.innerHTML="<p style='text-align:center;color:#e53e3e;padding:20px;'>Gagal load data Planning MDC.</p>";
-        });
+        })
+        .getMdcPlanningData(from, to);
     }
 
     function renderPlanningMdcTables(weeks){
@@ -2602,14 +2604,16 @@
       }
 
       if(typeof google !== 'undefined'){
-        API.getFdosData(function(res){
+        google.script.run
+          .withSuccessHandler(function(res){
             planWeekData = (res && res.success && res.weeks) ? res.weeks : [];
             renderPlanningTables();
-          },
-          function(){
+          })
+          .withFailureHandler(function(){
             document.getElementById('planningTabBody').innerHTML =
               "<p style='text-align:center;color:#e53e3e;padding:20px;'>Gagal load data.</p>";
-          });
+          })
+          .getFdosData(null, null); // null = ambil semua week
       } else {
         planWeekData = DUMMY_FDOS_WEEKS;
         renderPlanningTables();
@@ -2740,7 +2744,7 @@
       var results = new Array(calls.length);
       var done = 0;
       calls.forEach(function(call, i){
-        google.script.run /* TODO: manual replace google.script.run */
+        google.script.run
           .withSuccessHandler(function(res){ results[i] = res; if(++done === calls.length) onDone(results); })
           .withFailureHandler(onFail || function(){ })
           [call.fn].apply(null, call.args || []);
@@ -2769,13 +2773,14 @@
       }
       document.getElementById('realSummaryBody').innerHTML = "<div class='spinner' style='margin:20px auto;'></div>";
 
-      API.getRealisasiData(from, to,
-        function(fdosRes){
+      google.script.run
+        .withSuccessHandler(function(fdosRes){
           google.script.run
             .withSuccessHandler(function(realRes){
               renderDirectSimple(from, to, fdosRes, realRes);
-            },
-        function(){ showToast('❌ Gagal load data Realisasi','error'); });
+            })
+            .withFailureHandler(function(){ showToast('❌ Gagal load data Realisasi','error'); })
+            .getRealisasiData(from, to);
         })
         .withFailureHandler(function(){ showToast('❌ Gagal load data FDOS','error'); })
         .getFdosData(from, to);
@@ -2980,13 +2985,14 @@
       }
       document.getElementById('realSummaryBody').innerHTML = "<div class='spinner' style='margin:20px auto;'></div>";
 
-      API.getRealisasiData(from, to,
-        function(fdosRes){
+      google.script.run
+        .withSuccessHandler(function(fdosRes){
           google.script.run
             .withSuccessHandler(function(realRes){
               renderDirectSummary(from, to, fdosRes, realRes);
-            },
-        function(){ showToast('❌ Gagal load data Realisasi','error'); });
+            })
+            .withFailureHandler(function(){ showToast('❌ Gagal load data Realisasi','error'); })
+            .getRealisasiData(from, to);
         })
         .withFailureHandler(function(){ showToast('❌ Gagal load data FDOS','error'); })
         .getFdosData(from, to);
@@ -3409,12 +3415,14 @@
         });
         renderDetailView(masked);
       }
-      API.getRealisasiData(from, to,
-        function(res){ _realRes=res; _tryRenderDetail(); },
-        function(){ _realRes={success:false}; _tryRenderDetail(); });
-      API.getMdcPlanningData(from, to,
-        function(res){ _planRes=res; _tryRenderDetail(); },
-        function(){ _planRes={success:false,weeks:[]}; _tryRenderDetail(); });
+      google.script.run
+        .withSuccessHandler(function(res){ _realRes=res; _tryRenderDetail(); })
+        .withFailureHandler(function(){ _realRes={success:false}; _tryRenderDetail(); })
+        .getRealisasiData(from, to);
+      google.script.run
+        .withSuccessHandler(function(res){ _planRes=res; _tryRenderDetail(); })
+        .withFailureHandler(function(){ _planRes={success:false,weeks:[]}; _tryRenderDetail(); })
+        .getMdcPlanningData(from, to);
     }
 
     function loadMDCSummary(){
@@ -3436,12 +3444,14 @@
         if(!_realRes||!_realRes.success){ showToast('\u274c Gagal load data Realisasi','error'); return; }
         renderMDCSummary(from, to, _realRes, _planRes);
       }
-      API.getRealisasiData(from, to,
-        function(res){ _realRes=res; _tryRender(); },
-        function(){ _realRes={success:false}; _tryRender(); });
-      API.getMdcPlanningData(from, to,
-        function(res){ _planRes=res; _tryRender(); },
-        function(){ _planRes={success:false,weeks:[]}; _tryRender(); });
+      google.script.run
+        .withSuccessHandler(function(res){ _realRes=res; _tryRender(); })
+        .withFailureHandler(function(){ _realRes={success:false}; _tryRender(); })
+        .getRealisasiData(from, to);
+      google.script.run
+        .withSuccessHandler(function(res){ _planRes=res; _tryRender(); })
+        .withFailureHandler(function(){ _planRes={success:false,weeks:[]}; _tryRender(); })
+        .getMdcPlanningData(from, to);
     }
 
     function renderMDCSummary(from, to, realRes, planRes){
@@ -3686,7 +3696,6 @@
       if(body2) body2.style.paddingBottom = '12px';
     }
 
-
     // PWA: Inject manifest via data URI (compatible dengan GAS CSP)
     (function(){
       var manifest = JSON.stringify({
@@ -3709,3 +3718,566 @@
       el.setAttribute('href', 'data:application/manifest+json,' + encodeURIComponent(manifest));
       document.head.appendChild(el);
     })();
+    // =============================================
+    // REVISI RIWAYAT OPNAME
+    // =============================================
+    var _rvPending = null; // {tr, rowData, changedCols}
+
+    function _rvEdit(btn){
+      var tr = btn.closest('tr');
+      if(tr.classList.contains('tr-editing')) return;
+
+      // Cancel any existing edit first
+      _rvCancelActive();
+
+      var rowData = JSON.parse(decodeURIComponent(tr.dataset.row));
+      var isEk    = tr.dataset.isek === '1';
+
+      tr.classList.add('tr-editing');
+
+      // Make each data-col cell editable
+      tr.querySelectorAll('td[data-col]').forEach(function(td){
+        var col = td.dataset.col;
+        var raw = rowData[col];
+        if(raw === undefined || raw === null) raw = '';
+        td.classList.add('td-editable');
+        var inp = document.createElement('input');
+        inp.value = raw;
+        inp.dataset.origVal = raw;
+        inp.dataset.col = col;
+        td.textContent = '';
+        td.appendChild(inp);
+      });
+
+      // Replace edit pencil with save/cancel buttons
+      var editTd = tr.querySelector('.td-edit-btn');
+      editTd.innerHTML =
+        '<button class="opv-edit-save" onclick="_rvSave(this)" title="Simpan"><i class="fas fa-check"></i></button>' +
+        '<button class="opv-edit-cancel" onclick="_rvCancelActive()" title="Batal"><i class="fas fa-times"></i></button>';
+    }
+
+    function _rvCancelActive(){
+      var editing = document.querySelectorAll('.tr-editing');
+      editing.forEach(function(tr){
+        tr.classList.remove('tr-editing');
+        // Restore cells from input values
+        tr.querySelectorAll('td.td-editable').forEach(function(td){
+          var inp = td.querySelector('input');
+          td.classList.remove('td-editable');
+          td.textContent = inp ? inp.dataset.origVal : '';
+        });
+        // Restore edit button
+        var editTd = tr.querySelector('.td-edit-btn');
+        if(editTd) editTd.innerHTML = '<button class="opv-edit-btn" onclick="_rvEdit(this)" title="Edit baris ini"><i class="fas fa-pencil-alt"></i></button>';
+      });
+      _rvPending = null;
+    }
+
+    function _rvSave(btn){
+      var tr = btn.closest('tr');
+      var rowData = JSON.parse(decodeURIComponent(tr.dataset.row));
+
+      // Collect changed columns
+      var changedCols = [];
+      tr.querySelectorAll('td.td-editable input').forEach(function(inp){
+        var newVal = inp.value.trim();
+        var origVal = String(inp.dataset.origVal).trim();
+        changedCols.push({col: Number(inp.dataset.col), value: newVal, orig: origVal});
+      });
+
+      var hasChange = changedCols.some(function(c){ return String(c.value) !== String(c.orig); });
+      if(!hasChange){
+        _rvCancelActive();
+        return;
+      }
+
+      _rvPending = {tr: tr, rowData: rowData, changedCols: changedCols};
+
+      // Show popup
+      document.getElementById('revisiAlasan').value = '';
+      var modal = document.getElementById('revisiModal');
+      modal.classList.add('show');
+      setTimeout(function(){ document.getElementById('revisiAlasan').focus(); }, 100);
+    }
+
+    function _revisiCancel(){
+      document.getElementById('revisiModal').classList.remove('show');
+      _rvCancelActive();
+      _rvPending = null;
+    }
+
+    function _revisiConfirm(){
+      var alasan = document.getElementById('revisiAlasan').value.trim();
+      if(!alasan){
+        document.getElementById('revisiAlasan').style.borderColor='#e53e3e';
+        document.getElementById('revisiAlasan').focus();
+        return;
+      }
+      document.getElementById('revisiAlasan').style.borderColor='';
+      document.getElementById('revisiModal').classList.remove('show');
+
+      if(!_rvPending) return;
+      var pending   = _rvPending;
+      _rvPending    = null;
+      var rowData   = pending.rowData;
+      var tr        = pending.tr;
+
+      // Bangun full row array dengan nilai terbaru dari edit
+      var isEkPay = (String(rowData[3]||'').toUpperCase()==='EKSPOR'||String(rowData[3]||'').toUpperCase()==='GDFG-EKSPOR');
+      var hdLen   = isEkPay ? 18 : 16;
+      var newRow  = [];
+      for(var ci=0; ci<hdLen; ci++) newRow.push(rowData[ci]!==undefined?rowData[ci]:'');
+      // Timpa dengan nilai yang diedit
+      pending.changedCols.forEach(function(c){ newRow[Number(c.col)] = c.value; });
+
+      var payload = {
+        area    : rowData[3],
+        key     : {
+          tanggal   : rowData[0],
+          nama      : rowData[1],
+          plant     : rowData[2],
+          sku       : rowData[4],
+          quotation : isEkPay ? rowData[7] : ''
+        },
+        data    : newRow,
+        alasan  : alasan
+      };
+
+      // Show saving state
+      var editTd = tr.querySelector('.td-edit-btn');
+      if(editTd) editTd.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#718096;font-size:13px;"></i>';
+
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(res && res.success){
+            // Update display cells with new values
+            pending.changedCols.forEach(function(c){
+              var td = tr.querySelector('td[data-col="'+c.col+'"]');
+              if(td){
+                td.classList.remove('td-editable');
+                td.textContent = c.value;
+              }
+            });
+            tr.classList.remove('tr-editing');
+            // Flash green
+            tr.style.background='#c6f6d5';
+            setTimeout(function(){ tr.style.background=''; }, 1200);
+            // Restore edit button
+            if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEdit(this)" title="Edit baris ini"><i class="fas fa-pencil-alt"></i></button>';
+            // Update rowData in dataset
+            pending.changedCols.forEach(function(c){ rowData[c.col]=c.value; });
+            tr.dataset.row = encodeURIComponent(JSON.stringify(rowData));
+          } else {
+            alert('Gagal menyimpan: '+(res&&res.message?res.message:'Unknown error'));
+            _rvCancelActive();
+          }
+        })
+        .withFailureHandler(function(e){
+          alert('Error: '+e.message);
+          _rvCancelActive();
+        })
+        .updateOpnameRow(payload);
+    }
+
+    // ── Generic Edit untuk FIFO, QT Ready, SJ Rekap ──────────────
+    var _rvGenericPending = null;
+
+    function _rvEditGeneric(btn, tipe){
+      var tr = btn.closest('tr');
+      if(tr.classList.contains('tr-editing')) return;
+      _rvCancelGeneric();
+      tr.classList.add('tr-editing');
+      tr.querySelectorAll('td[data-col]').forEach(function(td){
+        var col = td.dataset.col;
+        if(col==='idx') return; // nomor urut, skip
+        var raw = td.textContent.trim();
+        td.classList.add('td-editable');
+        td._origText = raw;
+        var inp = document.createElement('input');
+        inp.value = raw;
+        inp.dataset.col = col;
+        inp.dataset.origVal = raw;
+        td.textContent = '';
+        td.appendChild(inp);
+      });
+      var editTd = tr.querySelector('.td-edit-btn');
+      if(editTd) editTd.innerHTML =
+        '<button class="opv-edit-save" onclick="_rvSaveGeneric(this,\''+tipe+'\')" title="Simpan"><i class="fas fa-check"></i></button>'+
+        '<button class="opv-edit-cancel" onclick="_rvCancelGeneric()" title="Batal"><i class="fas fa-times"></i></button>';
+    }
+
+    function _rvCancelGeneric(){
+      document.querySelectorAll('.tr-editing').forEach(function(tr){
+        // Skip opname rows yang punya handler sendiri
+        if(tr.closest('#opnameViewBody')) return;
+        tr.classList.remove('tr-editing');
+        tr.querySelectorAll('td.td-editable').forEach(function(td){
+          var inp = td.querySelector('input');
+          td.classList.remove('td-editable');
+          td.textContent = inp ? inp.dataset.origVal : (td._origText||'');
+        });
+        var editTd = tr.querySelector('.td-edit-btn');
+        if(editTd){
+          var tipe = tr.dataset.subtipe !== undefined ? 'fifo' : 'qt';
+          if(tr.closest('#qtViewBody')) tipe='qt';
+          if(tr.closest('#fifoViewBody')) tipe='fifo';
+          if(tr.closest('#srTable')) tipe='sj';
+          editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
+        }
+      });
+      _rvGenericPending = null;
+    }
+
+    function _rvSaveGeneric(btn, tipe){
+      var tr = btn.closest('tr');
+      var rowData = tr.dataset.row ? JSON.parse(decodeURIComponent(tr.dataset.row)) : null;
+      var changedCols = [];
+      tr.querySelectorAll('td.td-editable input').forEach(function(inp){
+        var newVal = inp.value.trim();
+        var origVal = String(inp.dataset.origVal||'').trim();
+        changedCols.push({col: inp.dataset.col, value: newVal, orig: origVal});
+      });
+      var hasChange = changedCols.some(function(c){ return c.value !== c.orig; });
+      if(!hasChange){ _rvCancelGeneric(); return; }
+      _rvGenericPending = {tr:tr, rowData:rowData, changedCols:changedCols, tipe:tipe};
+      // Tampilkan modal alasan revisi
+      document.getElementById('revisiAlasan').value = '';
+      var modal = document.getElementById('revisiModal');
+      // Override confirm button untuk generic
+      document.getElementById('revisiConfirmBtn').onclick = _rvGenericConfirm;
+      modal.classList.add('show');
+      setTimeout(function(){ document.getElementById('revisiAlasan').focus(); }, 100);
+    }
+
+    function _rvGenericConfirm(){
+      var alasan = document.getElementById('revisiAlasan').value.trim();
+      if(!alasan){
+        document.getElementById('revisiAlasan').style.borderColor='#e53e3e';
+        document.getElementById('revisiAlasan').focus();
+        return;
+      }
+      document.getElementById('revisiAlasan').style.borderColor='';
+      document.getElementById('revisiModal').classList.remove('show');
+      // Restore confirm button ke handler asli
+      document.getElementById('revisiConfirmBtn').onclick = _revisiConfirm;
+      if(!_rvGenericPending) return;
+
+      var pending = _rvGenericPending; _rvGenericPending = null;
+      var tr = pending.tr, rowData = pending.rowData, tipe = pending.tipe;
+
+      // Bangun newRow dari rowData + perubahan
+      var newRow = rowData ? rowData.slice() : [];
+      pending.changedCols.forEach(function(c){
+        var idx = parseInt(c.col);
+        if(!isNaN(idx)) newRow[idx] = c.value;
+      });
+
+      var editTd = tr.querySelector('.td-edit-btn');
+      if(editTd) editTd.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#718096;font-size:13px;"></i>';
+
+      var gasFn = tipe==='fifo' ? (tr.dataset.subtipe==='EKSPOR'?'updateFifoEksporRow':'updateFifoRow')
+                : tipe==='qt'   ? 'updateQtReadyRow'
+                : 'updateSjRekapRow';
+
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(res&&res.success){
+            pending.changedCols.forEach(function(c){
+              var td = tr.querySelector('td[data-col="'+c.col+'"]');
+              if(td){ td.classList.remove('td-editable'); td.textContent = c.value; }
+            });
+            tr.classList.remove('tr-editing');
+            tr.style.background='#c6f6d5';
+            setTimeout(function(){ tr.style.background=''; },1200);
+            if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
+            // Update dataset
+            tr.dataset.row = encodeURIComponent(JSON.stringify(newRow));
+          } else {
+            alert('Gagal: '+(res&&res.message||'unknown'));
+            _rvCancelGeneric();
+            if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
+          }
+        })
+        .withFailureHandler(function(e){
+          alert('Error: '+e.message);
+          _rvCancelGeneric();
+          if(editTd) editTd.innerHTML='<button class="opv-edit-btn" onclick="_rvEditGeneric(this,\''+tipe+'\')" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
+        })
+        [gasFn]({row: newRow, alasan: alasan});
+    } // end _rvGenericConfirm
+
+    // =============================================
+    // STD EDIT — Dashboard tab Lokal/Ekspor/GDFG
+    // =============================================
+    var _stdPending = null; // {tr, rowData, headers, changedCells}
+    var _stdSelectedPlant = '';
+
+    function _stdEdit(btn){
+      var tr = btn.closest('tr');
+      if(tr.classList.contains('tr-std-editing')) return;
+
+      // Cancel existing edit
+      _stdCancelActive();
+
+      tr.classList.add('tr-std-editing');
+
+      // Make editable cells into inputs
+      tr.querySelectorAll('td[data-stdcol]').forEach(function(td){
+        var origVal = td.textContent.trim();
+        // Strip badge text if any
+        var badge = td.querySelector('.std-kosong-badge');
+        if(badge) badge.remove();
+        td.classList.add('td-std-editable');
+        var inp = document.createElement('input');
+        inp.value = origVal;
+        inp.dataset.origVal = origVal;
+        inp.dataset.stdcol = td.dataset.stdcol;
+        inp.dataset.stdkey = td.dataset.stdkey;
+        td.textContent = '';
+        td.appendChild(inp);
+      });
+
+      // Replace pencil with save/cancel
+      var editTd = tr.querySelector('.td-std-edit-btn');
+      editTd.innerHTML =
+        '<button class="std-save-btn" onclick="_stdSave(this)"><i class="fas fa-check"></i></button>' +
+        '<button class="std-cancel-btn" onclick="_stdCancelActive()"><i class="fas fa-times"></i></button>';
+    }
+
+    function _stdCancelActive(){
+      document.querySelectorAll('.tr-std-editing').forEach(function(tr){
+        tr.classList.remove('tr-std-editing');
+        tr.querySelectorAll('td.td-std-editable').forEach(function(td){
+          var inp = td.querySelector('input');
+          td.classList.remove('td-std-editable');
+          td.textContent = inp ? inp.dataset.origVal : '';
+        });
+        var editTd = tr.querySelector('.td-std-edit-btn');
+        if(editTd) editTd.innerHTML = '<button class="std-edit-btn" onclick="_stdEdit(this)" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
+      });
+      _stdPending = null;
+      _stdSelectedPlant = '';
+    }
+
+    function _stdSave(btn){
+      var tr = btn.closest('tr');
+      var rowData  = JSON.parse(decodeURIComponent(tr.dataset.stdrow));
+      var headers  = JSON.parse(decodeURIComponent(tr.dataset.stdhdr));
+
+      var changedCells = [];
+      tr.querySelectorAll('td.td-std-editable input').forEach(function(inp){
+        changedCells.push({
+          col: Number(inp.dataset.stdcol),
+          key: inp.dataset.stdkey,
+          value: inp.value.trim(),
+          orig: inp.dataset.origVal.trim()
+        });
+      });
+
+      var hasChange = changedCells.some(function(c){ return c.value !== c.orig; });
+      if(!hasChange){ _stdCancelActive(); return; }
+
+      _stdPending = {tr: tr, rowData: rowData, headers: headers, changedCells: changedCells};
+      _stdSelectedPlant = '';
+
+      // Reset plant selection and show modal
+      document.querySelectorAll('.std-plant-opt').forEach(function(el){ el.classList.remove('selected'); });
+      document.getElementById('stdPlantModal').classList.add('show');
+    }
+
+    function _stdPlantSelect(el, plant){
+      document.querySelectorAll('.std-plant-opt').forEach(function(o){ o.classList.remove('selected'); });
+      el.classList.add('selected');
+      _stdSelectedPlant = plant;
+    }
+
+    function _stdPlantCancel(){
+      document.getElementById('stdPlantModal').classList.remove('show');
+      _stdCancelActive();
+      _stdPending = null;
+      _stdSelectedPlant = '';
+    }
+
+    function _stdPlantConfirm(){
+      if(!_stdSelectedPlant){
+        // Shake effect via inline style (GAS CSP safe)
+        var box = document.getElementById('stdPlantModalBox');
+        box.style.transform = 'translateX(-8px)';
+        setTimeout(function(){ box.style.transform='translateX(8px)'; }, 80);
+        setTimeout(function(){ box.style.transform='translateX(-5px)'; }, 160);
+        setTimeout(function(){ box.style.transform='translateX(0)'; }, 240);
+        return;
+      }
+      document.getElementById('stdPlantModal').classList.remove('show');
+
+      if(!_stdPending) return;
+      var pending  = _stdPending;
+      _stdPending  = null;
+      var tr       = pending.tr;
+      var rowData  = pending.rowData;
+      var headers  = pending.headers;
+      var changed  = pending.changedCells;
+
+      // Build payload: ambil nilai dari rowData + timpa dengan nilai baru
+      // Header mapping: [0]=SKU/MatCode, [1]=Nama, [2]=QTY, [3]=STD, [4]=JmlPallet, [5]=Divisi
+      var getValue = function(keyIdx){
+        var c = changed.find(function(x){ return x.col === keyIdx; });
+        return c ? c.value : (rowData[headers[keyIdx]]||'');
+      };
+
+      var payload = {
+        sku   : getValue(0),
+        nama  : getValue(1),
+        std   : Number(getValue(3)) || 0,
+        divisi: getValue(5),
+        plant : _stdSelectedPlant
+      };
+      _stdSelectedPlant = '';
+
+      // Show spinner
+      var editTd = tr.querySelector('.td-std-edit-btn');
+      if(editTd) editTd.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#718096;font-size:12px;"></i>';
+
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(res && res.success){
+            // Update display with new values
+            changed.forEach(function(c){
+              var td = tr.querySelector('td[data-stdcol="'+c.col+'"]');
+              if(td){ td.classList.remove('td-std-editable'); td.textContent = c.value; }
+            });
+            tr.classList.remove('tr-std-editing');
+            tr.style.background = '#c6f6d5';
+            // Refresh section setelah 1.4 detik (setelah flash hijau)
+            var contentEl = tr.closest('[id$="Content"]');
+            var section   = contentEl ? contentEl.id.replace('Content','') : null;
+            setTimeout(function(){
+              tr.style.background = '';
+              if(section && typeof loadSection === 'function') loadSection(section);
+            }, 1400);
+            if(editTd) editTd.innerHTML = '<button class="std-edit-btn" onclick="_stdEdit(this)" title="Edit"><i class="fas fa-pencil-alt"></i></button>';
+            // Update rowData dataset
+            changed.forEach(function(c){ rowData[headers[c.col]] = c.value; });
+            tr.dataset.stdrow = encodeURIComponent(JSON.stringify(rowData));
+          } else {
+            alert('Gagal menyimpan: ' + (res&&res.message?res.message:'Unknown error'));
+            _stdCancelActive();
+          }
+        })
+        .withFailureHandler(function(e){
+          alert('Error: ' + e.message);
+          _stdCancelActive();
+        })
+        .saveStdEdit(payload);
+    }
+
+
+  // MONITORING RDC — JS
+  // =============================================
+
+  // ── State ──
+  var _rdcZoom   = 100;
+  var _rdcSel    = {r1:-1,c1:-1,r2:-1,c2:-1};
+  var _rdcDrag   = false;
+
+  // Urutan kolom editable (sesuai urutan td di baris)
+  // Index 0 = td pertama setelah td-no
+  var RDC_COLS = [
+    {key:'plant',      grpSep:false},
+    {key:'docno',      grpSep:false},
+    {key:'no_do_sap',  grpSep:false},
+    {key:'no_spe_sap', grpSep:false},
+    {key:'ship_to',    grpSep:false},
+    {key:'ekspedisi',  grpSep:false},
+    {key:'no_pol',     grpSep:false},
+    {key:'route',      grpSep:false},
+    {key:'jenis_mob',  grpSep:false},
+    {key:'sch_muat',   grpSep:true},
+    {key:'sch_selesai',grpSep:false},
+    {key:'std_durasi', grpSep:true},
+    {key:'in_dt',      grpSep:true},
+    {key:'sl_dt',      grpSep:false},
+    {key:'fl_dt',      grpSep:false},
+    {key:'out_dt',     grpSep:false}
+  ];
+  var RDC_NCOLS = RDC_COLS.length; // 16 kolom editable (plant,docno,no_do_sap,no_spe_sap,ship_to,ekspedisi,no_pol,route,jenis_mob,sch_muat,sch_selesai,std_durasi,in_dt,sl_dt,fl_dt,out_dt)
+
+  // ── Helpers ──
+  function _rdcTbody(){ return document.getElementById('rdcInputTbody'); }
+  function _rdcTbl()  { return document.getElementById('rdcInputTbl'); }
+
+  function _rdcAllTds(){
+    // Returns 2D array [rowIdx][colIdx] of editable tds only
+    var trs = Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr'));
+    return trs.map(function(tr){
+      return RDC_COLS.map(function(col){
+        return tr.querySelector('[data-key="'+col.key+'"]');
+      });
+    });
+  }
+
+  function _rdcTrIdx(tr){
+    return Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr')).indexOf(tr);
+  }
+  function _rdcTcIdx(td){
+    var k = td.getAttribute('data-key');
+    for(var i=0;i<RDC_COLS.length;i++){ if(RDC_COLS[i].key===k) return i; }
+    return -1;
+  }
+
+  function _rdcFocus(ri,ci){
+    var grid=_rdcAllTds(), nRows=grid.length;
+    ri=Math.max(0,Math.min(nRows-1,ri));
+    ci=Math.max(0,Math.min(RDC_NCOLS-1,ci));
+    var td=grid[ri]&&grid[ri][ci];
+    if(td&&td.contentEditable==='true'){ td.focus(); td.scrollIntoView&&td.scrollIntoView({block:'nearest',inline:'nearest'}); }
+  }
+
+  function _rdcClearSel(){
+    document.querySelectorAll('#rdcInputTbl .rdc-sel').forEach(function(el){ el.classList.remove('rdc-sel'); });
+    _rdcSel={r1:-1,c1:-1,r2:-1,c2:-1};
+  }
+
+  function _rdcApplySel(){
+    document.querySelectorAll('#rdcInputTbl .rdc-sel').forEach(function(el){ el.classList.remove('rdc-sel'); });
+    if(_rdcSel.r1<0) return;
+    var trs=Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr'));
+    var r1=Math.min(_rdcSel.r1,_rdcSel.r2), r2=Math.max(_rdcSel.r1,_rdcSel.r2);
+    var c1=Math.min(_rdcSel.c1,_rdcSel.c2), c2=Math.max(_rdcSel.c1,_rdcSel.c2);
+    for(var r=r1;r<=r2;r++){
+      if(!trs[r]) continue;
+      for(var ci=c1;ci<=c2;ci++){
+        var td=trs[r].querySelector('[data-key="'+RDC_COLS[ci].key+'"]');
+        if(td) td.classList.add('rdc-sel');
+      }
+    }
+  }
+
+  function _rdcCopyBlock(){
+    var trs=Array.prototype.slice.call(_rdcTbody().querySelectorAll('tr'));
+    var r1=Math.min(_rdcSel.r1,_rdcSel.r2), r2=Math.max(_rdcSel.r1,_rdcSel.r2);
+    var c1=Math.min(_rdcSel.c1,_rdcSel.c2), c2=Math.max(_rdcSel.c1,_rdcSel.c2);
+    var lines=[];
+    for(var r=r1;r<=r2;r++){
+      if(!trs[r]) continue;
+      var cells=[];
+      for(var ci=c1;ci<=c2;ci++){
+        var td=trs[r].querySelector('[data-key="'+RDC_COLS[ci].key+'"]');
+        cells.push(td?td.textContent.trim():'');
+      }
+      lines.push(cells.join('\t'));
+    }
+    var text=lines.join('\n');
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text);
+    } else {
+      var ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    var nr=r2-r1+1, nc=c2-c1+1;
+    showToast('&#128203; Copied '+nr+'R \u00d7 '+nc+'K','');
+  }
+
+  // ── Build table ──

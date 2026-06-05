@@ -1,138 +1,3 @@
-    // =============================================
-    // REFRESH SEMUA DATA
-    // =============================================
-    function refreshData(){
-      // Reset ke terkini (hari ini)
-      var sel = document.getElementById('kapasitasTanggalSelect');
-      if(sel) sel.value = '';
-      updateLastRefresh();
-      loadTanggalHistory();   // update dropdown
-      loadKapasitasHariIni(); // load data hari ini dari HISTORY KAPASITAS
-    }
-
-    // =============================================
-    // SHOW TAB
-    // =============================================
-    function showTab(tabId){
-      document.querySelectorAll(".g-tab").forEach(function(t){ t.classList.remove("active"); });
-      document.querySelectorAll(".g-tab-pane").forEach(function(c){ c.classList.remove("active"); });
-      var tab = document.querySelector(".g-tab[onclick*='"+tabId+"']");
-      if(tab) tab.classList.add("active");
-      var content = document.getElementById(tabId);
-      if(content) content.classList.add("active");
-      if(tabId === 'summary'){
-        if(currentView === 'chart')           renderCharts();
-        else if(currentView === 'horizontal') renderChartsHorizontal();
-        else if(currentView === 'pie')        renderPieChart();
-        else                                  renderTableView();
-      }
-    }
-
-    // =============================================
-    // TOGGLE CHART / TABEL
-    // =============================================
-    function switchView(view){
-      currentView = view;
-
-      var tbl = document.getElementById('viewTable');
-      tbl.classList.remove('visible');
-
-      document.getElementById('btnToggleChart').classList.toggle('active',      view === 'chart');
-      document.getElementById('btnToggleHorizontal').classList.toggle('active', view === 'horizontal');
-      document.getElementById('btnToggleTable').classList.toggle('active',      view === 'table');
-      document.getElementById('btnTogglePie').classList.toggle('active',        view === 'pie');
-      document.getElementById('btnToggleTrend').classList.toggle('active',      view === 'trend');
-
-      document.getElementById('viewChart').style.display      = (view === 'chart')      ? 'grid'  : 'none';
-      document.getElementById('viewHorizontal').style.display = (view === 'horizontal') ? 'grid'  : 'none';
-      document.getElementById('viewPie').style.display        = (view === 'pie')        ? 'flex'  : 'none';
-      document.getElementById('viewTrend').style.display      = (view === 'trend')      ? 'block' : 'none';
-
-      if(view === 'table'){
-        tbl.style.display = 'grid';
-        renderTableView();
-        requestAnimationFrame(function(){ requestAnimationFrame(function(){ tbl.classList.add('visible'); }); });
-      } else {
-        tbl.style.display = 'none';
-      }
-
-      if(view === 'chart')           renderCharts();
-      else if(view === 'horizontal') renderChartsHorizontal();
-      else if(view === 'pie')        renderPieChart();
-      else if(view === 'trend')      initTrendView();
-    }
-
-    // =============================================
-    // LOAD SUMMARY (dari google.script.run)
-    // =============================================
-    function loadSummary(){
-      google.script.run.withSuccessHandler(function(res){ /* TODO: manual replace google.script.run */
-        if(res.success){
-          var sorted = res.data.slice().sort(function(a,b){ return b.jmlPallet - a.jmlPallet; });
-          // Simpan semua SKU ke lookup map
-          res.data.forEach(function(i){
-            if(i.skuBarang){
-              var sku=String(i.skuBarang).trim();
-              _skuNamaMap[sku]=i.namaBarang||'';
-              _opnameNamaMap[sku]=i.namaBarang||'';
-              if(!_skuDataMap[sku]) _skuDataMap[sku]={nama:i.namaBarang||'', sap:Number(i.jmlKarton)||0};
-            }
-          });
-          lokalChartData = {
-            labels:  sorted.slice(0,10).map(function(i){ return i.namaBarang;    }),
-            skus:    sorted.slice(0,10).map(function(i){ return i.skuBarang;     }),
-            values:  sorted.slice(0,10).map(function(i){ return i.jmlPallet;     }),
-            kartons: sorted.slice(0,10).map(function(i){ return i.jmlKarton || 0;})
-          };
-          if(document.getElementById('summary').classList.contains('active')){
-            if(currentView === 'chart') renderCharts();
-            else if(currentView === 'horizontal') renderChartsHorizontal();
-            else renderTableView();
-          }
-        }
-      }).getSummaryLokal();
-
-      google.script.run.withSuccessHandler(function(res){ /* TODO: manual replace google.script.run */
-        if(res.success){
-          var sorted = res.data.slice().sort(function(a,b){ return b.jmlPallet - a.jmlPallet; });
-          // Simpan semua SKU ke lookup map
-          res.data.forEach(function(i){
-            if(i.skuBarang){
-              var sku=String(i.skuBarang).trim();
-              _skuNamaMap[sku]=i.namaBarang||'';
-              _opnameNamaMap[sku]=i.namaBarang||'';
-              if(!_skuDataMap[sku]) _skuDataMap[sku]={nama:i.namaBarang||'', sap:Number(i.jmlKarton)||0};
-            }
-          });
-          eksporChartData = {
-            labels:  sorted.slice(0,10).map(function(i){ return i.namaBarang;    }),
-            skus:    sorted.slice(0,10).map(function(i){ return i.skuBarang;     }),
-            values:  sorted.slice(0,10).map(function(i){ return i.jmlPallet;     }),
-            kartons: sorted.slice(0,10).map(function(i){ return i.jmlKarton || 0;})
-          };
-          if(document.getElementById('summary').classList.contains('active')){
-            if(currentView === 'chart') renderCharts();
-            else if(currentView === 'horizontal') renderChartsHorizontal();
-            else renderTableView();
-          }
-        }
-      }).getSummaryEkspor();
-    }
-
-    // =============================================
-    // LOAD DIVISI (PIE CHART)
-    // =============================================
-    function loadDivisi(){
-      google.script.run.withSuccessHandler(function(res){ /* TODO: manual replace google.script.run */
-        if(res.success){
-          divisiChartData = res;
-          if(currentView === 'pie' && document.getElementById('summary').classList.contains('active')){
-            renderPieChart();
-          }
-        }
-      }).getSummaryDivisi();
-    }
-
     function renderPieChart(){
       if(!divisiChartData) return;
 
@@ -360,8 +225,8 @@
       // Belum ada data — load 3 section sekaligus
       var pending = 3;
       ['lokal','ekspor','gdfg'].forEach(function(sec){
-        API.getData(sec,
-          function(res){
+        google.script.run
+          .withSuccessHandler(function(res){
             if(res&&res.success&&res.headers&&res.data){
               var h0=res.headers[0], h1=res.headers[1], h2=res.headers[2];
               res.data.forEach(function(r){
@@ -373,14 +238,15 @@
               });
             }
             if(--pending===0) _skuMapReady=true;
-          },
-          function(){ --pending; });
+          })
+          .withFailureHandler(function(){ --pending; })
+          .getData(sec);
       });
     }
 
     function loadSection(section){
       document.getElementById(section+"Content").innerHTML = "<div class='spinner'></div>";
-      google.script.run.withSuccessHandler(function(res){ /* TODO: manual replace google.script.run */
+      google.script.run.withSuccessHandler(function(res){
         if(res.success && res.data.length > 0){
           var jumlahKosong = res.data.filter(function(r){ return r.__stdKosong; }).length;
           var html = "";
@@ -490,13 +356,15 @@
     }
 
     function updateLastRefresh(){
-      API.getLastUpdate(function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           document.getElementById("lastUpdateValue").innerText =
             (res && res.value) ? res.value : '-';
-        },
-        function(){
+        })
+        .withFailureHandler(function(){
           document.getElementById("lastUpdateValue").innerText = '-';
-        });
+        })
+        .getLastUpdate();
     }
 
     function updateStock(){
@@ -508,7 +376,7 @@
     // Auto refresh setiap 3 menit
     // ── Load daftar tanggal dari HISTORY KAPASITAS ──
     function loadTanggalHistory(){
-      google.script.run /* TODO: manual replace google.script.run */
+      google.script.run
         .withSuccessHandler(function(res){
           var sel = document.getElementById('kapasitasTanggalSelect');
           if(!sel) return;
@@ -582,7 +450,7 @@
     function loadKapasitasHariIni(){
       var today = _getTodayStr();
       // Cek apakah hari ini ada data — kalau tidak, pakai tanggal terakhir
-      google.script.run /* TODO: manual replace google.script.run */
+      google.script.run
         .withSuccessHandler(function(res){
           var tanggals = (res && res.success && res.tanggals) ? res.tanggals : [];
           var tglToLoad = today;
@@ -621,7 +489,7 @@
         if(el) el.innerHTML="<div class='spinner' style='margin:20px auto;'></div>";
       });
 
-      google.script.run /* TODO: manual replace google.script.run */
+      google.script.run
         .withSuccessHandler(function(res){
           if(!res||!res.success){
             ['lokalContent','eksporContent','gdfgContent'].forEach(function(id){
@@ -832,8 +700,8 @@
       document.getElementById('trendChartWrap').insertAdjacentHTML('beforeend',
         '<div id="trendLoading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#a0aec0;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Memuat...</div>');
 
-      API.getHistoryKapasitas(from, to, [],
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           var loader = document.getElementById('trendLoading');
           if(loader) loader.remove();
           if(!res||!res.success||!res.data.length){
@@ -842,12 +710,13 @@
             return;
           }
           _renderTrendChart(res.data, from, to);
-        },
-        function(){
+        })
+        .withFailureHandler(function(){
           var loader = document.getElementById('trendLoading');
           if(loader) loader.remove();
           document.getElementById('trendEmpty').style.display='flex';
-        });
+        })
+        .getHistoryKapasitas(from, to, []);
     }
 
     function _renderTrendChart(data, from, to){
@@ -972,3 +841,802 @@
     // Usage: _STOKInit(config)
     // =============================================
     function _STOKInit(cfg){
+      /*
+        cfg = {
+          tblId      : string  — id <table>
+          tbodyId    : string  — id <tbody>
+          cols       : array   — ordered col keys (data-col values)
+          autoCols   : object  — {colKey: true} untuk kolom auto/read-only
+          selClass   : string  — CSS class untuk cell terselect
+          onAfterPaste: fn(tr) — callback setelah paste per baris (opsional)
+          onDelete   : fn(tr,col) — callback setelah delete cell (opsional)
+        }
+      */
+      var tbl    = document.getElementById(cfg.tblId);
+      var tbody  = document.getElementById(cfg.tbodyId);
+      if(!tbl || !tbody) return;
+      if(tbl._stokBound) return;
+      tbl._stokBound = true;
+
+      // cfg.cols diupdate dari luar saat tipe berubah — cfg.cols selalu baca live
+      var AUTO      = cfg.autoCols || {};
+      var SEL_CLS   = cfg.selClass || 'stok-sel';
+      var sel       = {r1:-1,c1:-1,r2:-1,c2:-1};
+      var dragging  = false;
+      var fillDrag  = false;
+      var fillAnchorR = -1, fillAnchorC = -1;
+      // Expose updateCols agar caller bisa update cfg.cols saat tipe berubah
+      tbl._stokUpdateCols = function(newCols){ cfg.cols = newCols; };
+
+      function allTrs(){ return Array.from(tbody.querySelectorAll('tr')); }
+      function trIdx(tr){ return allTrs().indexOf(tr); }
+      function tcIdx(td){ return cfg.cols.indexOf(td.dataset.col||''); }
+      function getTd(trs,r,c){
+        if(r<0||r>=trs.length||c<0||c>=cfg.cols.length) return null;
+        return trs[r].querySelector('[data-col="'+cfg.cols[c]+'"]');
+      }
+      function isEditable(td){ return td && td.contentEditable==='true'; }
+
+      // ── Selection ──────────────────────────────
+      function clearSel(){
+        tbody.querySelectorAll('.'+SEL_CLS).forEach(function(el){ el.classList.remove(SEL_CLS); });
+        sel={r1:-1,c1:-1,r2:-1,c2:-1};
+        var info=document.getElementById(cfg.tbodyId.replace('Tbody','SelInfo').replace('tbody','SelInfo'));
+        if(info) info.textContent='';
+        fillHandleEl.style.display='none';
+      }
+      function applySel(){
+        tbody.querySelectorAll('.'+SEL_CLS).forEach(function(el){ el.classList.remove(SEL_CLS); });
+        var r1=Math.min(sel.r1,sel.r2), r2=Math.max(sel.r1,sel.r2);
+        var c1=Math.min(sel.c1,sel.c2), c2=Math.max(sel.c1,sel.c2);
+        var trs=allTrs();
+        for(var r=r1;r<=r2;r++) for(var c=c1;c<=c2;c++){
+          var td=getTd(trs,r,c); if(td) td.classList.add(SEL_CLS);
+        }
+        var info=document.getElementById(cfg.tbodyId.replace('Tbody','SelInfo').replace('tbody','SelInfo'));
+        if(info){ var rows=r2-r1+1, cols=c2-c1+1; info.textContent=rows>1||cols>1?rows+'×'+cols:''; }
+      }
+
+      // ── Focus + navigate ───────────────────────
+      function navigate(td, dr, dc, extend){
+        var trs=allTrs();
+        var ri=trIdx(td.closest('tr')), ci=tcIdx(td);
+        var nri=ri+dr, nci=ci+dc;
+        if(dc!==0 && dr===0){
+          if(nci<0){ nci=cfg.cols.length-1; nri--; }
+          else if(nci>=cfg.cols.length){ nci=0; nri++; }
+        }
+        nri=Math.max(0,Math.min(trs.length-1,nri));
+        nci=Math.max(0,Math.min(cfg.cols.length-1,nci));
+
+        if(extend){
+          if(sel.r1<0){ sel={r1:ri,c1:ci,r2:ri,c2:ci}; }
+          sel.r2=nri; sel.c2=nci; applySel();
+          var tgt=getTd(trs,nri,nci);
+          if(tgt){ tgt._stokSuppressFocus=true; tgt.focus(); }
+        } else {
+          var maxStep=cfg.cols.length+trs.length;
+          var step=0;
+          while(step<maxStep){
+            var tgt=getTd(trs,nri,nci);
+            if(!tgt) break;
+            if(isEditable(tgt)){
+              clearSel();
+              sel={r1:nri,c1:nci,r2:nri,c2:nci};
+              // Explicit blur dulu agar blur event (SAP lookup dll) terpanggil
+              if(td && td!==tgt && typeof td.blur==='function') td.blur();
+              tgt.focus(); break;
+            }
+            if(dr!==0){ nri+=dr; }
+            else { nci+=dc; if(nci<0){nci=cfg.cols.length-1;nri--;} else if(nci>=cfg.cols.length){nci=0;nri++;} }
+            nri=Math.max(0,Math.min(trs.length-1,nri));
+            nci=Math.max(0,Math.min(cfg.cols.length-1,nci));
+            step++;
+          }
+        }
+      }
+
+      // ── Copy ───────────────────────────────────
+      function copyBlock(){
+        var trs=allTrs();
+        var r1=Math.min(sel.r1,sel.r2),r2=Math.max(sel.r1,sel.r2);
+        var c1=Math.min(sel.c1,sel.c2),c2=Math.max(sel.c1,sel.c2);
+        if(r1<0) return;
+        var lines=[];
+        for(var r=r1;r<=r2;r++){
+          var cells=[];
+          for(var c=c1;c<=c2;c++){ var td=getTd(trs,r,c); cells.push(td?td.textContent.trim():''); }
+          lines.push(cells.join('\t'));
+        }
+        var text=lines.join('\n');
+
+        // Simpan focus sekarang sebelum membuat textarea
+        var prevFocus = document.activeElement;
+
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:50%;left:50%;width:1px;height:1px;'+
+          'padding:0;border:none;outline:none;box-shadow:none;'+
+          'background:transparent;color:transparent;font-size:1px;z-index:-1;';
+        ta.setAttribute('readonly','');
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        try{ ta.setSelectionRange(0, ta.value.length); }catch(ex){}
+        var copied = false;
+        try{ copied = document.execCommand('copy'); }catch(ex){}
+        document.body.removeChild(ta);
+
+        // Kembalikan focus ke cell terakhir yang terselect (bukan tbl/body)
+        // supaya user bisa langsung ketik setelah copy
+        var restoreTd = null;
+        if(sel.r1>=0){
+          var trs2=allTrs();
+          var rr=Math.max(sel.r1,sel.r2), cc=Math.max(sel.c1,sel.c2);
+          restoreTd = getTd(trs2,rr,cc);
+        }
+        if(restoreTd && isEditable(restoreTd)){
+          restoreTd.focus();
+        } else if(prevFocus && prevFocus!==ta && prevFocus!==document.body &&
+                  document.body.contains(prevFocus) && typeof prevFocus.focus==='function'){
+          prevFocus.focus();
+        }
+
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          navigator.clipboard.writeText(text).catch(function(){});
+        }
+
+        showToast(copied?'📋 '+(r2-r1+1)+(r2>r1?' baris':' sel')+' disalin':'📋 Ctrl+C untuk copy','');
+      }
+
+      // ── Paste ──────────────────────────────────
+      function doPaste(text, startR, startC){
+        var trs=allTrs();
+        var rows=text.split(/\r?\n/).filter(function(l,i,a){ return !(i===a.length-1&&l===''); });
+        rows.forEach(function(rowStr,ri){
+          while(allTrs().length<=startR+ri){
+            // Append kosong jika kurang baris — panggil fungsi append tabel masing-masing
+            var appendFn = window['_append'+cfg.tbodyId.charAt(0).toUpperCase()+cfg.tbodyId.slice(1).replace('Tbody','')+'Row']
+                        || window['_append'+cfg.tbodyId.replace('Tbody','')+'Row']
+                        || window['_append'+cfg.tbodyId.replace('tbody','').charAt(0).toUpperCase()+cfg.tbodyId.replace('tbody','').slice(1)+'Row'];
+            if(appendFn) appendFn(); else break;
+            trs=allTrs();
+          }
+          var tr=allTrs()[startR+ri]; if(!tr) return;
+          rowStr.split('\t').forEach(function(val,ci){
+            var colIdx=startC+ci; if(colIdx>=cfg.cols.length) return;
+            var k=cfg.cols[colIdx]; if(AUTO[k]) return;
+            var td=tr.querySelector('[data-col="'+k+'"]'); if(td) td.textContent=val.trim();
+          });
+          if(cfg.onAfterPaste) cfg.onAfterPaste(tr);
+        });
+      }
+
+      // ── Undo / Redo stack ──────────────────────
+      var undoStack=[], redoStack=[], MAX_UNDO=50;
+
+      function snapshotTbl(){
+        // Snapshot isi semua editable cell sebagai array-of-objects {r,c,v}
+        var snap=[];
+        var trs=allTrs();
+        for(var r=0;r<trs.length;r++){
+          for(var c=0;c<cfg.cols.length;c++){
+            if(AUTO[cfg.cols[c]]) continue;
+            var td=getTd(trs,r,c);
+            snap.push({r:r,c:c,v:td?td.textContent:''});
+          }
+        }
+        return snap;
+      }
+
+      function applySnapshot(snap){
+        var trs=allTrs();
+        snap.forEach(function(s){
+          var td=getTd(trs,s.r,s.c);
+          if(td) td.textContent=s.v;
+        });
+        // Trigger callbacks untuk recalc
+        trs.forEach(function(tr){
+          if(cfg.onAfterPaste) cfg.onAfterPaste(tr);
+        });
+      }
+
+      function pushUndo(){
+        var snap=snapshotTbl();
+        // Jangan push kalau sama dengan snapshot terakhir
+        var last=undoStack[undoStack.length-1];
+        if(last){
+          var same=last.length===snap.length&&last.every(function(s,i){ return s.v===snap[i].v; });
+          if(same) return;
+        }
+        undoStack.push(snap);
+        if(undoStack.length>MAX_UNDO) undoStack.shift();
+        redoStack=[];
+      }
+
+      function doUndo(){
+        if(undoStack.length<2) return; // butuh minimal 2: sebelum dan sesudah
+        var current=undoStack.pop();
+        redoStack.push(current);
+        var prev=undoStack[undoStack.length-1];
+        applySnapshot(prev);
+        showToast('↩ Undo','');
+      }
+
+      function doRedo(){
+        if(!redoStack.length) return;
+        var next=redoStack.pop();
+        undoStack.push(next);
+        applySnapshot(next);
+        showToast('↪ Redo','');
+      }
+
+      // Push snapshot awal
+      pushUndo();
+
+      // ── Drag Fill handle — overlay fixed di luar tabel ──
+      var fillHandleEl=(function(){
+        var h=document.createElement('div');
+        h.className='stok-fill-handle-overlay';
+        h.dataset.stokId=cfg.tbodyId; // tandai milik tabel mana
+        h.style.cssText='display:none;position:fixed;width:8px;height:8px;background:#2563eb;border:2px solid #fff;cursor:crosshair;z-index:9999;border-radius:1px;box-shadow:0 0 0 1px #2563eb;pointer-events:auto;';
+        document.body.appendChild(h);
+        h.addEventListener('mousedown',function(e){
+          e.preventDefault(); e.stopPropagation();
+          fillDrag=true;
+          h._active=true;
+          fillAnchorR=Math.max(sel.r1,sel.r2);
+          fillAnchorC=Math.max(sel.c1,sel.c2);
+        });
+        return h;
+      })();
+
+      function showFillHandle(){
+        if(sel.r1<0){ fillHandleEl.style.display='none'; return; }
+        var r2=Math.max(sel.r1,sel.r2), c2=Math.max(sel.c1,sel.c2);
+        var td=getTd(allTrs(),r2,c2);
+        if(!td){ fillHandleEl.style.display='none'; return; }
+        // Sembunyikan fillHandle milik tabel lain
+        document.querySelectorAll('.stok-fill-handle-overlay').forEach(function(h){
+          if(h!==fillHandleEl) h.style.display='none';
+        });
+        var rect=td.getBoundingClientRect();
+        fillHandleEl.style.left=(rect.right-5)+'px';
+        fillHandleEl.style.top=(rect.bottom-5)+'px';
+        fillHandleEl.style.display='block';
+      }
+
+      // ── Mouse events ───────────────────────────
+      tbody.addEventListener('mousedown',function(e){
+        var td=e.target.closest('td[data-col]'); if(!td) return;
+        var ri=trIdx(td.closest('tr')), ci=tcIdx(td); if(ri<0||ci<0) return;
+        if(e.shiftKey && sel.r1>=0){
+          // Shift+Click: extend selection dari anchor ke cell ini
+          e.preventDefault();
+          sel.r2=ri; sel.c2=ci; applySel();
+          return;
+        }
+        clearSel(); sel={r1:ri,c1:ci,r2:ri,c2:ci};
+        dragging=true; applySel();
+      });
+      document.addEventListener('mousemove',function(e){
+        if(!dragging&&!fillDrag) return;
+        // Pastikan drag ini milik instance ini (bukan fillDrag dari tabel lain)
+        if(fillDrag && !fillHandleEl._active) return;
+        if(fillDrag){
+          var td2=e.target.closest&&e.target.closest('td[data-col]');
+          if(!td2||!td2.closest('#'+cfg.tbodyId)) return;
+          var ri2=trIdx(td2.closest('tr'));
+          // Highlight range fill
+          tbody.querySelectorAll('.stok-fill-preview').forEach(function(el){ el.classList.remove('stok-fill-preview'); });
+          var trs=allTrs();
+          var c1=Math.min(sel.c1,sel.c2), c2m=Math.max(sel.c1,sel.c2);
+          var rStart=Math.max(sel.r1,sel.r2)+1;
+          for(var r=rStart;r<=ri2;r++) for(var c=c1;c<=c2m;c++){ var tdt=getTd(trs,r,c); if(tdt) tdt.classList.add('stok-fill-preview'); }
+          return;
+        }
+        // drag select
+        var td2=e.target.closest&&e.target.closest('td[data-col]');
+        if(!td2||!td2.closest('#'+cfg.tbodyId)) return;
+        var ri2=trIdx(td2.closest('tr')), ci2=tcIdx(td2); if(ri2<0||ci2<0) return;
+        if(ri2!==sel.r2||ci2!==sel.c2){ sel.r2=ri2; sel.c2=ci2; applySel(); tbl.focus(); }
+      });
+      document.addEventListener('mouseup',function(e){
+        if(fillDrag){
+          fillDrag=false;
+          fillHandleEl._active=false;
+          tbody.querySelectorAll('.stok-fill-preview').forEach(function(el){ el.classList.remove('stok-fill-preview'); });
+          var td2=e.target.closest&&e.target.closest('td[data-col]');
+          if(td2&&td2.closest('#'+cfg.tbodyId)){
+            var endR=trIdx(td2.closest('tr'));
+            var r1=Math.min(sel.r1,sel.r2), r2=Math.max(sel.r1,sel.r2);
+            var c1=Math.min(sel.c1,sel.c2), c2=Math.max(sel.c1,sel.c2);
+            var trs=allTrs();
+            if(endR>r2){
+              pushUndo();
+              // Ambil nilai dari baris sumber
+              var srcVals={};
+              for(var c=c1;c<=c2;c++){ var st=getTd(trs,r2,c); srcVals[c]=st?st.textContent.trim():''; }
+              for(var r=r2+1;r<=endR;r++){
+                for(var c=c1;c<=c2;c++){
+                  var k=cfg.cols[c]; if(AUTO[k]) continue;
+                  var tdt=getTd(trs,r,c); if(tdt) tdt.textContent=srcVals[c];
+                }
+                if(cfg.onAfterPaste) cfg.onAfterPaste(trs[r]);
+              }
+              sel.r2=endR; applySel();
+            }
+          }
+        }
+        if(dragging){
+          dragging=false; showFillHandle();
+          var multiSel=(Math.abs(sel.r2-sel.r1)>0||Math.abs(sel.c2-sel.c1)>0);
+          if(multiSel) tbl.focus();
+        }
+      });
+
+      // ── Keyboard ───────────────────────────────
+      tbl.addEventListener('keydown',function(e){
+        var ae=document.activeElement, td=ae&&ae.closest&&ae.closest('td[data-col]');
+        var inThisTbl=td&&td.closest('#'+cfg.tbodyId);
+
+        // Delete / Backspace
+        if(e.key==='Delete'||e.key==='Backspace'){
+          if(sel.r1>=0){
+            var multi=Math.abs(sel.r2-sel.r1)>0||Math.abs(sel.c2-sel.c1)>0;
+            if(multi||(inThisTbl&&ae===tbl)){
+              e.preventDefault();
+              pushUndo();
+              var trs=allTrs();
+              var r1=Math.min(sel.r1,sel.r2),r2=Math.max(sel.r1,sel.r2);
+              var c1=Math.min(sel.c1,sel.c2),c2=Math.max(sel.c1,sel.c2);
+              for(var r=r1;r<=r2;r++) for(var c=c1;c<=c2;c++){
+                var k=cfg.cols[c]; if(AUTO[k]) continue;
+                var tdt=getTd(trs,r,c); if(tdt){ tdt.textContent=''; if(cfg.onDelete) cfg.onDelete(trs[r],k); }
+              }
+              if(multi) clearSel();
+            }
+          }
+          return;
+        }
+
+        // Ctrl+Z — Undo
+        if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){
+          if(!inThisTbl) return;
+          e.preventDefault(); doUndo(); return;
+        }
+
+        // Ctrl+Y / Ctrl+Shift+Z — Redo
+        if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.key==='z'&&e.shiftKey))){
+          if(!inThisTbl) return;
+          e.preventDefault(); doRedo(); return;
+        }
+
+        // Ctrl+C
+        if((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C')&&sel.r1>=0){ e.preventDefault(); copyBlock(); return; }
+
+        // Ctrl+A
+        if((e.ctrlKey||e.metaKey)&&e.key==='a'){
+          if(inThisTbl&&isEditable(td)) return; // biar browser handle select-all teks
+          e.preventDefault();
+          var trs2=allTrs();
+          sel={r1:0,c1:0,r2:trs2.length-1,c2:cfg.cols.length-1}; applySel(); return;
+        }
+
+        if(!inThisTbl) return;
+
+        // Arrow keys
+        var isArrow=['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key)>=0;
+        if(isArrow){
+          var txt=td.textContent, sObj=window.getSelection(), off=sObj?sObj.focusOffset:0;
+          var atEnd=off>=txt.length, atStart=off<=0;
+          if(e.key==='ArrowUp'||e.key==='ArrowDown'){ e.preventDefault(); navigate(td,e.key==='ArrowDown'?1:-1,0,e.shiftKey); return; }
+          if(e.key==='ArrowLeft'&&(atStart||txt==='')){ e.preventDefault(); navigate(td,0,-1,e.shiftKey); return; }
+          if(e.key==='ArrowRight'&&(atEnd||txt==='')){ e.preventDefault(); navigate(td,0,1,e.shiftKey); return; }
+          return;
+        }
+
+        // Tab
+        if(e.key==='Tab'){ e.preventDefault(); navigate(td,0,e.shiftKey?-1:1,false); return; }
+
+        // Enter
+        if(e.key==='Enter'){ e.preventDefault(); navigate(td,1,0,false); return; }
+      });
+
+      // Focus → set sel anchor
+      tbody.addEventListener('focusin',function(e){
+        var td=e.target.closest('td[data-col]'); if(!td) return;
+        var ri=trIdx(td.closest('tr')), ci=tcIdx(td); if(ri<0) return;
+        if(td._stokSuppressFocus){ td._stokSuppressFocus=false; return; }
+        if(sel.r1<0||!e.shiftKey){ sel={r1:ri,c1:ci,r2:ri,c2:ci}; applySel(); showFillHandle(); }
+      });
+
+      // Blur → push undo + trigger SKU lookup kalau perlu
+      tbody.addEventListener('focusout',function(e){
+        var td=e.target.closest('td[data-col]'); if(!td) return;
+        pushUndo();
+        // Kalau cell SKU yang blur, trigger lookup via callback
+        if(td.dataset.col==='sku' && cfg.onSkuBlur){
+          cfg.onSkuBlur(td.closest('tr'));
+        }
+      });
+
+      // Paste
+      tbl.addEventListener('paste',function(e){
+        var ae=document.activeElement, td=ae&&ae.closest&&ae.closest('td[data-col]');
+        if(!td||!td.closest('#'+cfg.tbodyId)){
+          if(sel.r1>=0){
+            var trs=allTrs();
+            var r1=Math.min(sel.r1,sel.r2), c1=Math.min(sel.c1,sel.c2);
+            td=getTd(trs,r1,c1);
+          }
+          if(!td||!td.closest('#'+cfg.tbodyId)) return;
+        }
+        var text=(e.clipboardData||window.clipboardData).getData('text'); if(!text) return;
+        e.preventDefault();
+        pushUndo();
+        doPaste(text, trIdx(td.closest('tr')), tcIdx(td));
+      });
+
+      // Click outside → clear sel
+      document.addEventListener('mousedown',function(e){
+        if(!tbl.contains(e.target)){ clearSel(); fillHandleEl.style.display='none'; }
+      });
+    }
+
+    // CSS untuk SISTEM TABEL OK (inject sekali)
+    (function(){
+      if(document.getElementById('_stokStyle')) return;
+      var s=document.createElement('style'); s.id='_stokStyle';
+      s.textContent=
+        '.stok-sel{background:#bfdbfe!important;}'+
+        '.stok-fill-preview{background:#dbeafe!important;outline:1px dashed #3b82f6;}';
+      document.head.appendChild(s);
+    })();
+
+    // =============================================
+    // STOCK OPNAME
+    // =============================================
+    var _opnameStdMap   = {};
+    var _opnameNamaMap  = {};
+    var _opnameInitDone = false;
+    var _opSel = {r1:-1,c1:-1,r2:-1,c2:-1};
+    var _opDragging = false;
+
+    // Kolom per tipe
+    var OP_COLS_LOKAL   = ['sku','item','sap','fisik','sel_awal','pgr','pgi','salah_kirim','adj','sel_akhir','ket','std','palet'];
+    var OP_EDIT_LOKAL   = ['sku','item','sap','fisik','pgr','pgi','salah_kirim','adj','std','ket'];
+    var OP_COLS_EKSPOR  = ['sku','item','buyer','quotation','exp_date','fisik','sap_detail','sap_total','pgr','pgi','sel_akhir','ket','std','palet'];
+    var OP_EDIT_EKSPOR  = ['sku','item','buyer','quotation','exp_date','fisik','sap_detail','sap_total','pgr','pgi','std','ket'];
+
+    var OP_COLS_ORDER = OP_COLS_LOKAL.slice();
+    var OP_EDITABLE   = OP_EDIT_LOKAL.slice();
+    var _opCurrentTipe = 'LOKAL';
+    var _opActiveTab = 'input';
+
+
+    // Mapping nama per plant + tipe
+    var _NAMA_MAP = {
+      '1111|LOKAL':       ['Faisal'],
+      '1111|EKSPOR':      ['Ade'],
+      '1112|LOKAL':       ['Dimas','Apri'],
+      '1112|EKSPOR':      ['Aldy'],
+      '1113|LOKAL':       ['Dimas'],
+      '1113|EKSPOR':      ['Aldy'],
+      // GDFG ikut plant yg sama (lokal)
+      '1111|GDFG':        ['Faisal'],
+      '1112|GDFG':        ['Dimas','Apri'],
+      '1113|GDFG':        ['Dimas'],
+      '1111|GDFG-EKSPOR': ['Ade'],
+      '1112|GDFG-EKSPOR': ['Aldy'],
+      '1113|GDFG-EKSPOR': ['Aldy'],
+      // FIFO
+      '1111|FIFO':        ['Faishal'],
+      '1112|FIFO':        ['Dimas','Apri'],
+      '1113|FIFO':        ['Dimas'],
+      // FIFO EKSPOR
+      '1111|FIFO-EKSPOR': ['Ade'],
+      '1112|FIFO-EKSPOR': ['Aldy'],
+      '1113|FIFO-EKSPOR': ['Aldy'],
+      // QT READY (sama dengan EKSPOR)
+      '1111|QT_READY':    ['Ade'],
+      '1112|QT_READY':    ['Aldy'],
+      '1113|QT_READY':    ['Aldy'],
+    };
+
+    // Mapping terbalik: nama → [{plant, tipe}]
+    var _NAMA_TO_PT = (function(){
+      var map = {};
+      Object.keys(_NAMA_MAP).forEach(function(key){
+        var parts = key.split('|'), plant=parts[0], tipe=parts[1];
+        // Hanya lokal/ekspor untuk filter riwayat (bukan GDFG)
+        if(tipe==='GDFG'||tipe==='GDFG-EKSPOR') return;
+        _NAMA_MAP[key].forEach(function(nama){
+          if(!map[nama]) map[nama]=[];
+          map[nama].push({plant:plant, tipe:tipe});
+        });
+      });
+      return map;
+    })();
+
+    function _initViewNamaOptions(){
+      var sel = document.getElementById('opViewNama');
+      if(!sel) return;
+      var allNames = Object.keys(_NAMA_TO_PT).sort();
+      sel.innerHTML = '<option value="">Semua Nama</option>';
+      allNames.forEach(function(n){
+        var opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        sel.appendChild(opt);
+      });
+    }
+
+    function _onViewNamaChange(){
+      var nama  = (document.getElementById('opViewNama')||{}).value||'';
+      var plantSel = document.getElementById('opViewPlant');
+      var tipeSel  = document.getElementById('opViewTipe');
+      if(!nama){
+        // Kosong → reset plant & tipe
+        if(plantSel) plantSel.value='';
+        if(tipeSel)  tipeSel.value='';
+        return;
+      }
+      var pts = _NAMA_TO_PT[nama]||[];
+      var _plantsSeen={}, plants=[];
+      pts.forEach(function(x){ if(!_plantsSeen[x.plant]){ _plantsSeen[x.plant]=1; plants.push(x.plant); } });
+      var _tipesSeen={}, tipes=[];
+      pts.forEach(function(x){ if(!_tipesSeen[x.tipe]){ _tipesSeen[x.tipe]=1; tipes.push(x.tipe); } });
+      // Selalu auto-set saat nama dipilih (bisa diubah manual setelahnya)
+      if(plantSel) plantSel.value = plants.length===1 ? plants[0] : '';
+      if(tipeSel)  tipeSel.value  = tipes.length===1  ? tipes[0]  : '';
+    }
+
+    function _onViewPlantChange(){
+      // Plant berubah manual — biarkan nama tetap terpilih
+    }
+
+    function _updateNamaOptions(){
+      var plant = (document.getElementById('opPlant')||{}).value || '';
+      var tipe  = _opCurrentTipe || 'LOKAL';
+      // FIFO bisa punya sub-tipe EKSPOR → key berbeda
+      var key = (tipe==='FIFO' && _fifoSubTipe==='EKSPOR')
+                ? plant + '|FIFO-EKSPOR'
+                : plant + '|' + tipe;
+      var names = _NAMA_MAP[key] || [];
+      var sel   = document.getElementById('opNama');
+      if(!sel) return;
+      var prev  = sel.value;
+      sel.innerHTML = '<option value="">— Pilih Nama —</option>';
+      names.forEach(function(n){
+        var opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        if(n === prev) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      if(names.length === 1) sel.value = names[0];
+    }
+    // Cache data tabel per tipe agar tidak hilang saat switch
+    var _opTipeCache = { LOKAL: null, EKSPOR: null };
+    var _opGdfgTipeCache = { LOKAL: null, EKSPOR: null };
+
+    function _opSaveCacheFor(tipe){
+      if(!tipe) return;
+      var rows = [];
+      document.getElementById('opnameTbody').querySelectorAll('tr').forEach(function(tr){
+        var rowData = {};
+        tr.querySelectorAll('td[data-col]').forEach(function(td){
+          rowData[td.dataset.col] = td.textContent.trim();
+        });
+        rows.push(rowData);
+      });
+      _opTipeCache[tipe] = rows;
+      var gRows = [];
+      document.getElementById('opnameTbodyGdfg').querySelectorAll('tr').forEach(function(tr){
+        var rowData = {};
+        tr.querySelectorAll('td[data-col]').forEach(function(td){
+          rowData[td.dataset.col] = td.textContent.trim();
+        });
+        gRows.push(rowData);
+      });
+      _opGdfgTipeCache[tipe] = gRows;
+    }
+
+    function _opRestoreCache(tipe){
+      var cached = _opTipeCache[tipe];
+      if(!cached || !cached.length) return;
+      var trs = Array.from(document.getElementById('opnameTbody').querySelectorAll('tr'));
+      cached.forEach(function(rowData, i){
+        var tr = trs[i];
+        if(!tr) return;
+        Object.keys(rowData).forEach(function(col){
+          var td = tr.querySelector('[data-col="'+col+'"]');
+          if(td && rowData[col]) td.textContent = rowData[col];
+        });
+        _calcOpRow(tr);
+      });
+      _updateOpTotals();
+      // GDFG
+      var gCached = _opGdfgTipeCache[tipe];
+      if(gCached && gCached.length){
+        var gTrs = Array.from(document.getElementById('opnameTbodyGdfg').querySelectorAll('tr'));
+        gCached.forEach(function(rowData, i){
+          var tr = gTrs[i];
+          if(!tr) return;
+          Object.keys(rowData).forEach(function(col){
+            var td = tr.querySelector('[data-col="'+col+'"]');
+            if(td && rowData[col]) td.textContent = rowData[col];
+          });
+          _calcOpGdfgRow(tr);
+        });
+        _updateOpGdfgTotals();
+      }
+    }
+
+        function opSetTipe(val){
+      var prevTipe = _opCurrentTipe; // simpan sebelum update
+      _opSaveCacheFor(prevTipe);     // simpan data tabel lama
+      _opCurrentTipe = val;
+      var sel = document.getElementById('opTipe');
+      var strip = document.getElementById('opTipeStrip');
+      var badge = document.getElementById('opTipeBadge');
+      var labelMain = document.getElementById('opCardLabelMain');
+      var labelTbl  = document.getElementById('opCardLabelTbl');
+      var isEkspor  = val==='EKSPOR';
+      var isFifo    = val==='FIFO';
+      var isQtReady = val==='QT_READY';
+
+      // CSS class untuk warna
+      var cls = isFifo ? 'fifo' : (isEkspor ? 'ekspor' : (isQtReady ? 'qtready' : 'lokal'));
+      if(sel){ sel.className = 'op-tipe-select '+cls; }
+      if(strip){ strip.className = 'op-tipe-strip '+cls; }
+      if(badge){ badge.textContent = val; }
+
+      var cardMain = document.querySelector('#opnamePage .op-card-section:not(.op-card-gdfg):not(.op-card-fifo):not(.op-card-qtready)');
+      var cardGdfg = document.querySelector('.op-card-gdfg');
+      var cardFifo = document.getElementById('opCardFifo');
+      var cardQt   = document.getElementById('opCardQtReady');
+      var saveBarMain = document.getElementById('opSaveBarMain');
+
+      // Sembunyikan semua card dulu
+      if(cardMain)    cardMain.style.display='none';
+      if(cardGdfg)    cardGdfg.style.display='none';
+      if(saveBarMain) saveBarMain.style.display='none';
+      if(cardFifo){   cardFifo.style.display='none'; cardFifo.classList.remove('active'); }
+      if(cardQt){     cardQt.style.display='none';   cardQt.classList.remove('active'); }
+
+      if(isFifo){
+        if(cardFifo){ cardFifo.style.display=''; cardFifo.classList.add('active'); }
+        _initFifoIfNeeded();
+        _updateFifoStats();
+      } else if(isQtReady){
+        if(cardQt){ cardQt.style.display=''; cardQt.classList.add('active'); }
+        _initQtIfNeeded();
+        _updateQtStats();
+        // Update judul tabel dengan tanggal
+        _qtUpdateTitle();
+      } else {
+        if(cardMain)    cardMain.style.display='';
+        if(cardGdfg)    cardGdfg.style.display='';
+        if(saveBarMain) saveBarMain.style.display='';
+        if(labelMain){ labelMain.textContent = isEkspor ? '🚢 EKSPOR' : '🏭 LOKAL'; }
+        if(labelTbl) { labelTbl.textContent  = isEkspor ? 'Ekspor'   : 'Lokal';   }
+        if(isEkspor){
+          OP_COLS_ORDER = OP_COLS_EKSPOR.slice();
+          OP_EDITABLE   = OP_EDIT_EKSPOR.slice();
+        } else {
+          OP_COLS_ORDER = OP_COLS_LOKAL.slice();
+          OP_EDITABLE   = OP_EDIT_LOKAL.slice();
+        }
+        // Update STOK cols agar navigate/paste ikut kolom baru
+        var opTbl=document.getElementById('opnameTbl');
+        if(opTbl&&opTbl._stokUpdateCols) opTbl._stokUpdateCols(OP_COLS_ORDER);
+        var opTblG=document.getElementById('opnameTblGdfg');
+        if(opTblG&&opTblG._stokUpdateCols) opTblG._stokUpdateCols(OP_COLS_ORDER);
+        _renderOpThead();
+        _renderOpTheadGdfg();
+        _updateNamaOptions();
+        initOpnameRows(30);
+        initOpnameGdfgRows(30);
+        _opRestoreCache(val);
+      }
+    }
+
+    function _renderOpThead(){
+      var thead = document.getElementById('opnameThead');
+      if(!thead) return;
+      if(_opCurrentTipe === 'EKSPOR'){
+        thead.innerHTML =
+          '<tr>' +
+            '<th class="row-no" rowspan="2">#</th>' +
+            '<th style="min-width:90px" rowspan="2">SKU</th>' +
+            '<th style="min-width:200px" rowspan="2">NAMA BARANG</th>' +
+            '<th style="min-width:110px" rowspan="2">BUYER</th>' +
+            '<th style="min-width:110px" rowspan="2">QUOTATION</th>' +
+            '<th style="min-width:105px" rowspan="2">PROD / EXP DATE</th>' +
+            '<th style="min-width:80px;text-align:right" rowspan="2">FISIK</th>' +
+            '<th colspan="2" style="text-align:center;background:rgba(66,153,225,.12)">SAP</th>' +
+            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GR</th>' +
+            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GI</th>' +
+            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.15)" rowspan="2">SELISIH AKHIR</th>' +
+            '<th style="min-width:120px" rowspan="2">KETERANGAN</th>' +
+            '<th style="min-width:70px;text-align:right;background:rgba(246,224,94,.06)" rowspan="2">STD PALLET</th>' +
+            '<th style="min-width:80px;text-align:right;background:rgba(246,224,94,.1)" rowspan="2">JML PALLET</th>' +
+            '<th style="width:28px" rowspan="2"></th>' +
+          '</tr>' +
+          '<tr>' +
+            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.08)">Detail QT</th>' +
+            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.12)">TOTAL</th>' +
+          '</tr>';
+      } else {
+        thead.innerHTML =
+          '<tr>' +
+            '<th class="row-no">#</th>' +
+            '<th style="min-width:90px">SKU</th>' +
+            '<th style="min-width:220px">NAMA BARANG</th>' +
+            '<th style="min-width:75px;text-align:right">SAP</th>' +
+            '<th style="min-width:75px;text-align:right">FISIK</th>' +
+            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AWAL</th>' +
+            '<th style="min-width:75px;text-align:right">PEND. GR</th>' +
+            '<th style="min-width:75px;text-align:right">PEND. GI</th>' +
+            '<th style="min-width:85px;text-align:right">SALAH KIRIM</th>' +
+            '<th style="min-width:65px;text-align:right">ADJ</th>' +
+            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AKHIR</th>' +
+            '<th style="min-width:110px">KET</th>' +
+            '<th style="min-width:60px;text-align:right;background:rgba(246,224,94,.06)">STD</th>' +
+            '<th style="min-width:75px;text-align:right;background:rgba(246,224,94,.1)">PALET</th>' +
+            '<th style="width:28px"></th>' +
+          '</tr>';
+      }
+    }
+
+    // ── Opname Zoom ──────────────────────────────
+    var _opZoom = 100; // percent
+    // opZoom dan opZoomReset: lihat definisi di bawah (support parameter tbl)
+
+    function _renderOpTheadGdfg(){
+      var thead = document.getElementById('opnameTheadGdfg');
+      if(!thead) return;
+      // GDFG pakai kolom yang sama dengan tipe aktif (lokal/ekspor)
+      if(_opCurrentTipe === 'EKSPOR'){
+        thead.innerHTML =
+          '<tr>' +
+            '<th class="row-no" rowspan="2">#</th>' +
+            '<th style="min-width:90px" rowspan="2">SKU</th>' +
+            '<th style="min-width:200px" rowspan="2">NAMA BARANG</th>' +
+            '<th style="min-width:110px" rowspan="2">BUYER</th>' +
+            '<th style="min-width:110px" rowspan="2">QUOTATION</th>' +
+            '<th style="min-width:105px" rowspan="2">PROD / EXP DATE</th>' +
+            '<th style="min-width:80px;text-align:right" rowspan="2">FISIK</th>' +
+            '<th colspan="2" style="text-align:center;background:rgba(66,153,225,.12)">SAP</th>' +
+            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GR</th>' +
+            '<th style="min-width:80px;text-align:right" rowspan="2">PENDING GI</th>' +
+            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.15)" rowspan="2">SELISIH AKHIR</th>' +
+            '<th style="min-width:120px" rowspan="2">KETERANGAN</th>' +
+            '<th style="min-width:70px;text-align:right;background:rgba(246,224,94,.06)" rowspan="2">STD PALLET</th>' +
+            '<th style="min-width:80px;text-align:right;background:rgba(246,224,94,.1)" rowspan="2">JML PALLET</th>' +
+            '<th style="width:28px" rowspan="2"></th>' +
+          '</tr>' +
+          '<tr>' +
+            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.08)">Detail QT</th>' +
+            '<th style="min-width:90px;text-align:right;background:rgba(66,153,225,.12)">TOTAL</th>' +
+          '</tr>';
+      } else {
+        thead.innerHTML =
+          '<tr>' +
+            '<th class="row-no">#</th>' +
+            '<th style="min-width:90px">SKU</th>' +
+            '<th style="min-width:220px">NAMA BARANG</th>' +
+            '<th style="min-width:75px;text-align:right">SAP</th>' +
+            '<th style="min-width:75px;text-align:right">FISIK</th>' +
+            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AWAL</th>' +
+            '<th style="min-width:75px;text-align:right">PEND. GR</th>' +
+            '<th style="min-width:75px;text-align:right">PEND. GI</th>' +
+            '<th style="min-width:85px;text-align:right">SALAH KIRIM</th>' +
+            '<th style="min-width:65px;text-align:right">ADJ</th>' +
+            '<th style="min-width:75px;text-align:right;background:rgba(66,153,225,.15)">SEL. AKHIR</th>' +
+            '<th style="min-width:110px">KET</th>' +
+            '<th style="min-width:60px;text-align:right;background:rgba(246,224,94,.06)">STD</th>' +
+            '<th style="min-width:75px;text-align:right;background:rgba(246,224,94,.1)">PALET</th>' +
+            '<th style="width:28px"></th>' +
+          '</tr>';
+      }
+    }

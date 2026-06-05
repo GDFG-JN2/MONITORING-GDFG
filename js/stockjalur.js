@@ -1,425 +1,3 @@
-  // ── Buka overlay pattern lock ──
-  function _patternOpen(onSuccess){
-    _patternLoadAsync(function(saved){
-      if(!saved){
-        // Belum ada pola — langsung masuk
-        onSuccess && onSuccess();
-        return;
-      }
-      _patternSuccess = onSuccess;
-      _patternSeq = [];
-      _patternReset();
-      document.getElementById('patternSubtitle').textContent = 'Masukkan pola untuk melanjutkan';
-      document.getElementById('patternOverlay').classList.add('show');
-    });
-  }
-
-  function _patternCancel(){
-    document.getElementById('patternOverlay').classList.remove('show');
-    _patternSeq = [];
-    _patternSuccess = null;
-  }
-
-  function _patternReset(){ _patternSeq=[]; _patternDrawLines([]); document.querySelectorAll('.pdot').forEach(function(d){ d.classList.remove('active','error','success'); }); }
-
-  function _patternGetDotCenter(i){
-    var dots = document.getElementById('patternDots');
-    var wrap = document.getElementById('patternDotsWrap');
-    var dot  = dots.querySelectorAll('.pdot')[i];
-    if(!dot||!wrap) return {x:0,y:0};
-    var wr = wrap.getBoundingClientRect();
-    var dr = dot.getBoundingClientRect();
-    return { x: dr.left+dr.width/2 - wr.left, y: dr.top+dr.height/2 - wr.top };
-  }
-
-  function _patternDrawLines(seq, curX, curY){
-    var svg = document.getElementById('patternSvg');
-    var wrap= document.getElementById('patternDotsWrap');
-    if(!svg||!wrap) return;
-    svg.style.width  = wrap.offsetWidth  + 'px';
-    svg.style.height = wrap.offsetHeight + 'px';
-    var lines = '';
-    for(var i=1;i<seq.length;i++){
-      var a=_patternGetDotCenter(seq[i-1]), b=_patternGetDotCenter(seq[i]);
-      lines += '<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>';
-    }
-    if(seq.length && curX !== undefined){
-      var last=_patternGetDotCenter(seq[seq.length-1]);
-      var wr=wrap.getBoundingClientRect();
-      lines += '<line x1="'+last.x+'" y1="'+last.y+'" x2="'+(curX-wr.left)+'" y2="'+(curY-wr.top)+'" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" opacity=".4" stroke-dasharray="4"/>';
-    }
-    svg.innerHTML = lines;
-  }
-
-  function _patternBindEvents(){
-    var dots = document.querySelectorAll('#patternDots .pdot');
-    var wrap = document.getElementById('patternDotsWrap');
-
-    function startDot(i){
-      if(_patternSeq.indexOf(i)<0){
-        _patternSeq.push(i);
-        dots[i].classList.add('active');
-        _patternDrawLines(_patternSeq);
-      }
-    }
-
-    function hitTest(clientX, clientY){
-      dots.forEach(function(d){
-        var r=d.getBoundingClientRect();
-        var i=parseInt(d.dataset.i);
-        if(clientX>=r.left&&clientX<=r.right&&clientY>=r.top&&clientY<=r.bottom && _patternSeq.indexOf(i)<0){
-          _patternSeq.push(i);
-          d.classList.add('active');
-        }
-      });
-      _patternDrawLines(_patternSeq, clientX, clientY);
-    }
-
-    dots.forEach(function(d){
-      d.addEventListener('mousedown',function(e){ e.preventDefault(); _patternDragging=true; startDot(parseInt(d.dataset.i)); });
-      d.addEventListener('touchstart',function(e){ e.preventDefault(); _patternDragging=true; startDot(parseInt(d.dataset.i)); },{passive:false});
-    });
-    wrap.addEventListener('mousemove',function(e){ if(!_patternDragging) return; hitTest(e.clientX,e.clientY); });
-    wrap.addEventListener('touchmove',function(e){ e.preventDefault(); if(!_patternDragging) return; var t=e.touches[0]; hitTest(t.clientX,t.clientY); },{passive:false});
-
-    function endDraw(){
-      if(!_patternDragging) return;
-      _patternDragging=false;
-      if(_patternSeq.length >= 4) _patternCheck();
-      else { _patternFlash('error','Min. 4 titik'); }
-    }
-    document.addEventListener('mouseup', endDraw);
-    document.addEventListener('touchend', endDraw);
-  }
-
-  function _patternCheck(){
-    var saved = _patternCache;
-    if(!saved){ _patternCancel(); _patternSuccess&&_patternSuccess(); return; }
-    var ok = (JSON.stringify(_patternSeq) === JSON.stringify(saved));
-    if(ok){
-      _patternFlash('success','✓ Pola benar', function(){
-        document.getElementById('patternOverlay').classList.remove('show');
-        _patternSuccess && _patternSuccess();
-        _patternSuccess = null;
-      });
-    } else {
-      _patternFlash('error','✗ Pola salah, coba lagi');
-    }
-  }
-
-  function _patternFlash(type, msg, cb){
-    document.querySelectorAll('#patternDots .pdot').forEach(function(d){ d.classList.remove('active'); d.classList.add(type); });
-    _patternDrawLines([]);
-    document.getElementById('patternSubtitle').textContent = msg;
-    setTimeout(function(){
-      document.querySelectorAll('#patternDots .pdot').forEach(function(d){ d.classList.remove(type,'active'); });
-      _patternSeq=[];
-      if(cb) cb();
-      else document.getElementById('patternSubtitle').textContent='Masukkan pola untuk melanjutkan';
-    }, 700);
-  }
-
-  // ── Setting Pola ──
-  function _psOpen(){
-    document.getElementById('patternSettingOverlay').classList.add('show');
-    document.getElementById('psettingPwInput').value='';
-    document.getElementById('psettingErr').textContent='';
-    ['psStep1','psStep2','psStep3'].forEach(function(s){ document.getElementById(s).classList.remove('active'); });
-    document.getElementById('psStep1').classList.add('active');
-    setTimeout(function(){ document.getElementById('psettingPwInput').focus(); }, 300);
-  }
-
-  function _psClose(){
-    document.getElementById('patternSettingOverlay').classList.remove('show');
-    _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1;
-    _psNewReset();
-  }
-
-  function _psCheckPassword(){
-    var pw = document.getElementById('psettingPwInput').value;
-    if(pw === _PATTERN_PW){
-      document.getElementById('psettingErr').textContent='';
-      document.getElementById('psStep1').classList.remove('active');
-      document.getElementById('psStep2').classList.add('active');
-    } else {
-      document.getElementById('psettingErr').textContent='Password salah.';
-      document.getElementById('psettingPwInput').select();
-    }
-  }
-
-  function _psGoSetNew(){
-    document.getElementById('psStep2').classList.remove('active');
-    document.getElementById('psStep3').classList.add('active');
-    _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1;
-    _psNewReset();
-    document.getElementById('psStep3Hint').textContent='Gambar pola baru Anda (min. 4 titik)';
-    document.getElementById('psettingHint').textContent='Gambar pola di atas';
-    _psBindNewDots();
-  }
-
-  function _psRemovePattern(){
-    _patternClear();
-    _psClose();
-    showToast('✓ Pola dihapus — Riwayat tidak terkunci','');
-  }
-
-  var _psNewDragging = false;
-  var _psNewSeqCurrent = [];
-
-  function _psNewReset(){
-    _psNewSeqCurrent=[];
-    document.querySelectorAll('#psettingNewDots .psnewdot').forEach(function(d){ d.classList.remove('active'); });
-    document.getElementById('psNewSvg').innerHTML='';
-  }
-
-  function _psNewGetCenter(i){
-    var wrap = document.getElementById('psNewDotsWrap');
-    var dot  = document.querySelectorAll('#psettingNewDots .psnewdot')[i];
-    if(!dot||!wrap) return {x:0,y:0};
-    var wr=wrap.getBoundingClientRect(), dr=dot.getBoundingClientRect();
-    return {x:dr.left+dr.width/2-wr.left, y:dr.top+dr.height/2-wr.top};
-  }
-
-  function _psNewDrawLines(seq, curX, curY){
-    var svg = document.getElementById('psNewSvg');
-    var wrap= document.getElementById('psNewDotsWrap');
-    if(!svg||!wrap) return;
-    svg.style.width=wrap.offsetWidth+'px'; svg.style.height=wrap.offsetHeight+'px';
-    var lines='';
-    for(var i=1;i<seq.length;i++){
-      var a=_psNewGetCenter(seq[i-1]),b=_psNewGetCenter(seq[i]);
-      lines+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#3182ce" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>';
-    }
-    if(seq.length&&curX!==undefined){
-      var last=_psNewGetCenter(seq[seq.length-1]);
-      var wr=wrap.getBoundingClientRect();
-      lines+='<line x1="'+last.x+'" y1="'+last.y+'" x2="'+(curX-wr.left)+'" y2="'+(curY-wr.top)+'" stroke="#3182ce" stroke-width="2" stroke-linecap="round" opacity=".4" stroke-dasharray="4"/>';
-    }
-    svg.innerHTML=lines;
-  }
-
-  function _psBindNewDots(){
-    var dots = document.querySelectorAll('#psettingNewDots .psnewdot');
-    var wrap = document.getElementById('psNewDotsWrap');
-
-    function startDot(i){ if(_psNewSeqCurrent.indexOf(i)<0){ _psNewSeqCurrent.push(i); dots[i].classList.add('active'); _psNewDrawLines(_psNewSeqCurrent); } }
-    function hitTest(cx,cy){
-      dots.forEach(function(d){
-        var r=d.getBoundingClientRect(), i=parseInt(d.dataset.i);
-        if(cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom&&_psNewSeqCurrent.indexOf(i)<0){ _psNewSeqCurrent.push(i); d.classList.add('active'); }
-      });
-      _psNewDrawLines(_psNewSeqCurrent,cx,cy);
-    }
-
-    dots.forEach(function(d){
-      d.addEventListener('mousedown',function(e){ e.preventDefault(); _psNewDragging=true; startDot(parseInt(d.dataset.i)); });
-      d.addEventListener('touchstart',function(e){ e.preventDefault(); _psNewDragging=true; startDot(parseInt(d.dataset.i)); },{passive:false});
-    });
-    wrap.addEventListener('mousemove',function(e){ if(!_psNewDragging)return; hitTest(e.clientX,e.clientY); });
-    wrap.addEventListener('touchmove',function(e){ e.preventDefault(); if(!_psNewDragging)return; var t=e.touches[0]; hitTest(t.clientX,t.clientY); },{passive:false});
-
-    function endDraw(){
-      if(!_psNewDragging)return; _psNewDragging=false;
-      if(_psNewSeqCurrent.length<4){ document.getElementById('psettingHint').textContent='Min. 4 titik, ulangi'; _psNewReset(); return; }
-      if(_psNewPhase===1){
-        _psNewSeq1 = _psNewSeqCurrent.slice();
-        _psNewPhase = 2;
-        _psNewReset();
-        document.getElementById('psStep3Hint').textContent='Konfirmasi pola';
-        document.getElementById('psettingHint').textContent='Gambar ulang pola yang sama';
-      } else {
-        _psNewSeq2 = _psNewSeqCurrent.slice();
-        if(JSON.stringify(_psNewSeq1)===JSON.stringify(_psNewSeq2)){
-          _patternSave(_psNewSeq1);
-          _psClose();
-          showToast('✓ Pola berhasil disimpan','');
-        } else {
-          document.getElementById('psettingHint').textContent='✗ Pola tidak cocok, mulai ulang';
-          _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1;
-          setTimeout(function(){ _psNewReset(); document.getElementById('psStep3Hint').textContent='Gambar pola baru Anda (min. 4 titik)'; document.getElementById('psettingHint').textContent='Gambar pola di atas'; }, 800);
-        }
-      }
-    }
-    document.addEventListener('mouseup',endDraw);
-    document.addEventListener('touchend',endDraw);
-  }
-
-  function _psResetNew(){ _psNewSeq1=[]; _psNewSeq2=[]; _psNewPhase=1; _psNewReset(); document.getElementById('psStep3Hint').textContent='Gambar pola baru Anda (min. 4 titik)'; document.getElementById('psettingHint').textContent='Gambar pola di atas'; }
-
-  // Init pattern events on load
-  function sjToggleSSMenu(){
-    var menu=document.getElementById('sjSSMenu');
-    if(!menu)return;
-    var isOpen=menu.style.display!=='none';
-    menu.style.display=isOpen?'none':'block';
-  }
-  // Tutup dropdown saat klik di luar
-  document.addEventListener('click',function(e){
-    var wrap=document.getElementById('sjSSDropWrap');
-    var menu=document.getElementById('sjSSMenu');
-    if(menu&&wrap&&!wrap.contains(e.target)) menu.style.display='none';
-  });
-
-  window.addEventListener('load', function(){ _patternBindEvents(); });
-
-  // =============================================
-  // STOCK JALUR PAGE
-  // =============================================
-  var _sjZoom=100, _soZoom=100, _sjActiveTab='input';
-  var _sjSel={r1:-1,c1:-1,r2:-1,c2:-1}, _sjDragging=false;
-  var _soSel={r1:-1,c1:-1,r2:-1,c2:-1}, _soDragging=false;
-  var _sjInitDone=false;
-  var _srCurrentSheet=''; // sheet name aktif untuk edit rekap
-  var _srCurrentSsUrl=''; // ssUrl aktif untuk edit rekap
-
-  var SJ_COLS=['prodate','sku','nama','qty','shift','plant','catatan','status'];
-  var SO_COLS=['prodate','sku','nama','qty','tglkeluar','nomobil','nodo','tujuan','plant','catatan','status'];
-  // STATUS saja yang auto (tidak bisa diedit) — NAMA BARANG bisa diedit
-  var SJ_AUTO={'status':true};
-  var SO_AUTO={'status':true};
-
-  function _sjFallbackCopy(text){
-    var ta=document.createElement('textarea');
-    ta.value=text; ta.style.cssText='position:fixed;top:0;left:0;width:2px;height:2px;opacity:0;';
-    document.body.appendChild(ta); ta.focus(); ta.select();
-    try{ document.execCommand('copy'); }catch(ex){}
-    document.body.removeChild(ta);
-  }
-  function _sjRawText(td){ return td?(td.textContent||'').trim():''; }
-
-  function _sjApplyShiftBadge(td){
-    var v=_sjRawText(td); td.innerHTML=''; if(!v)return;
-    var cls={'1':'sj-shift-1','2':'sj-shift-2','3':'sj-shift-3'}[v];
-    if(cls){var s=document.createElement('span');s.className=cls;s.textContent='Shift '+v;td.appendChild(s);}else td.textContent=v;
-  }
-  function _sjApplyPlantBadge(td,pfx){
-    var v=_sjRawText(td); td.innerHTML=''; if(!v)return;
-    var p=pfx||'sj';
-    var cls={'1111':p+'-plant-1111','1112':p+'-plant-1112','1113':p+'-plant-1113'}[v];
-    if(cls){var s=document.createElement('span');s.className=cls;s.textContent=v;td.appendChild(s);}else td.textContent=v;
-  }
-  function _sjApplyStatusBadge(td,pfx){
-    var v=_sjRawText(td); td.innerHTML=''; if(!v)return;
-    var p=pfx||'sj';
-    var cls=v==='DONE'?p+'-status-done':(v.indexOf('Error')>=0||v.indexOf('kurang')>=0?p+'-status-error':'so-status-warn');
-    var s=document.createElement('span');s.className=cls;s.textContent=v;td.appendChild(s);
-  }
-
-  // Lookup nama — pakai _opnameNamaMap (shared), hanya auto-fill jika sel masih kosong
-  function _sjGetNama(sku){
-    if(typeof _opnameNamaMap!=='undefined'&&_opnameNamaMap[sku]) return _opnameNamaMap[sku];
-    if(typeof _skuNamaMap!=='undefined'&&_skuNamaMap[sku]) return _skuNamaMap[sku];
-    return null;
-  }
-  var _sjStdLoading = false;   // sedang load STD
-  var _sjStdLoaded  = false;   // sudah selesai load
-  var _sjPendingLookup = [];   // [{tr, namaCol}] yang menunggu data
-
-  function _sjLookupSku(tr, namaCol){
-    var st=tr.querySelector('[data-col="sku"]');
-    var nt=tr.querySelector('[data-col="'+(namaCol||'nama')+'"]');
-    if(!st||!nt) return;
-    var sku=_sjRawText(st);
-    if(!sku){ nt.textContent=''; nt.style.color=''; return; }
-    // Hanya auto-fill jika sel nama masih kosong
-    if(_sjRawText(nt)) return;
-
-    var nama=_sjGetNama(sku);
-    if(nama){
-      nt.textContent=nama; nt.style.color='#2d3748'; return;
-    }
-
-    // Nama tidak ditemukan di map lokal
-    if(_sjStdLoaded){
-      // Data sudah ada tapi SKU benar-benar tidak ada
-      nt.textContent='\u26a0\ufe0f Tidak terdaftar'; nt.style.color='#e53e3e';
-      return;
-    }
-
-    // Data belum ada — queue dan load kalau belum loading
-    nt.textContent='\u23f3 Mencari...'; nt.style.color='#a0aec0';
-    _sjPendingLookup.push({tr:tr, namaCol:namaCol||'nama'});
-
-    if(!_sjStdLoading){
-      _sjStdLoading=true;
-      google.script.run /* TODO: manual replace google.script.run */
-        .withSuccessHandler(function(res){
-          _sjStdLoading=false;
-          _sjStdLoaded=true;
-          if(res&&res.success&&res.data) res.data.forEach(function(r){
-            if(r.sku){
-              var sk=String(r.sku).trim();
-              if(typeof _opnameNamaMap!=='undefined') _opnameNamaMap[sk]=_opnameNamaMap[sk]||r.nama||'';
-              if(typeof _skuNamaMap!=='undefined')    _skuNamaMap[sk]   =_skuNamaMap[sk]   ||r.nama||'';
-            }
-          });
-          // Retry semua yang pending
-          var pending=_sjPendingLookup.splice(0);
-          pending.forEach(function(p){
-            var st2=p.tr.querySelector('[data-col="sku"]');
-            var nt2=p.tr.querySelector('[data-col="'+p.namaCol+'"]');
-            if(!st2||!nt2) return;
-            var sku2=_sjRawText(st2);
-            var nama2=_sjGetNama(sku2);
-            if(nama2){ nt2.textContent=nama2; nt2.style.color='#2d3748'; }
-            else { nt2.textContent='\u26a0\ufe0f Tidak terdaftar'; nt2.style.color='#e53e3e'; }
-          });
-        })
-        .withFailureHandler(function(){
-          _sjStdLoading=false; _sjStdLoaded=true;
-          var pending=_sjPendingLookup.splice(0);
-          pending.forEach(function(p){
-            var nt2=p.tr.querySelector('[data-col="'+p.namaCol+'"]');
-            if(nt2){ nt2.textContent='\u26a0\ufe0f Tidak terdaftar'; nt2.style.color='#e53e3e'; }
-          });
-        })
-        .getStandarPalet();
-    }
-  }
-
-  function _sjTrIdx(tbody,tr){ return Array.from(tbody.querySelectorAll('tr')).indexOf(tr); }
-  function _sjTcIdx(cols,td){ return cols.indexOf(td.dataset.col||''); }
-
-  function sjSwitchTab(tab){
-    if(_sjActiveTab===tab)return; _sjActiveTab=tab;
-    var panes={input:'sjInputPane',output:'sjOutputPane',rekap:'sjRekapPane'};
-    var btns={input:'btnSjInput',output:'btnSjOutput',rekap:'btnSjRekap'};
-    // Sembunyikan semua pane dengan animasi fade
-    var curPane=document.getElementById(panes[_sjActiveTab==='input'?'input':_sjActiveTab]);
-    // Cari pane yang sedang tampil
-    var curId=null;
-    ['input','output','rekap'].forEach(function(t){
-      var p=document.getElementById(panes[t]);
-      if(p&&p.style.display!=='none')curId=panes[t];
-    });
-    var cur=curId?document.getElementById(curId):null;
-    var tgt=document.getElementById(panes[tab]);
-    if(!tgt)return;
-    _sjActiveTab=tab;
-    // Update tombol aktif
-    Object.keys(btns).forEach(function(t){
-      var b=document.getElementById(btns[t]);
-      if(b)b.style.background=t===tab?'rgba(255,255,255,.38)':'rgba(255,255,255,.18)';
-    });
-    if(cur&&cur!==tgt){
-      cur.style.transition='opacity .18s ease,transform .18s ease';
-      cur.style.opacity='0'; cur.style.transform='translateX(-24px)';
-      setTimeout(function(){
-        cur.style.display='none'; cur.style.transition=cur.style.opacity=cur.style.transform='';
-        _sjShowPane(tgt);
-      },180);
-    } else {
-      _sjShowPane(tgt);
-    }
-  }
-  function _sjShowPane(tgt){
-    tgt.style.display=''; tgt.style.opacity='0'; tgt.style.transform='translateX(24px)';
-    void tgt.offsetWidth;
-    tgt.style.transition='opacity .18s ease,transform .18s ease';
-    tgt.style.opacity='1'; tgt.style.transform='translateX(0)';
-    setTimeout(function(){tgt.style.transition='';},200);
-  }
-
   function sjInitPage(){
     var bi=document.getElementById('btnSjInput'),bo=document.getElementById('btnSjOutput'),br=document.getElementById('btnSjRekap');
     if(bi)bi.style.background='rgba(255,255,255,.38)';
@@ -630,18 +208,19 @@
     if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Menyimpan...';}
     _sjSaving=true;
     showToast('\u23f3 Menyimpan '+payload.length+' baris...','');
-    API.rekapStockJalur(payload,
-      function(res){
+    google.script.run
+      .withSuccessHandler(function(res){
         _sjSaving=false;
         if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan & Rekap';}
         if(res&&res.success){showToast('\u2705 Berhasil merekap '+payload.length+' baris!','success');_sjMarkDone(data,res.done||[],res.errors||[]);}
         else showToast('\u274c Gagal: '+(res&&res.message?res.message:'Unknown error'),'error');
-      },
-      function(err){
+      })
+      .withFailureHandler(function(err){
         _sjSaving=false;
         if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan & Rekap';}
         showToast('\u274c Error: '+(err&&err.message?err.message:String(err)),'error');
-      });
+      })
+      .rekapStockJalur(payload);
   }
   function _sjMarkDone(dataWithRows,done,errors){
     dataWithRows.forEach(function(d){
@@ -809,18 +388,19 @@
     if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Memproses...';}
     _soSaving=true;
     showToast('\u23f3 Memproses '+payload.length+' baris...','');
-    API.rekapOutputJalur(payload,
-      function(res){
+    google.script.run
+      .withSuccessHandler(function(res){
         _soSaving=false;
         if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-truck"></i> Simpan & Kirim';}
         if(res&&res.success){showToast('\u2705 Selesai! '+res.done+' berhasil.','success');_soMarkResult(data,res.results||[]);_soUpdateTotals();}
         else showToast('\u274c Gagal: '+(res&&res.message?res.message:'Unknown error'),'error');
-      },
-      function(err){
+      })
+      .withFailureHandler(function(err){
         _soSaving=false;
         if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-truck"></i> Simpan & Kirim';}
         showToast('\u274c Error: '+(err&&err.message?err.message:String(err)),'error');
-      });
+      })
+      .rekapOutputJalur(payload);
   }
   function _soMarkResult(dataWithRows,results){
     dataWithRows.forEach(function(d,i){
@@ -929,18 +509,19 @@
     dd.innerHTML='<div class="sr-sku-empty"><i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Mencari "'+_srEsc(keyword)+'"...</div>';
     dd.style.display='block';
 
-    API.searchSheetNames(ssInfo.url, keyword,
-      function(res){
+    google.script.run
+      .withSuccessHandler(function(res){
         // Hanya render kalau keyword masih aktif (user belum ketik lagi)
         if(_srSearchActive!==keyword) return;
         var results = (res&&res.success&&res.sheets) ? res.sheets : [];
         _srSearchCache[keyword] = results;
         _srRenderDropdown(keyword, results);
-      },
-      function(){
+      })
+      .withFailureHandler(function(){
         if(_srSearchActive!==keyword) return;
         dd.innerHTML='<div class="sr-sku-empty" style="color:#e53e3e;">Gagal memuat</div>';
-      });
+      })
+      .searchSheetNames(ssInfo.url, keyword);
   }
 
   function _srRenderDropdown(keyword, list){
@@ -1037,8 +618,8 @@
       var ssUrl     = _srCurrentSsUrl;
       if(!sheetName||!ssUrl){ showToast('Sheet tidak diketahui','error'); return; }
       td.style.opacity = '0.5';
-      API.updateSrKirimCell({ssUrl: ssUrl, sheetName: sheetName, blokIdx: blokIdx, ki: ki, field: field, value: newVal},
-        function(res){
+      google.script.run
+        .withSuccessHandler(function(res){
           td.style.opacity = '';
           if(res && res.success){
             td.style.background='#c6f6d5'; td.style.outline='1px solid #38a169';
@@ -1047,12 +628,13 @@
             showToast('❌ Gagal: '+(res&&res.message||'unknown'),'error');
             td.innerHTML = origText;
           }
-        },
-        function(e){
+        })
+        .withFailureHandler(function(e){
           td.style.opacity = '';
           showToast('❌ Error: '+e.message,'error');
           td.innerHTML = origText;
-        });
+        })
+        .updateSrKirimCell({ssUrl: ssUrl, sheetName: sheetName, blokIdx: blokIdx, ki: ki, field: field, value: newVal});
     }
 
     inp.addEventListener('blur', save);
@@ -1137,7 +719,8 @@
     modal.style.display='none';
     td.style.opacity='0.5';
 
-    API.updateSrShiftCell(function(res){
+    google.script.run
+      .withSuccessHandler(function(res){
         td.style.opacity='';
         if(res&&res.success){
           td.textContent=Number(newVal).toLocaleString('id-ID');
@@ -1147,12 +730,13 @@
           showToast('❌ Gagal: '+(res&&res.message||'unknown'),'error');
           td.textContent=origVal;
         }
-      },
-      function(e){
+      })
+      .withFailureHandler(function(e){
         td.style.opacity='';
         showToast('❌ Error: '+e.message,'error');
         td.textContent=origVal;
-      });
+      })
+      .updateSrShiftCell({
         ssUrl     : modal._ssUrl,
         sheetName : modal._sheetName,
         blokIdx   : modal._blokIdx,
@@ -1213,17 +797,18 @@
     document.getElementById('srEmpty').style.display='none';
     document.getElementById('srTable').style.display='none';
     document.getElementById('srSkuInfo').style.display='none';
-    API.getKartuStock(ssInfo.url, sku,
-      function(res){
+    google.script.run
+      .withSuccessHandler(function(res){
         document.getElementById('srLoading').style.display='none';
         if(!res||!res.success){showToast('\u274c Gagal: '+(res&&res.message?res.message:'error'),'error');srHideResult();return;}
         srRender(res, plant, ssInfo.label, sku);
-      },
-      function(err){
+      })
+      .withFailureHandler(function(err){
         document.getElementById('srLoading').style.display='none';
         showToast('\u274c Error: '+(err&&err.message?err.message:String(err)),'error');
         srHideResult();
-      });
+      })
+      .getKartuStock(ssInfo.url, sku);
   }
 
   function srRender(res, plant, ssLabel, skuName){
