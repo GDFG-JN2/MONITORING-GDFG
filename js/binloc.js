@@ -1,4 +1,4 @@
-  function blInitPage() {
+function blInitPage() {
     if (!_blData.length) blLoadData(false);
     blStartAutoRefresh();
   }
