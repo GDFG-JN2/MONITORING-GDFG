@@ -1,4 +1,4 @@
-    function renderPieChart(){
+function renderPieChart(){
       if(!divisiChartData) return;
 
       // === PIE 1: Lokal (Wafer+Biskuit) vs Ekspor ===
@@ -355,17 +355,6 @@
       }).getSummaryEkspor();
     }
 
-    function updateLastRefresh(){
-      google.script.run
-        .withSuccessHandler(function(res){
-          document.getElementById("lastUpdateValue").innerText =
-            (res && res.value) ? res.value : '-';
-        })
-        .withFailureHandler(function(){
-          document.getElementById("lastUpdateValue").innerText = '-';
-        })
-        .getLastUpdate();
-    }
 
     function updateStock(){
       _patternOpen(function(){
