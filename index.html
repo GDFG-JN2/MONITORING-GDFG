@@ -202,6 +202,15 @@
     }
     .toggle-btn.active{ background:linear-gradient(135deg,#0f2027,#2c5364); color:#fff; box-shadow:0 2px 8px rgba(15,32,39,.25); }
     .toggle-btn:not(.active):hover{ background:#cbd5e0; color:#2d3748; }
+    .chart-zoom-ctrl{ display:flex; align-items:center; gap:4px; margin-left:auto; flex-shrink:0; }
+    .chart-zoom-btn{
+      width:26px; height:26px; border-radius:6px; border:1.5px solid #e2e8f0;
+      background:#fff; color:#4a5568; font-size:14px; font-weight:800;
+      cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+      transition:all .15s; line-height:1;
+    }
+    .chart-zoom-btn:hover{ background:#f7fafc; border-color:#a0aec0; }
+    .chart-zoom-val{ font-size:11px; color:#718096; min-width:36px; text-align:center; font-weight:700; }
 
     /* ===== CHART CARDS ===== */
     .summary-charts{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:10px; }
@@ -1239,6 +1248,21 @@
       font-size:13px;
     }
 
+    /* ===== ZOOM CONTROL ===== */
+    #zoomControl{
+      display:flex; align-items:center; gap:4px;
+      background:rgba(255,255,255,.12); border-radius:20px;
+      padding:3px 8px; font-size:11px; color:#fff;
+    }
+    #zoomControl button{
+      background:none; border:none; color:#fff;
+      font-size:13px; cursor:pointer; padding:2px 5px;
+      border-radius:10px; transition:background .15s;
+      line-height:1;
+    }
+    #zoomControl button:hover{ background:rgba(255,255,255,.2); }
+    #zoomControl span{ min-width:30px; text-align:center; font-weight:700; font-size:10px; }
+
     /* ===== APP PORTAL ===== */
     .app-portal-card{
       display:flex; align-items:center; gap:14px;
@@ -1338,8 +1362,11 @@
       .toggle-btn{ padding:6px 12px; font-size:12px; }
       .last-update{ margin:4px 12px; font-size:11px; }
 
-      .chart-canvas-wrap{ height:200px; }
-      .chart-canvas-wrap.horizontal{ height:300px; }
+      .chart-canvas-wrap{ height:160px; }
+      .chart-canvas-wrap.horizontal{ height:220px; }
+      .chart-card{ padding:12px 12px 10px; }
+      .chart-card-title{ font-size:12px; }
+      .chart-card-sub{ font-size:10px; margin-bottom:8px; }
 
       .input-page-wrap{ padding:12px 12px 24px 12px; }
       .sp-form-grid{ grid-template-columns:1fr 1fr; gap:8px; }
@@ -1362,20 +1389,22 @@
     @media(max-width:520px){
       /* Summary cards 2 kolom compact */
       .summary-boxes{ grid-template-columns:1fr 1fr; gap:6px; margin:6px 10px; }
-      .summary-card{ padding:10px 8px; }
-      .summary-card h3{ font-size:10px; }
-      .summary-card p{ font-size:15px; }
-      .summary-card span{ font-size:10px; }
+      .summary-card{ padding:8px 8px; }
+      .summary-card h3{ font-size:9px; }
+      .summary-card p{ font-size:14px; }
+      .summary-card span{ font-size:9px; }
 
       /* Header — sembunyikan teks tombol */
       .btn-hdr-text{ display:none; }
       .btn-hdr{ padding:5px 8px; }
 
       /* Chart */
-      .chart-canvas-wrap{ height:170px; }
-      .chart-canvas-wrap.horizontal{ height:500px; }
-      .chart-card{ padding:10px 8px; }
-      .chart-card-title{ font-size:12px; }
+      .chart-canvas-wrap{ height:140px; }
+      .chart-canvas-wrap.horizontal{ height:300px; }
+      .chart-card{ padding:8px 8px; margin-bottom:8px; }
+      .chart-card-title{ font-size:11px; }
+      .chart-card-sub{ display:none; }
+      .summary-charts{ gap:8px; }
       /* Pie & trend full width di mobile */
       #viewPie{ flex-direction:column !important; }
       #viewTrend .trend-filter{ flex-wrap:wrap; gap:6px; }
@@ -2336,6 +2365,11 @@
         <button class="btn-hdr" onclick="showPage('inputPage')"><i class="fas fa-keyboard"></i> <span class="btn-hdr-text">Input Data</span></button>
         <button class="btn-hdr" onclick="updateStock()"><i class="fas fa-database"></i> <span class="btn-hdr-text">Spreadsheet</span></button>
         <button class="btn-hdr" onclick="refreshData()"><i class="fas fa-sync-alt"></i> <span class="btn-hdr-text">Refresh</span></button>
+        <div id="zoomControl">
+          <button onclick="_zoomOut()" title="Zoom out">−</button>
+          <span id="zoomLabel">100%</span>
+          <button onclick="_zoomIn()" title="Zoom in">+</button>
+        </div>
         <button class="btn-hdr" onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span class="btn-hdr-text">Logout</span></button>
       </div>
     </div>
@@ -2402,6 +2436,12 @@
         <button class="toggle-btn" id="btnToggleTrend" onclick="switchView('trend')">
           <i class="fas fa-chart-line"></i> Trend
         </button>
+        <!-- Zoom control -->
+        <div class="chart-zoom-ctrl" id="chartZoomCtrl">
+          <button class="chart-zoom-btn" onclick="_chartZoom(-10)">−</button>
+          <span class="chart-zoom-val" id="chartZoomVal">100%</span>
+          <button class="chart-zoom-btn" onclick="_chartZoom(+10)">+</button>
+        </div>
       </div>
 
       <!-- VIEW: CHART -->
