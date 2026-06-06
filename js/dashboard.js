@@ -410,23 +410,6 @@ function renderPieChart(){
     }
 
     // ── Render tab section dari data history ──
-    function _renderHistorySection(containerId, arr, badgeId){
-      var el = document.getElementById(containerId);
-      var badge = document.getElementById(badgeId);
-      if(!el) return;
-      if(!arr.length){
-        el.innerHTML='<div style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</div>';
-        if(badge) badge.textContent='0 SKU';
-        return;
-      }
-      if(badge) badge.textContent=arr.length+' SKU';
-      var html='<table class="g-table"><thead><tr><th>#</th><th>Material Code</th><th>Nama Barang</th><th style="text-align:right;">Ending Balance</th><th style="text-align:right;">Jml Pallet</th></tr></thead><tbody>';
-      arr.forEach(function(r,i){
-        html+='<tr><td style="color:#a0aec0;">'+(i+1)+'</td><td style="font-weight:700;color:#2b6cb0;font-size:11px;">'+r.skuBarang+'</td><td>'+r.namaBarang+'</td><td style="text-align:right;font-variant-numeric:tabular-nums;">'+(r.jmlKarton||0).toLocaleString('id-ID')+'</td><td style="text-align:right;font-weight:700;">'+(r.jmlPallet||0).toLocaleString('id-ID')+'</td></tr>';
-      });
-      html+='</tbody></table>';
-      el.innerHTML=html;
-    }
 
     // =============================================
     // LOAD KAPASITAS DARI HISTORY (pengganti REKAP STOCK)
