@@ -1136,13 +1136,27 @@
 
     /* ===== SIDEBAR ===== */
     .sidebar{
-      position:fixed; top:0; left:-260px; width:260px; height:100%;
+      position:fixed; top:0; left:-260px; width:260px;
+      height:100%; height:100dvh;
       background:linear-gradient(180deg,#0f2027 0%,#1a3a4a 60%,#2c5364 100%);
       color:white; transition:left .35s cubic-bezier(.4,0,.2,1);
       z-index:1000; display:flex; flex-direction:column;
       box-shadow:4px 0 24px rgba(0,0,0,.3);
+      overflow-y:auto; overflow-x:hidden;
+      -webkit-overflow-scrolling:touch;
     }
     .sidebar.active{ left:0; }
+    /* Landscape mobile: sidebar lebih compact */
+    @media(max-height:500px){
+      .sidebar{ width:220px; left:-220px; }
+      .sidebar-header{ padding:12px 14px 10px; }
+      .sidebar-logo{ width:28px; height:28px; font-size:14px; }
+      .sidebar-app-name{ font-size:11px; }
+      .sidebar-section-label{ padding:8px 14px 4px; font-size:9px; }
+      .sidebar-menu a{ padding:7px 10px; font-size:12px; }
+      .sidebar-menu a .s-icon{ width:26px; height:26px; font-size:12px; }
+      .sidebar-footer{ padding:8px 10px; }
+    }
 
     /* Header sidebar */
     .sidebar-header{
@@ -1172,7 +1186,7 @@
     }
 
     /* Menu items */
-    .sidebar-menu{ flex:1; padding:4px 12px; }
+    .sidebar-menu{ flex:1; padding:4px 12px; overflow-y:auto; overflow-x:hidden; }
     .sidebar-menu a{
       display:flex; align-items:center; gap:12px;
       padding:11px 14px; border-radius:10px; margin-bottom:2px;
@@ -1234,10 +1248,41 @@
 
     /* ===== RESPONSIVE ===== */
     *, *::before, *::after{ box-sizing:border-box; }
-    body{ overflow-x:hidden; }
+    html{ overflow-x:hidden; }
+    body{
+      overflow-x:hidden; max-width:100vw;
+      /* Safe area untuk notch/landscape */
+      padding-left:  env(safe-area-inset-left,  0px);
+      padding-right: env(safe-area-inset-right,  0px);
+    }
+    #dashboard{ overflow-x:hidden; max-width:100vw; }
+    #loginWrap{ overflow-x:hidden; }
+    /* Semua page: tidak boleh overflow ke kanan */
+    #inputPage, #realisasiPage, #opnamePage,
+    #rdcPage, #stockJalurPage, #binLocPage{
+      overflow-x:hidden; max-width:100vw;
+    }
+    /* Tabel dalam page: scroll horizontal di dalam container */
+    .tbl-scroll-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    /* Header sticky safe area */
+    .gdrm-header{
+      padding-left: max(16px, calc(env(safe-area-inset-left, 0px) + 16px));
+      padding-right: max(16px, calc(env(safe-area-inset-right, 0px) + 16px));
+    }
+    /* Sidebar tidak melampaui layar */
+    .sidebar{ max-height:100vh; overflow-y:auto; }
 
     /* Tablet ≤ 768px */
     @media(max-width:768px){
+      /* Filter bar wrap di semua halaman */
+      .rdc-filter-bar, .sj-filter-bar, .sr-filter-bar{
+        flex-wrap:wrap !important;
+        gap:8px !important;
+      }
+      .rdc-filter-bar > *, .sj-filter-bar > *, .sr-filter-bar > *{
+        flex: 1 1 calc(50% - 4px) !important;
+        min-width:120px !important;
+      }
       .gdrm-header{ padding:8px 12px; }
       .gdrm-header h2{ font-size:13px; }
       .gdrm-header-btns{ gap:6px; flex-wrap:wrap; }
@@ -1299,9 +1344,12 @@
 
       /* Chart */
       .chart-canvas-wrap{ height:170px; }
-      .chart-canvas-wrap.horizontal{ height:480px; }
-      .chart-card{ padding:12px; }
+      .chart-canvas-wrap.horizontal{ height:500px; }
+      .chart-card{ padding:10px 8px; }
       .chart-card-title{ font-size:12px; }
+      /* Pie & trend full width di mobile */
+      #viewPie{ flex-direction:column !important; }
+      #viewTrend .trend-filter{ flex-wrap:wrap; gap:6px; }
 
       /* Tabs */
       .g-tab{ padding:7px 10px; font-size:11px; }
