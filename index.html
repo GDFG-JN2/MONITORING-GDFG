@@ -3940,19 +3940,360 @@
 
 
 
+  <!-- Modal Plant untuk STD Edit -->
+  <div id="stdPlantModal">
+    <div id="stdPlantModalBox">
+      <h3><i class="fas fa-industry" style="margin-right:6px;"></i>Pilih Plant</h3>
+      <p>Pilih plant untuk menyimpan perubahan data standar ini.</p>
+      <div class="std-plant-opts">
+        <div class="std-plant-opt" onclick="_stdPlantSelect(this,'1111')">1111</div>
+        <div class="std-plant-opt" onclick="_stdPlantSelect(this,'1112')">1112</div>
+        <div class="std-plant-opt" onclick="_stdPlantSelect(this,'1113')">1113</div>
+      </div>
+      <div class="std-plant-modal-btns">
+        <button id="stdPlantCancelBtn" onclick="_stdPlantCancel()">Batal</button>
+        <button id="stdPlantConfirmBtn" onclick="_stdPlantConfirm()">Simpan</button>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Alasan Revisi -->
+  <div id="revisiModal">
+    <div id="revisiModalBox">
+      <h3><i class="fas fa-edit" style="margin-right:6px;"></i>Alasan Revisi</h3>
+      <p>Tuliskan alasan perubahan data ini. Akan dicatat otomatis di spreadsheet.</p>
+      <textarea id="revisiAlasan" placeholder="Contoh: Koreksi fisik salah hitung, typo pada SAP, dll..."></textarea>
+      <div class="revisi-modal-btns">
+        <button id="revisiCancelBtn" onclick="_revisiCancel()">Batal</button>
+        <button id="revisiConfirmBtn" onclick="_revisiConfirm()">Simpan Revisi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════ MONITORING RDC ═══════════════════════════ -->
+  <div id="rdcPage" style="display:none">
+
+    <!-- Header — sama persis seperti opnamePage -->
+    <div class="gdrm-header">
+      <h2>
+        <span style="cursor:pointer;font-size:17px;" onclick="toggleSidebar()">
+          <i class="fa-solid fa-bars"></i>
+        </span>
+        <i class="fa-solid fa-truck-ramp-box"></i> Monitoring RDC
+      </h2>
+      <div class="gdrm-header-btns">
+        <button class="btn-hdr" onclick="rdcSwitchTab('summary')" id="btnRdcSummary"><i class="fas fa-chart-bar"></i> <span class="btn-hdr-text">Summary</span></button>
+        <button class="btn-hdr" onclick="rdcSwitchTab('input')"   id="btnRdcInput"  ><i class="fas fa-plus-circle"></i> <span class="btn-hdr-text">Input</span></button>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div style="display:flex;gap:0;background:#fff;border-bottom:2px solid #e2e8f0;">
+      <button id="rdcTabSummary" onclick="rdcSwitchTab('summary')" style="padding:10px 22px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#2c5364;border-bottom:3px solid #2c5364;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;"><i class="fas fa-chart-bar"></i> Summary</button>
+      <button id="rdcTabInput"   onclick="rdcSwitchTab('input')"   style="padding:10px 22px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;"><i class="fas fa-plus-circle"></i> Input Data</button>
+    </div>
+
+    <div class="input-page-wrap" style="padding-bottom:0;">
+
+      <!-- ════ TAB SUMMARY ════ -->
+      <div id="rdcSummaryPane">
+
+        <!-- Filter bar -->
+        <div class="opname-filter-bar">
+          <div class="fi"><label>Dari</label><input type="date" id="rdcFilterFrom"></div>
+          <div class="fi"><label>Sampai</label><input type="date" id="rdcFilterTo"></div>
+          <div class="fi"><label>Plant</label>
+            <select id="rdcFilterPlant">
+              <option value="">Semua Plant</option>
+              <option value="1111">1111</option><option value="1112">1112</option><option value="1113">1113</option>
+            </select>
+          </div>
+          <div class="fi"><label>Ship to Name</label>
+            <select id="rdcFilterShipTo">
+              <option value="">Semua Shipment</option>
+              <option value="RDC">RDC</option>
+              <option value="SELAIN_RDC">Selain RDC</option>
+            </select>
+          </div>
+          <button class="opname-btn opname-btn-primary" onclick="rdcLoadSummary()" style="margin-top:auto;"><i class="fas fa-search"></i> Tampilkan</button>
+        </div>
+
+        <!-- Toggle Data | Rekap -->
+        <div style="display:flex;gap:8px;padding:10px 14px 0;align-items:center;">
+          <button id="rdcToggleData"  onclick="rdcSwitchView('data')"  style="padding:6px 18px;border-radius:20px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:#2c5364;color:#fff;transition:all .15s;">Data</button>
+          <button id="rdcToggleRekap" onclick="rdcSwitchView('rekap')" style="padding:6px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:#fff;color:#4a5568;transition:all .15s;">Rekap</button>
+        </div>
+
+        <!-- Rekap pane -->
+        <div id="rdcRekapPane" style="display:none;padding:10px 14px;"></div>
+
+        <!-- Summary table card -->
+        <div class="opname-view-card" style="margin:10px 14px;" id="rdcDataPane">
+          <div class="opname-view-header" style="background:linear-gradient(135deg,#0f2027,#2c5364);">
+            <span style="font-size:13px;font-weight:800;"><i class="fas fa-table" style="margin-right:6px;"></i>Data Monitoring RDC</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="rdcSumRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 DATA</span>
+              <button onclick="rdcDownloadPdf()" id="rdcBtnPdf" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
+                <i class="fas fa-file-pdf"></i> Download PDF
+              </button>
+            </div>
+          </div>
+          <div style="overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100vh - 340px);">
+            <table class="opname-view-tbl" id="rdcSumTable" style="min-width:1400px;">
+              <thead>
+                <tr>
+                  <th rowspan="2" style="text-align:center;width:36px;background:#f0f4f8;color:#2d3748;">#</th>
+                  <th rowspan="2" style="min-width:130px;background:#f0f4f8;color:#2d3748;">Ship to Name</th>
+                  <th rowspan="2" style="background:#f0f4f8;color:#2d3748;">EKSPEDISI</th>
+                  <th rowspan="2" style="background:#f0f4f8;color:#2d3748;">NO POL</th>
+                  <th rowspan="2" style="background:#f0f4f8;color:#2d3748;">JENIS MOBIL</th>
+                  <th rowspan="2" style="background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;">ROUTE</th>
+                  <th colspan="2" style="text-align:center;background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;font-weight:800;">SCHEDULE</th>
+                  <th rowspan="2" style="text-align:center;min-width:80px;background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;font-weight:800;">STD<br>DURASI<br>(mnt)</th>
+                  <th colspan="4" style="text-align:center;background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;font-weight:800;">LOADING</th>
+                  <th rowspan="2" style="text-align:center;min-width:90px;background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;font-weight:800;">DELAY</th>
+                  <th rowspan="2" style="text-align:center;min-width:90px;background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;font-weight:800;">DURASI<br>LOADING<br>(mnt)</th>
+                  <th rowspan="2" style="text-align:center;min-width:90px;background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;font-weight:800;">SELISIH<br>DURASI<br>(mnt)</th>
+                  <th rowspan="2" style="text-align:center;min-width:110px;background:#f0f4f8;color:#2d3748;border-left:1px solid #e2e8f0;font-weight:800;">DURASI<br>TOTAL IN/OUT</th>
+                  <th colspan="3" style="text-align:center;background:#1a3a5c;color:#fff;border-left:1px solid #e2e8f0;font-weight:800;">KETERANGAN</th>
+                </tr>
+                <tr>
+                  <th style="text-align:center;background:#f0f4f8 !important;color:#2d3748;border-left:1px solid #e2e8f0;min-width:140px;">Waktu Muat</th>
+                  <th style="text-align:center;background:#f0f4f8 !important;color:#2d3748;min-width:140px;">Waktu Selesai</th>
+                  <th style="text-align:center;background:#f0f4f8 !important;color:#2d3748;border-left:1px solid #e2e8f0;min-width:140px;">IN</th>
+                  <th style="text-align:center;background:#f0f4f8 !important;color:#2d3748;min-width:140px;">Start Loading</th>
+                  <th style="text-align:center;background:#f0f4f8 !important;color:#2d3748;min-width:140px;">Finish Loading</th>
+                  <th style="text-align:center;background:#f0f4f8 !important;color:#2d3748;min-width:140px;">Out</th>
+                  <th style="text-align:center;background:#1a3a5c !important;color:#fff;border-left:1px solid #e2e8f0;font-weight:700;">SCHEDULE</th>
+                  <th style="text-align:center;background:#1a3a5c !important;color:#fff;font-weight:700;">WAKTU STAY</th>
+                  <th style="text-align:center;background:#1a3a5c !important;color:#fff;font-weight:700;">WAKTU LOADING</th>
+                </tr>
+              </thead>
+              <tbody id="rdcSumTbody">
+                <tr><td colspan="19" style="text-align:center;padding:40px;color:#a0aec0;font-size:13px;">
+                  <i class="fas fa-truck" style="font-size:32px;display:block;margin-bottom:10px;opacity:.2;"></i>
+                  Klik Filter untuk memuat data
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        </div><!-- /rdcDataPane -->
+      </div><!-- /rdcSummaryPane -->
+
+      <!-- ════ TAB INPUT ════ -->
+      <div id="rdcInputPane" style="display:none;">
+
+        <!-- Meta -->
+        <div class="op-meta-grid" style="grid-template-columns:220px;padding:12px 14px 10px;">
+          <div class="op-meta-field">
+            <label>Tanggal Input</label>
+            <input type="date" id="rdcMetaTanggal">
+          </div>
+        </div>
+
+        <!-- Table card -->
+        <div class="input-table-card" style="border-radius:0;box-shadow:none;border:none;">
+          <!-- Table header bar -->
+          <div class="op-tbl-hdr">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="op-tbl-title"><i class="fas fa-table" style="margin-right:5px;"></i>Input Monitoring RDC</span>
+              <span class="op-row-count" id="rdcRowCount">0 BARIS</span>
+            </div>
+            <div class="op-tbl-actions">
+              <button class="op-btn dim" onclick="rdcAddRows(10)"><i class="fas fa-plus"></i> +10 Baris</button>
+              <button class="op-btn dim" onclick="showToast('&#128161; Klik sel lalu Ctrl+V dari Excel','')"><i class="fas fa-paste"></i> Paste Excel</button>
+              <button class="op-btn danger" onclick="rdcClearTable()"><i class="fas fa-trash"></i> Clear</button>
+            </div>
+          </div>
+          <!-- Zoom bar -->
+          <div class="op-zoom-bar">
+            <button class="op-zoom-btn" onclick="rdcZoom(-10)" title="Zoom Out">&#8722;</button>
+            <span class="op-zoom-label" id="rdcZoomLabel">100%</span>
+            <button class="op-zoom-btn" onclick="rdcZoom(+10)" title="Zoom In">+</button>
+            <span class="op-zoom-reset" onclick="rdcZoomReset()">Reset</span>
+            <span style="margin-left:8px;font-size:11px;color:#a0aec0;">Scroll horizontal untuk lihat semua kolom</span>
+          </div>
+          <!-- Table scroll -->
+          <div class="op-tbl-scroll" id="rdcTblScroll">
+            <table class="input-tbl rdc-itbl" id="rdcInputTbl" style="min-width:2100px;" tabindex="0">
+              <thead>
+                <tr>
+                  <th class="th-no" rowspan="2" style="background:#0f2027;color:#fff;text-align:center;width:36px;">#</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:60px;">PLANT</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:120px;">DocNo SPE / SPM</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:100px;">NO DO SAP</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:100px;">NO SPE SAP</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:140px;">Ship to Name</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:100px;">EKSPEDISI</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:90px;">NO POL</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:100px;">ROUTE</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;min-width:100px;">JENIS MOBIL</th>
+                  <th colspan="2" style="text-align:center;background:#0f2027;color:#fff;border-left:2px solid rgba(255,255,255,.3);">SCHEDULE</th>
+                  <th rowspan="2" style="text-align:center;background:#0f2027;color:#fff;border-left:2px solid rgba(255,255,255,.3);min-width:110px;">STANDAR DURASI<br>LOADING (MENIT)</th>
+                  <th colspan="4" style="text-align:center;background:#0f2027;color:#fff;border-left:2px solid rgba(255,255,255,.3);">LOADING</th>
+                  <th rowspan="2" style="background:#0f2027;color:#fff;text-align:center;min-width:90px;border-left:2px solid rgba(255,255,255,.3);">DURASI<br>IN/OUT</th>
+                  <th rowspan="2" style="background:#0f2027;width:28px;border:none;"></th>
+                </tr>
+                <tr>
+                  <th class="th-sub" style="background:#0f2027;color:#e2e8f0;border-left:2px solid rgba(255,255,255,.3);min-width:140px;">WAKTU MUAT</th>
+                  <th class="th-sub" style="background:#0f2027;color:#e2e8f0;min-width:140px;">WAKTU SELESAI</th>
+                  <th class="th-sub" style="background:#0f2027;color:#e2e8f0;border-left:2px solid rgba(255,255,255,.3);min-width:140px;">IN</th>
+                  <th class="th-sub" style="background:#0f2027;color:#e2e8f0;min-width:140px;">START LOADING</th>
+                  <th class="th-sub" style="background:#0f2027;color:#e2e8f0;min-width:140px;">FINISH LOADING</th>
+                  <th class="th-sub" style="background:#0f2027;color:#e2e8f0;min-width:140px;">OUT</th>
+                </tr>
+              </thead>
+              <tbody id="rdcInputTbody"></tbody>
+            </table>
+          </div>
+          <!-- Save bar -->
+          <div class="op-save-bar">
+            <button class="op-btn dim" style="background:#e2e8f0;color:#4a5568;padding:9px 20px;border-radius:8px;" onclick="rdcClearTable()">Reset</button>
+            <button class="op-btn success op-btn-save" onclick="rdcSaveData()"><i class="fas fa-save" style="margin-right:5px;"></i>Simpan Data</button>
+          </div>
+        </div>
+
+      </div><!-- /rdcInputPane -->
+
+    </div><!-- /input-page-wrap -->
+  </div><!-- /rdcPage -->
+
+  <!-- ═══════ RDC DETAIL POPUP ═══════ -->
+  <div id="rdcDetailOverlay" onclick="rdcClosePopup(event)">
+    <div id="rdcDetailBox">
+      <div class="rdc-popup-hdr">
+        <h3><i class="fas fa-info-circle" style="margin-right:8px;"></i>Detail Monitoring RDC</h3>
+        <button class="rdc-popup-close" onclick="rdcClosePopup(null,true)">&#10005;</button>
+      </div>
+      <div class="rdc-popup-body">
+        <!-- Shift & TIM card -->
+        <div class="rdc-popup-shift-card">
+          <div class="rdc-popup-shift-ico"><i class="fas fa-users"></i></div>
+          <div>
+            <div class="rdc-popup-shift-label">TIM PENANGGUNG JAWAB</div>
+            <div class="rdc-popup-shift-val" id="rdcPopupTim">-</div>
+            <div class="rdc-popup-shift-sub" id="rdcPopupShiftInfo">Shift - | -</div>
+          </div>
+        </div>
+        <!-- Info grid -->
+        <div class="rdc-popup-info-grid">
+          <div class="rdc-popup-info-item">
+            <div class="rdc-popup-info-lbl">Ship to Name</div>
+            <div class="rdc-popup-info-val" id="rdcPopupShipTo">-</div>
+          </div>
+          <div class="rdc-popup-info-item">
+            <div class="rdc-popup-info-lbl">No POL</div>
+            <div class="rdc-popup-info-val" id="rdcPopupNoPol">-</div>
+          </div>
+          <div class="rdc-popup-info-item">
+            <div class="rdc-popup-info-lbl">Start Loading</div>
+            <div class="rdc-popup-info-val" id="rdcPopupSl">-</div>
+          </div>
+          <div class="rdc-popup-info-item">
+            <div class="rdc-popup-info-lbl">Ekspedisi</div>
+            <div class="rdc-popup-info-val" id="rdcPopupEkspedisi">-</div>
+          </div>
+        </div>
+        <!-- Catatan -->
+        <div class="rdc-popup-catatan-lbl"><i class="fas fa-pencil-alt" style="margin-right:5px;"></i>Catatan</div>
+        <textarea id="rdcCatatanInput" placeholder="Tambahkan catatan..."></textarea>
+      </div>
+      <div class="rdc-popup-footer">
+        <button class="rdc-popup-btn cancel" onclick="rdcClosePopup(null,true)">Tutup</button>
+        <button class="rdc-popup-btn save" id="rdcCatatanSaveBtn" onclick="rdcSaveCatatan()">
+          <i class="fas fa-save" style="margin-right:5px;"></i>Simpan Catatan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       PATTERN LOCK OVERLAY
+  ═══════════════════════════════════════════════ -->
+  <div id="patternOverlay">
+    <div id="patternBox">
+      <div id="patternTitle"><i class="fas fa-lock" style="margin-right:7px;color:#60a5fa;"></i>Riwayat Stock Opname</div>
+      <div id="patternSubtitle">Masukkan pola untuk melanjutkan</div>
+      <div id="patternDotsWrap">
+        <svg id="patternSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="patternDots">
+          <div class="pdot" data-i="0"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="1"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="2"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="3"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="4"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="5"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="6"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="7"><div class="pdot-inner"></div></div>
+          <div class="pdot" data-i="8"><div class="pdot-inner"></div></div>
+        </div>
+      </div>
+      <button id="patternCancelBtn" onclick="_patternCancel()">Batal</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SETTING POLA MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="patternSettingOverlay">
+    <div id="patternSettingBox">
+      <h3><i class="fas fa-shield-alt" style="margin-right:7px;color:#2b6cb0;"></i>Setting Pola</h3>
+
+      <!-- Step 1: Password -->
+      <div class="psetting-step active" id="psStep1">
+        <p>Masukkan password untuk mengakses pengaturan pola.</p>
+        <input type="password" id="psettingPwInput" placeholder="Password..." onkeydown="if(event.key==='Enter') _psCheckPassword()">
+        <div id="psettingErr"></div>
+        <div class="psetting-btns">
+          <button class="psetting-btn cancel" onclick="_psClose()">Batal</button>
+          <button class="psetting-btn primary" onclick="_psCheckPassword()">Lanjut</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Pilih aksi -->
+      <div class="psetting-step" id="psStep2">
+        <p>Pilih tindakan yang ingin dilakukan.</p>
+        <div id="psettingErr"></div>
+        <div class="psetting-btns" style="flex-direction:column;gap:8px;">
+          <button class="psetting-btn primary" style="width:100%;" onclick="_psGoSetNew()"><i class="fas fa-pencil-alt" style="margin-right:5px;"></i>Ubah Pola</button>
+          <button class="psetting-btn danger"  style="width:100%;" onclick="_psRemovePattern()"><i class="fas fa-lock-open" style="margin-right:5px;"></i>Hapus Pola (tanpa kunci)</button>
+          <button class="psetting-btn cancel"  style="width:100%;" onclick="_psClose()">Batal</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Gambar pola baru (pertama) -->
+      <div class="psetting-step" id="psStep3">
+        <p id="psStep3Hint">Gambar pola baru Anda (min. 4 titik).</p>
+        <div id="psNewDotsWrap" style="position:relative;width:168px;margin:0 auto;">
+          <svg id="psNewSvg" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></svg>
+          <div id="psettingNewDots">
+            <div class="psnewdot" data-i="0"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="1"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="2"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="3"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="4"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="5"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="6"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="7"><div class="psnewdot-inner"></div></div>
+            <div class="psnewdot" data-i="8"><div class="psnewdot-inner"></div></div>
+          </div>
+        </div>
+        <div id="psettingHint">Gambar pola di atas</div>
+        <div class="psetting-btns">
+          <button class="psetting-btn cancel" onclick="_psResetNew()">Ulangi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ============================================================ -->
-  <!-- JS MODULES — urutan penting!                                 -->
+  <!-- JS MODULES                                                   -->
   <!-- ============================================================ -->
-  <!-- 1. API layer (pengganti google.script.run) -->
   <script src="js/api.js"></script>
-
-  <!-- 2. Compatibility shim (untuk sisa google.script.run multiline) -->
   <script src="js/shim.js"></script>
-
-  <!-- 3. App core (global state, login, sidebar, routing) -->
   <script src="js/app.js"></script>
-
-  <!-- 4. Halaman per modul -->
   <script src="js/dashboard.js"></script>
   <script src="js/input.js"></script>
   <script src="js/realisasi.js"></script>
