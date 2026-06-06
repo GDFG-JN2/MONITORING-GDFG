@@ -936,6 +936,183 @@ function sjInitPage(){
     // Tampilkan tombol PDF
     var pdfBtn=document.getElementById('srPdfBtn');
     if(pdfBtn){pdfBtn.style.display='flex';}
+    // Reset arsip state & tampilkan tombol arsip
+    _srArsipLoaded = false;
+    _srArsipData   = null;
+    _srRenderArsipToggle();
+  }
+
+  function _srRenderArsipToggle(){
+    // Buat/update wrapper arsip di bawah srTableWrap
+    var wrap = document.getElementById('srArsipWrap');
+    if(!wrap){
+      wrap = document.createElement('div');
+      wrap.id = 'srArsipWrap';
+      wrap.style.cssText = 'padding:0 14px 14px;';
+      var tableWrap = document.getElementById('srTableWrap');
+      if(tableWrap && tableWrap.parentNode){
+        tableWrap.parentNode.insertBefore(wrap, tableWrap.nextSibling);
+      }
+    }
+    wrap.innerHTML =
+      '<div id="srArsipToggleBtn" onclick="_srToggleArsip()" style="'+
+      'display:inline-flex;align-items:center;gap:8px;cursor:pointer;'+
+      'padding:8px 16px;border-radius:8px;border:1.5px solid #e2e8f0;'+
+      'background:#fff;color:#718096;font-size:12px;font-weight:700;'+
+      'margin-top:8px;transition:all .2s;user-select:none;">' +
+      '<i class="fas fa-archive"></i> Lihat Arsip' +
+      '</div>'+
+      '<div id="srArsipContent" style="display:none;margin-top:12px;"></div>';
+  }
+
+  function _srToggleArsip(){
+    var btn     = document.getElementById('srArsipToggleBtn');
+    var content = document.getElementById('srArsipContent');
+    if(!btn || !content) return;
+
+    var isOpen = content.style.display !== 'none';
+    if(isOpen){
+      // Tutup
+      content.style.display = 'none';
+      btn.innerHTML = '<i class="fas fa-archive"></i> Lihat Arsip';
+      btn.style.color = '#718096';
+      btn.style.borderColor = '#e2e8f0';
+      return;
+    }
+
+    // Buka — cek apakah perlu load
+    if(_srArsipLoaded){
+      content.style.display = 'block';
+      btn.innerHTML = '<i class="fas fa-archive"></i> Sembunyikan Arsip';
+      btn.style.color = '#c05621';
+      btn.style.borderColor = '#c05621';
+      return;
+    }
+
+    // Load dari GAS
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memuat arsip...';
+    btn.style.pointerEvents = 'none';
+
+    var plant  = document.getElementById('srPlant').value;
+    var ssKey  = document.getElementById('srSS').value;
+    var ssInfo = null;
+    (SR_SS_MAP[plant]||[]).forEach(function(s){ if(s.key===ssKey) ssInfo=s; });
+    if(!ssInfo){
+      btn.innerHTML = '<i class="fas fa-archive"></i> Lihat Arsip';
+      btn.style.pointerEvents = '';
+      showToast('\u26a0\ufe0f Spreadsheet tidak ditemukan','error');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        btn.style.pointerEvents = '';
+        if(!res || !res.success){
+          var msg = res && res.message ? res.message : 'Sheet arsip tidak ditemukan';
+          btn.innerHTML = '<i class="fas fa-archive"></i> Arsip tidak tersedia';
+          btn.style.color = '#a0aec0';
+          btn.onclick = null;
+          showToast('\u2139\ufe0f '+msg,'');
+          return;
+        }
+        _srArsipLoaded = true;
+        _srArsipData   = res;
+        // Render arsip
+        _srRenderArsipContent(res);
+        content.style.display = 'block';
+        btn.innerHTML = '<i class="fas fa-archive"></i> Sembunyikan Arsip';
+        btn.style.color = '#c05621';
+        btn.style.borderColor = '#c05621';
+      })
+      .withFailureHandler(function(err){
+        btn.style.pointerEvents = '';
+        btn.innerHTML = '<i class="fas fa-archive"></i> Lihat Arsip';
+        btn.style.color = '#718096';
+        showToast('\u274c Error: '+(err&&err.message||'gagal load arsip'),'error');
+      })
+      .getKartuStockArsip(ssInfo.url, _srCurrentSheet);
+  }
+
+  function _srRenderArsipContent(res){
+    var content = document.getElementById('srArsipContent');
+    if(!content) return;
+
+    var bloks = res.bloks || [];
+    if(!bloks.length){
+      content.innerHTML =
+        '<div style="text-align:center;padding:24px;color:#a0aec0;font-size:13px;">'+
+        '<i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;opacity:.4;"></i>'+
+        'Tidak ada data di sheet arsip</div>';
+      return;
+    }
+
+    // Header arsip
+    var maxKirim = 0;
+    bloks.forEach(function(b){ if((b.kirim||[]).length>maxKirim) maxKirim=(b.kirim||[]).length; });
+    maxKirim = Math.max(maxKirim,1);
+
+    var html =
+      '<div style="background:#fff8f0;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 14px;margin-bottom:10px;">'+
+      '<div style="font-size:11px;font-weight:800;color:#c05621;text-transform:uppercase;letter-spacing:.5px;">'+
+      '<i class="fas fa-archive" style="margin-right:6px;"></i>Data Arsip — '+res.sheetName+'</div>'+
+      '<div style="font-size:12px;color:#718096;margin-top:2px;">'+bloks.length+' blok produksi tersimpan di arsip</div>'+
+      '</div>';
+
+    html += '<div style="overflow:auto;"><table class="input-tbl" style="min-width:700px;opacity:.85;">';
+    // Header
+    html += '<thead><tr>';
+    html += '<th style="text-align:center;">No.</th>';
+    html += '<th style="min-width:110px;text-align:center;">TGL PRODUKSI</th>';
+    html += '<th style="text-align:center;">SHIFT 1</th>';
+    html += '<th style="text-align:center;">SHIFT 2</th>';
+    html += '<th style="text-align:center;">SHIFT 3</th>';
+    html += '<th style="text-align:center;">TOTAL</th>';
+    html += '<th style="text-align:center;">SISA</th>';
+    if(maxKirim>0) html += '<th colspan="'+maxKirim+'" style="text-align:center;">PENGIRIMAN</th>';
+    html += '</tr></thead><tbody>';
+
+    function fn(v){ if(v===null||v===undefined||v==='')return ''; var n=Number(String(v).replace(/[^0-9.-]/g,'')); return isNaN(n)?String(v):n.toLocaleString('id-ID'); }
+
+    bloks.forEach(function(blok,idx){
+      var sisa = Number(blok.sisa)||0;
+      var rowStyle = 'background:#fffaf5;';
+      html += '<tr style="'+rowStyle+'">';
+      html += '<td style="text-align:center;color:#a0aec0;" rowspan="5">'+(idx+1)+'</td>';
+      html += '<td rowspan="5" style="font-weight:700;text-align:center;font-size:12px;">'+blok.tglProd+'</td>';
+      html += '<td style="text-align:right;">'+fn(blok.shift1)+'</td>';
+      html += '<td style="text-align:right;">'+fn(blok.shift2)+'</td>';
+      html += '<td style="text-align:right;">'+fn(blok.shift3)+'</td>';
+      html += '<td style="text-align:right;font-weight:700;">'+fn(blok.total)+'</td>';
+      html += '<td rowspan="5" style="text-align:center;font-weight:800;color:'+(sisa>0?'#c05621':'#9b2c2c')+';">'+fn(sisa)+'</td>';
+      // Pengiriman baris 1 (tanggal)
+      var kirims = blok.kirim || [];
+      for(var ki=0;ki<maxKirim;ki++){
+        var k = kirims[ki];
+        html += '<td style="text-align:center;font-size:11px;color:#718096;">'+(k?k.tanggal:'')+'</td>';
+      }
+      html += '</tr>';
+      // Baris 2-4: data pengiriman lainnya
+      var subLabels = ['tujuan','noDO','noMobil'];
+      subLabels.forEach(function(field){
+        html += '<tr style="'+rowStyle+'">';
+        for(var ki=0;ki<maxKirim;ki++){
+          var k = kirims[ki];
+          html += '<td style="text-align:center;font-size:11px;color:#4a5568;">'+(k?k[field]:'')+'</td>';
+        }
+        html += '</tr>';
+      });
+      // Baris 5: jumlah pengiriman
+      html += '<tr style="'+rowStyle+'">';
+      for(var ki=0;ki<maxKirim;ki++){
+        var k = kirims[ki];
+        html += '<td style="text-align:right;font-weight:700;">'+(k&&k.jumlah?fn(k.jumlah):'')+'</td>';
+      }
+      html += '</tr>';
+      html += '<tr class="sr-sep"><td colspan="'+(7+maxKirim)+'"></td></tr>';
+    });
+
+    html += '</tbody></table></div>';
+    content.innerHTML = html;
   }
 
   function srDownloadPdf(){
