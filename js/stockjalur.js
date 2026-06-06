@@ -1,4 +1,4 @@
-  function sjInitPage(){
+function sjInitPage(){
     var bi=document.getElementById('btnSjInput'),bo=document.getElementById('btnSjOutput'),br=document.getElementById('btnSjRekap');
     if(bi)bi.style.background='rgba(255,255,255,.38)';
     if(bo)bo.style.background='rgba(255,255,255,.18)';
