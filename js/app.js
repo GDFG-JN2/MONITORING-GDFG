@@ -184,6 +184,7 @@ function showPage(page) {
   var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage'];
   pages.forEach(function (p) {
     var el = document.getElementById(p);
+    if (!el) return;
     el.style.display = 'none';
     el.classList.remove('page-enter');
   });
