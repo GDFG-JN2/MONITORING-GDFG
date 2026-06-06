@@ -177,6 +177,10 @@ function closeSidebar() {
 // ROUTING — SHOW PAGE
 // ============================================================
 function showPage(page) {
+  // Push ke history agar tombol back HP kembali ke halaman sebelumnya
+  if (window.history && window.history.pushState) {
+    window.history.pushState({ page: page }, '', '#' + page);
+  }
   _opDragging = false;
   if (page !== 'opnamePage')   _opClearSel();
   if (page !== 'inputPage')    _inResetSel();
@@ -391,3 +395,67 @@ function updateLastRefresh() {
 function _openApp(url) {
   window.open(url, '_blank');
 }
+
+// ============================================================
+// BACK BUTTON HANDLER (tombol back HP)
+// ============================================================
+window._lastPage = 'dashboard';
+
+// Handle tombol back — kembali ke halaman sebelumnya
+window.addEventListener('popstate', function(event) {
+  if (event.state && event.state.page) {
+    // Ada state — navigasi ke halaman tersebut tanpa push history baru
+    window._lastPage = null; // sementara null agar pushState tidak double
+    showPage(event.state.page);
+    window._lastPage = event.state.page;
+  } else {
+    // Tidak ada state — artinya sudah di halaman paling awal
+    // Push state kosong agar tidak keluar app, kembali ke dashboard
+    showPage('dashboard');
+    window.history.pushState({ page: 'dashboard' }, '', '');
+    window._lastPage = 'dashboard';
+  }
+});
+
+// Push initial state saat pertama load (agar ada state awal)
+window.addEventListener('load', function() {
+  window.history.replaceState({ page: 'dashboard' }, '', '');
+  window._lastPage = 'dashboard';
+});
+
+// ============================================================
+// BACK BUTTON INTERCEPT
+// ============================================================
+window.addEventListener('popstate', function(e) {
+  if (e.state && e.state.page) {
+    // Kembali ke halaman sebelumnya tanpa push history baru
+    var page = e.state.page;
+    var pages = ['dashboard','inputPage','realisasiPage','opnamePage',
+                 'rdcPage','stockJalurPage','binLocPage','appsPage'];
+    pages.forEach(function(p) {
+      var el = document.getElementById(p);
+      if (el) { el.style.display = 'none'; el.classList.remove('page-enter'); }
+    });
+    var target = document.getElementById(page);
+    if (target) {
+      target.style.display = 'block';
+      requestAnimationFrame(function() { target.classList.add('page-enter'); });
+    }
+    closeSidebar();
+  } else {
+    // Tidak ada state — tutup sidebar kalau terbuka, atau biarkan browser keluar
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('active')) {
+      closeSidebar();
+      // Push dummy state agar back berikutnya bisa keluar
+      window.history.pushState(null, '', window.location.href);
+    }
+  }
+});
+
+// Push initial state saat pertama load
+window.addEventListener('load', function() {
+  if (window.history && window.history.pushState) {
+    window.history.replaceState({ page: 'dashboard' }, '', '#dashboard');
+  }
+});

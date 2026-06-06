@@ -1,4 +1,40 @@
-function renderPieChart(){
+
+// ============================================================
+// CHART ZOOM
+// ============================================================
+var _chartZoomLevel = 100; // percent
+
+function _chartZoom(delta) {
+  _chartZoomLevel = Math.min(200, Math.max(50, _chartZoomLevel + delta));
+  var el = document.getElementById('chartZoomVal');
+  if (el) el.textContent = _chartZoomLevel + '%';
+  _applyChartZoom();
+}
+
+function _applyChartZoom() {
+  var scale = _chartZoomLevel / 100;
+  // Scale canvas wrap height
+  var baseH   = window.innerWidth <= 520 ? 300 : window.innerWidth <= 768 ? 220 : 340;
+  var newH    = Math.round(baseH * scale);
+  document.querySelectorAll('.chart-canvas-wrap.horizontal').forEach(function(el) {
+    el.style.height = newH + 'px';
+  });
+  var baseV   = window.innerWidth <= 520 ? 140 : window.innerWidth <= 768 ? 160 : 220;
+  var newHV   = Math.round(baseV * scale);
+  document.querySelectorAll('.chart-canvas-wrap:not(.horizontal)').forEach(function(el) {
+    el.style.height = newHV + 'px';
+  });
+  // Re-render chart
+  if      (currentView === 'horizontal') renderChartsHorizontal();
+  else if (currentView === 'chart')      renderCharts();
+  // Update zoom font size
+  var fScale = Math.max(0.7, Math.min(1.4, scale));
+  document.querySelectorAll('.chart-card').forEach(function(el) {
+    el.style.fontSize = (fScale * 100) + '%';
+  });
+}
+
+    function renderPieChart(){
       if(!divisiChartData) return;
 
       // === PIE 1: Lokal (Wafer+Biskuit) vs Ekspor ===
