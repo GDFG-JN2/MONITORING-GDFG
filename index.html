@@ -2236,8 +2236,14 @@
 
     <!-- Footer -->
     <div class="sidebar-footer">
-      <div style="text-align:center;padding:6px 16px 10px;opacity:.5;font-size:10px;color:#fff;letter-spacing:.5px;">
-        v1.0.0
+      <div id="appVersionBadge" style="text-align:center;padding:6px 16px 6px;opacity:.6;font-size:10px;color:#fff;letter-spacing:.5px;cursor:pointer;" onclick="_checkAppUpdate()" title="Tap untuk cek update">
+        v1.0.1 <span id="appUpdateDot" style="display:none;background:#f6ad55;border-radius:50%;width:6px;height:6px;display:inline-block;vertical-align:middle;margin-left:3px;"></span>
+      </div>
+      <div id="appUpdateBar" style="display:none;margin:0 12px 8px;background:rgba(246,173,85,.15);border:1px solid rgba(246,173,85,.4);border-radius:8px;padding:8px 10px;font-size:11px;color:#f6ad55;text-align:center;">
+        🔄 Update tersedia!
+        <button onclick="_forceAppUpdate()" style="display:block;width:100%;margin-top:6px;padding:6px;background:#f6ad55;color:#1a202c;border:none;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;">
+          Update Sekarang
+        </button>
       </div>
       <a onclick="logout()">
         <div class="s-icon"><i class="fa-solid fa-sign-out-alt"></i></div>
@@ -4363,29 +4369,83 @@
 
   <!-- Service Worker Registration -->
   <script>
-    if ('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com') {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js')
-          .then(function(reg) {
-            console.log('[SW] Registered, scope:', reg.scope);
-            // Cek update saat ada versi baru
-            reg.addEventListener('updatefound', function() {
-              var newWorker = reg.installing;
-              newWorker.addEventListener('statechange', function() {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // Ada versi baru — tampilkan notif
-                  if (typeof showToast === 'function') {
-                    showToast('🔄 Update tersedia — refresh untuk memuat versi terbaru', '');
-                  }
-                }
-              });
-            });
-          })
-          .catch(function(err) {
-            console.warn('[SW] Register failed:', err);
-          });
-      });
+  var _swReg = null;
+  var _swWaiting = null;
+
+  function _checkAppUpdate() {
+    if (!_swReg) { showToast('Service Worker belum aktif',''); return; }
+    _swReg.update().then(function() {
+      if (!_swReg.waiting) showToast('✅ Aplikasi sudah versi terbaru','');
+    });
+  }
+
+  function _forceAppUpdate() {
+    if (_swWaiting) {
+      // Kirim pesan ke SW baru untuk ambil alih
+      _swWaiting.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      // Fallback: hapus semua cache lalu reload
+      if ('caches' in window) {
+        caches.keys().then(function(keys) {
+          return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+        }).then(function() {
+          location.reload(true);
+        });
+      } else {
+        location.reload(true);
+      }
     }
+  }
+
+  function _showUpdateAvailable() {
+    var bar = document.getElementById('appUpdateBar');
+    var dot = document.getElementById('appUpdateDot');
+    if (bar) bar.style.display = 'block';
+    if (dot) dot.style.display = 'inline-block';
+  }
+
+  if ('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com') {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('./sw.js')
+        .then(function(reg) {
+          _swReg = reg;
+          console.log('[SW] Registered v1.0.1');
+
+          // SW baru sudah waiting (update tersedia)
+          if (reg.waiting) {
+            _swWaiting = reg.waiting;
+            _showUpdateAvailable();
+          }
+
+          // SW baru ditemukan saat halaman terbuka
+          reg.addEventListener('updatefound', function() {
+            var newWorker = reg.installing;
+            newWorker.addEventListener('statechange', function() {
+              if (newWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  // Ada update baru
+                  _swWaiting = newWorker;
+                  _showUpdateAvailable();
+                }
+              }
+            });
+          });
+
+          // Force check update setiap kali tab aktif kembali
+          document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') reg.update();
+          });
+        })
+        .catch(function(err) {
+          console.warn('[SW] Register failed:', err);
+        });
+
+      // Setelah SW baru ambil alih → reload otomatis
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        location.reload();
+      });
+    });
+  }
   </script>
 
 </body>
