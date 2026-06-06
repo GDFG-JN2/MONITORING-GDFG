@@ -53,6 +53,7 @@
     'getSheetNames':       function(a){ return {ssUrl:a[0]}; },
     'searchSheetNames':    function(a){ return {ssUrl:a[0], keyword:a[1]}; },
     'getKartuStock':       function(a){ return {ssUrl:a[0], sheetName:a[1]}; },
+    'getKartuStockArsip':  function(a){ return {ssUrl:a[0], sheetName:a[1]}; },
     'rekapStockJalur':     function(a){ return {data:a[0]}; },
     'rekapOutputJalur':    function(a){ return {data:a[0]}; },
     'updateSrShiftCell':   function(a){ return a[0]||{}; },
