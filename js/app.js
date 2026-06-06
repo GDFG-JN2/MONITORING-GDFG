@@ -181,7 +181,7 @@ function showPage(page) {
   if (page !== 'opnamePage')   _opClearSel();
   if (page !== 'inputPage')    _inResetSel();
 
-  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage'];
+  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage'];
   pages.forEach(function (p) {
     var el = document.getElementById(p);
     if (!el) return;
@@ -203,6 +203,7 @@ function showPage(page) {
   document.getElementById('menuRdc').classList.toggle('active-page',        page === 'rdcPage');
   document.getElementById('menuStockJalur').classList.toggle('active-page', page === 'stockJalurPage');
   document.getElementById('menuBinLoc').classList.toggle('active-page',     page === 'binLocPage');
+  document.getElementById('menuApps').classList.toggle('active-page',      page === 'appsPage');
 
   // Page-specific init
   if (page === 'dashboard') {
@@ -382,4 +383,11 @@ function updateLastRefresh() {
     var el = document.getElementById('lastUpdateValue');
     if (el) el.innerText = (res && res.value) ? res.value : '-';
   });
+}
+
+// ============================================================
+// APPS PAGE
+// ============================================================
+function _openApp(url) {
+  window.open(url, '_blank');
 }
