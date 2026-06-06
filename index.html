@@ -9,6 +9,12 @@
   <meta name="apple-mobile-web-app-title" content="WH Monitor">
   <meta name="theme-color" content="#0f2027">
   <title>MONITORING GDFG</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f2027">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GDFG">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2180,6 +2186,9 @@
 
     <!-- Footer -->
     <div class="sidebar-footer">
+      <div style="text-align:center;padding:6px 16px 10px;opacity:.5;font-size:10px;color:#fff;letter-spacing:.5px;">
+        v1.0.0
+      </div>
       <a onclick="logout()">
         <div class="s-icon"><i class="fa-solid fa-sign-out-alt"></i></div>
         <span>Logout</span>
@@ -4301,6 +4310,33 @@
   <script src="js/rdc.js"></script>
   <script src="js/stockjalur.js"></script>
   <script src="js/binloc.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com') {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js')
+          .then(function(reg) {
+            console.log('[SW] Registered, scope:', reg.scope);
+            // Cek update saat ada versi baru
+            reg.addEventListener('updatefound', function() {
+              var newWorker = reg.installing;
+              newWorker.addEventListener('statechange', function() {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Ada versi baru — tampilkan notif
+                  if (typeof showToast === 'function') {
+                    showToast('🔄 Update tersedia — refresh untuk memuat versi terbaru', '');
+                  }
+                }
+              });
+            });
+          })
+          .catch(function(err) {
+            console.warn('[SW] Register failed:', err);
+          });
+      });
+    }
+  </script>
 
 </body>
 </html>
