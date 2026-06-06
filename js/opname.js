@@ -3220,6 +3220,8 @@ function initOpnamePage(){
       _patternReset();
       document.getElementById('patternSubtitle').textContent = 'Masukkan pola untuk melanjutkan';
       document.getElementById('patternOverlay').classList.add('show');
+      // Bind events setelah overlay visible
+      setTimeout(function(){ _patternBindEvents(); }, 50);
     });
   }
 
@@ -3263,6 +3265,8 @@ function initOpnamePage(){
   function _patternBindEvents(){
     var dots = document.querySelectorAll('#patternDots .pdot');
     var wrap = document.getElementById('patternDotsWrap');
+    // Guard: jika elemen belum ada / overlay hidden, jangan bind
+    if (!wrap || dots.length === 0) return;
 
     function startDot(i){
       if(_patternSeq.indexOf(i)<0){
