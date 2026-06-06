@@ -1,4 +1,4 @@
-    function initRealForm(){
+function initRealForm(){
       // Set tanggal hari ini jika kosong
       if(!document.getElementById('realTanggal').value){
         var today = new Date();
