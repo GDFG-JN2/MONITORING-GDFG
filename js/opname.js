@@ -1,4 +1,4 @@
-    function initOpnamePage(){
+function initOpnamePage(){
       _preloadSkuNames(); // pastikan SKU map terisi sebelum user mulai input
       _renderOpThead();     // render header tabel utama
       _renderOpTheadGdfg(); // render header tabel GDFG
@@ -1069,7 +1069,7 @@
     // Load STD map dari getStandarPalet (sudah ada di GAS)
     function _loadFifoSkuMap(cb){
       if(Object.keys(_fifoSkuMap).length > 0){ if(cb) cb(); return; }
-      if(false){ if(cb) cb(); return; }
+      if(typeof google === 'undefined' || !google.script){ if(cb) cb(); return; }
       google.script.run.withSuccessHandler(function(res){
         if(res && res.data){
           res.data.forEach(function(d){
@@ -1587,7 +1587,7 @@
       var btn = document.querySelector('#opCardFifo .op-btn-save');
       if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Menyimpan...'; }
 
-      if(false){ showToast('Tidak bisa connect ke server','error'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan FIFO';} return; }
+      if(typeof google === 'undefined' || !google.script){ showToast('Tidak bisa connect ke server','error'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan FIFO';} return; }
 
       var fn = isEks ? 'saveFifoEksporData' : 'saveFifoData';
       google.script.run
@@ -1996,7 +1996,7 @@
       var subTipe = (document.getElementById('fifoViewSubTipe')||{}).value||'LOKAL';
       if(!from||!to){ showToast('Pilih rentang tanggal','error'); return; }
       document.getElementById('fifoViewBody').innerHTML = "<div class='spinner' style='margin:20px auto;'></div>";
-      if(false){ showToast('Tidak bisa connect ke server','error'); return; }
+      if(typeof google === 'undefined' || !google.script){ showToast('Tidak bisa connect ke server','error'); return; }
       var fn = subTipe==='EKSPOR' ? 'getFifoEksporData' : 'getFifoData';
       google.script.run
         .withSuccessHandler(function(res){ renderFifoView(res, nama, plant, subTipe); })
@@ -3131,72 +3131,209 @@
     // =============================================
     // SIDEBAR
     // =============================================
-    function toggleSidebar(){
-      document.getElementById("sidebar").classList.toggle("active");
-      document.getElementById("sidebarOverlay").classList.toggle("active");
-    }
-    function closeSidebar(){
-      document.getElementById("sidebar").classList.remove("active");
-      document.getElementById("sidebarOverlay").classList.remove("active");
-    }
 
-    function showPage(page){
-      // Reset state opname agar tidak bocor ke halaman lain
-      _opDragging = false;
-      if(page !== 'opnamePage') _opClearSel();
-      if(page !== 'inputPage') _inResetSel();
-      var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage'];
-      pages.forEach(function(p){
-        var el = document.getElementById(p);
-        el.style.display = 'none';
-        el.classList.remove('page-enter');
-      });
-      // Sembunyikan floating footer saat ganti halaman (kecuali realisasiPage)
-      if(page !== 'realisasiPage') hideStickyFooter();
-      var target = document.getElementById(page);
-      target.style.display = 'block';
-      requestAnimationFrame(function(){ target.classList.add('page-enter'); });
-      closeSidebar();
-      document.getElementById('menuDashboard').classList.toggle('active-page',  page === 'dashboard');
-      document.getElementById('menuRealisasi').classList.toggle('active-page',  page === 'realisasiPage');
-      document.getElementById('menuOpname').classList.toggle('active-page',     page === 'opnamePage');
-      document.getElementById('menuRdc').classList.toggle('active-page',        page === 'rdcPage');
-      document.getElementById('menuStockJalur').classList.toggle('active-page', page === 'stockJalurPage');
-      document.getElementById('menuBinLoc').classList.toggle('active-page',     page === 'binLocPage');
-      if(page === 'dashboard'){
-        updateLastRefresh();
-        loadTanggalHistory();
-        loadKapasitasHariIni();
-      }
-      if(page === 'inputPage')   initEmptyRows(30);
-      if(page === 'opnamePage'){ initOpnamePage(); switchOpnameTab('input'); }
-      if(page === 'rdcPage'){ rdcInitPage(); }
-      if(page === 'stockJalurPage'){ sjInitPage(); }
-      if(page === 'binLocPage'){ blInitPage(); }
-      if(page === 'realisasiPage'){
-        initRealForm();
-        // Reset filter ke hari ini saat buka halaman
-        var today = new Date();
-        var yyyy = today.getFullYear();
-        var mm   = String(today.getMonth()+1).padStart(2,'0');
-        var dd   = String(today.getDate()).padStart(2,'0');
-        var todayStr = yyyy+'-'+mm+'-'+dd;
-        document.getElementById('filterFrom').value = todayStr;
-        document.getElementById('filterTo').value   = todayStr;
-        // Reset filter mode ke Tanggal
-        switchFilterMode('date');
-        loadSummaryReal();
-      }
-    }
 
     // =============================================
     // INPUT TABLE — MODERN
     // =============================================
 
-    function showToast(msg, type){
-      var t = document.getElementById('toast');
-      t.innerText  = msg;
-      t.className  = 'toast ' + (type||'');
-      t.classList.add('show');
-      setTimeout(function(){ t.classList.remove('show'); }, 3000);
+
+
+  // ── Pattern Lock (dipindah dari rdc.js) ──
+  var _patternSeq     = [];       // titik yang sudah disentuh sesi ini
+  var _patternDragging= false;
+  var _patternSuccess = null;     // callback saat pola benar
+  var _psNewSeq1      = [];       // pola baru step-1
+  var _psNewSeq2      = [];       // pola baru step-2 (konfirmasi)
+  var _psNewPhase     = 1;        // 1=gambar, 2=konfirmasi
+  var _patternCache   = null;     // cache pola di memory (avoid repeated GAS calls)
+  var _patternLoaded  = false;    // sudah di-load dari server?
+
+  // ── Simpan / baca pola — GAS sheet PATTERN_LOCK per username, fallback sessionStorage preview ──
+  function _patternSave(seq){
+    var str = seq.join(',');
+    _patternCache = seq.slice();
+    _patternLoaded = true;
+    if(true){
+      API.saveOpnamePattern(_currentUser, str);
+    } else {
+      try{ sessionStorage.setItem(_PATTERN_KEY+'_'+_currentUser, str); }catch(e){}
     }
+  }
+
+  function _patternClear(){
+    _patternCache = null;
+    _patternLoaded = true;
+    if(true){
+      API.saveOpnamePattern(_currentUser, '');
+    } else {
+      try{ sessionStorage.removeItem(_PATTERN_KEY+'_'+_currentUser); }catch(e){}
+    }
+  }
+
+  // Load pola async — panggil callback(seq|null)
+  function _patternLoadAsync(cb){
+    if(_patternLoaded){
+      cb(_patternCache);
+      return;
+    }
+    if(true){
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(res && res.success && res.pattern){
+            _patternCache = res.pattern.split(',').map(Number);
+          } else {
+            _patternCache = null;
+          }
+          _patternLoaded = true;
+          cb(_patternCache);
+        })
+        .withFailureHandler(function(){
+          _patternCache = null;
+          _patternLoaded = true;
+          cb(null);
+        })
+        .loadOpnamePattern(_currentUser);
+    } else {
+      // Preview mode: pakai sessionStorage per user
+      try{
+        var s = sessionStorage.getItem(_PATTERN_KEY+'_'+_currentUser);
+        _patternCache = s ? s.split(',').map(Number) : null;
+      }catch(e){ _patternCache = null; }
+      _patternLoaded = true;
+      cb(_patternCache);
+    }
+  }
+
+  // ── Buka overlay pattern lock ──
+  var _patternEventsbound = false;
+  function _patternOpen(onSuccess){
+    if (!_patternEventsbound) { _patternBindEvents(); _patternEventsbound = true; }
+    _patternLoadAsync(function(saved){
+      if(!saved){
+        // Belum ada pola — langsung masuk
+        onSuccess && onSuccess();
+        return;
+      }
+      _patternSuccess = onSuccess;
+      _patternSeq = [];
+      _patternReset();
+      document.getElementById('patternSubtitle').textContent = 'Masukkan pola untuk melanjutkan';
+      document.getElementById('patternOverlay').classList.add('show');
+    });
+  }
+
+  function _patternCancel(){
+    document.getElementById('patternOverlay').classList.remove('show');
+    _patternSeq = [];
+    _patternSuccess = null;
+  }
+
+  function _patternReset(){ _patternSeq=[]; _patternDrawLines([]); document.querySelectorAll('.pdot').forEach(function(d){ d.classList.remove('active','error','success'); }); }
+
+  function _patternGetDotCenter(i){
+    var dots = document.getElementById('patternDots');
+    var wrap = document.getElementById('patternDotsWrap');
+    var dot  = dots.querySelectorAll('.pdot')[i];
+    if(!dot||!wrap) return {x:0,y:0};
+    var wr = wrap.getBoundingClientRect();
+    var dr = dot.getBoundingClientRect();
+    return { x: dr.left+dr.width/2 - wr.left, y: dr.top+dr.height/2 - wr.top };
+  }
+
+  function _patternDrawLines(seq, curX, curY){
+    var svg = document.getElementById('patternSvg');
+    var wrap= document.getElementById('patternDotsWrap');
+    if(!svg||!wrap) return;
+    svg.style.width  = wrap.offsetWidth  + 'px';
+    svg.style.height = wrap.offsetHeight + 'px';
+    var lines = '';
+    for(var i=1;i<seq.length;i++){
+      var a=_patternGetDotCenter(seq[i-1]), b=_patternGetDotCenter(seq[i]);
+      lines += '<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>';
+    }
+    if(seq.length && curX !== undefined){
+      var last=_patternGetDotCenter(seq[seq.length-1]);
+      var wr=wrap.getBoundingClientRect();
+      lines += '<line x1="'+last.x+'" y1="'+last.y+'" x2="'+(curX-wr.left)+'" y2="'+(curY-wr.top)+'" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" opacity=".4" stroke-dasharray="4"/>';
+    }
+    svg.innerHTML = lines;
+  }
+
+  function _patternBindEvents(){
+    var dots = document.querySelectorAll('#patternDots .pdot');
+    var wrap = document.getElementById('patternDotsWrap');
+
+    function startDot(i){
+      if(_patternSeq.indexOf(i)<0){
+        _patternSeq.push(i);
+        dots[i].classList.add('active');
+        _patternDrawLines(_patternSeq);
+      }
+    }
+
+    function hitTest(clientX, clientY){
+      dots.forEach(function(d){
+        var r=d.getBoundingClientRect();
+        var i=parseInt(d.dataset.i);
+        if(clientX>=r.left&&clientX<=r.right&&clientY>=r.top&&clientY<=r.bottom && _patternSeq.indexOf(i)<0){
+          _patternSeq.push(i);
+          d.classList.add('active');
+        }
+      });
+      _patternDrawLines(_patternSeq, clientX, clientY);
+    }
+
+    dots.forEach(function(d){
+      d.addEventListener('mousedown',function(e){ e.preventDefault(); _patternDragging=true; startDot(parseInt(d.dataset.i)); });
+      d.addEventListener('touchstart',function(e){ e.preventDefault(); _patternDragging=true; startDot(parseInt(d.dataset.i)); },{passive:false});
+    });
+    wrap.addEventListener('mousemove',function(e){ if(!_patternDragging) return; hitTest(e.clientX,e.clientY); });
+    wrap.addEventListener('touchmove',function(e){ e.preventDefault(); if(!_patternDragging) return; var t=e.touches[0]; hitTest(t.clientX,t.clientY); },{passive:false});
+
+    function endDraw(){
+      if(!_patternDragging) return;
+      _patternDragging=false;
+      if(_patternSeq.length >= 4) _patternCheck();
+      else { _patternFlash('error','Min. 4 titik'); }
+    }
+    document.addEventListener('mouseup', endDraw);
+    document.addEventListener('touchend', endDraw);
+  }
+
+  function _patternCheck(){
+    var saved = _patternCache;
+    if(!saved){ _patternCancel(); _patternSuccess&&_patternSuccess(); return; }
+    var ok = (JSON.stringify(_patternSeq) === JSON.stringify(saved));
+    if(ok){
+      _patternFlash('success','✓ Pola benar', function(){
+        document.getElementById('patternOverlay').classList.remove('show');
+        _patternSuccess && _patternSuccess();
+        _patternSuccess = null;
+      });
+    } else {
+      _patternFlash('error','✗ Pola salah, coba lagi');
+    }
+  }
+
+  function _patternFlash(type, msg, cb){
+    document.querySelectorAll('#patternDots .pdot').forEach(function(d){ d.classList.remove('active'); d.classList.add(type); });
+    _patternDrawLines([]);
+    document.getElementById('patternSubtitle').textContent = msg;
+    setTimeout(function(){
+      document.querySelectorAll('#patternDots .pdot').forEach(function(d){ d.classList.remove(type,'active'); });
+      _patternSeq=[];
+      if(cb) cb();
+      else document.getElementById('patternSubtitle').textContent='Masukkan pola untuk melanjutkan';
+    }, 700);
+  }
+
+  // ── Setting Pola ──
+  function _psOpen(){
+    document.getElementById('patternSettingOverlay').classList.add('show');
+    document.getElementById('psettingPwInput').value='';
+    document.getElementById('psettingErr').textContent='';
+    ['psStep1','psStep2','psStep3'].forEach(function(s){ document.getElementById(s).classList.remove('active'); });
+    document.getElementById('psStep1').classList.add('active');
+    setTimeout(function(){ document.getElementById('psettingPwInput').focus(); }, 300);
+  }
