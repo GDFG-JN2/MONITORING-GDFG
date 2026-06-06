@@ -1,4 +1,4 @@
-    function updateRowCount(){
+function updateRowCount(){
       var n = document.querySelectorAll("#tbodyInput tr").length;
       var el = document.getElementById('rowCount');
       if(el) el.innerText = n + ' baris';
