@@ -49,6 +49,13 @@ self.addEventListener('activate', function(event) {
   );
 });
 
+// ── MESSAGE: handle SKIP_WAITING dari halaman ──────────────────
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 // ── FETCH: Network First untuk JS/HTML, Cache First untuk asset ──
 self.addEventListener('fetch', function(event) {
   var url = new URL(event.request.url);
