@@ -1,20 +1,24 @@
 // ============================================================
 // shim.js — google.script.run compatibility layer
-// Proxy semua panggilan google.script.run ke API
 // ============================================================
 (function() {
   var _s = null, _f = null;
 
-  // Mapping: nama fungsi → cara pack args jadi payload
   var ARG_MAP = {
     // Auth
     'verifyLogin':         function(a){ return {username:a[0], password:a[1]}; },
-    // Kapasitas
+    // Kapasitas / Dashboard
     'getData':             function(a){ return {section:a[0]}; },
+    'getSummaryLokal':     function(a){ return {}; },
+    'getSummaryEkspor':    function(a){ return {}; },
+    'getTotalPallet':      function(a){ return {}; },
+    'getLastUpdate':       function(a){ return {}; },
+    'getSummaryDivisi':    function(a){ return {}; },
     'getHistoryKapasitas': function(a){ return {from:a[0]||'', to:a[1]||'', tipes:a[2]||[]}; },
-    // Input
+    // Input Data
     'saveGudangData':      function(a){ return {gudang:a[0], rows:a[1], tanggal:a[2], newSkus:a[3]}; },
     'saveStandarPallet':   function(a){ return {rows:a[0]}; },
+    'getStandarPalet':     function(a){ return {}; },
     'saveStdEdit':         function(a){ return a[0]||{}; },
     'saveRekapHistory':    function(a){ return a[0]||{}; },
     'getRekapHistory':     function(a){ return {from:a[0]||'', to:a[1]||'', tipes:a[2]||[]}; },
@@ -69,16 +73,15 @@
 
   Object.keys(ARG_MAP).forEach(function(fn) {
     handler[fn] = function() {
-      var args  = Array.prototype.slice.call(arguments);
-      var onS   = _s, onF = _f;
+      var args    = Array.prototype.slice.call(arguments);
+      var onS     = _s, onF = _f;
       _s = null; _f = null;
-      var payload = ARG_MAP[fn] ? ARG_MAP[fn](args) : (args[0]||{});
+      var payload = ARG_MAP[fn](args);
       API.run(fn, payload, onS, onF);
     };
   });
 
-  // Expose ke window
-  window.google         = window.google         || {};
-  window.google.script  = window.google.script  || {};
-  window.google.script.run = handler;
+  window.google              = window.google              || {};
+  window.google.script       = window.google.script       || {};
+  window.google.script.run   = handler;
 })();
