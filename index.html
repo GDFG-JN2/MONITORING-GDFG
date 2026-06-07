@@ -229,7 +229,7 @@
     .chart-card-badge{ font-size:11px; font-weight:600; padding:2px 10px; border-radius:20px; background:#e8f0fe; color:#0f2027; }
     .chart-card-sub{ font-size:11px; color:#a0aec0; margin-bottom:12px; }
     .chart-canvas-wrap{ position:relative; height:220px; }
-    .chart-canvas-wrap.horizontal{ height:340px; }
+    .chart-canvas-wrap.horizontal{ height:340px; overflow:visible; }
 
     /* ===== FADE KHUSUS TABEL ===== */
     #viewTable{
@@ -1383,9 +1383,10 @@
       .summary-card p{ font-size:15px; }
       .summary-card span{ font-size:10px; }
 
-      /* Header — sembunyikan teks tombol */
+      /* Header — icon saja, nowrap */
       .btn-hdr-text{ display:none; }
       .btn-hdr{ padding:5px 8px; }
+      .gdrm-header-btns{ flex-wrap:nowrap !important; gap:4px !important; }
 
       /* Chart */
       .chart-canvas-wrap{ height:170px; }
@@ -2458,12 +2459,7 @@
         <button class="toggle-btn" id="btnToggleTrend" onclick="switchView('trend')">
           <i class="fas fa-chart-line"></i> Trend
         </button>
-        <!-- Zoom control -->
-        <div class="chart-zoom-ctrl" id="chartZoomCtrl">
-          <button class="chart-zoom-btn" onclick="_chartZoom(-10)">−</button>
-          <span class="chart-zoom-val" id="chartZoomVal">100%</span>
-          <button class="chart-zoom-btn" onclick="_chartZoom(+10)">+</button>
-        </div>
+
       </div>
 
       <!-- VIEW: CHART -->
