@@ -774,7 +774,6 @@ function mekHandleSiFiles(files) {
           });
         });
       }
-      }
     });
   });
 }
