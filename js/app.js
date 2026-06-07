@@ -215,7 +215,8 @@ function showPage(page) {
   if (page !== 'realisasiPage') hideStickyFooter();
 
   var target = document.getElementById(page);
-  target.style.display = 'block';
+  target.style.display = page === 'monitoringEksporPage' ? 'flex' : 'block';
+  if (page === 'monitoringEksporPage') target.style.flexDirection = 'column';
   requestAnimationFrame(function () { target.classList.add('page-enter'); });
   closeSidebar();
 
