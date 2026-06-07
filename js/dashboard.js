@@ -1,4 +1,3 @@
-
 // ============================================================
 // CHART ZOOM
 // ============================================================
@@ -6,8 +5,10 @@ var _chartZoomLevel = 100; // percent
 
 function _chartZoom(delta) {
   _chartZoomLevel = Math.min(200, Math.max(50, _chartZoomLevel + delta));
-  var el = document.getElementById('chartZoomVal');
-  if (el) el.textContent = _chartZoomLevel + '%';
+  // Update semua elemen chartZoomVal (ada 2: atas dan bawah toggle)
+  document.querySelectorAll('#chartZoomVal').forEach(function(el) {
+    el.textContent = _chartZoomLevel + '%';
+  });
   _applyChartZoom();
 }
 
@@ -156,42 +157,32 @@ function _applyChartZoom() {
       var shortLabels = labels.map(function(l){
         return l.length > 28 ? l.substring(0,26)+'…' : l;
       });
-      // Potong label lebih pendek di mobile
-      var isMobile = window.innerWidth <= 520;
-      var maxLen   = isMobile ? 22 : 28;
-      var shortLabels2 = labels.map(function(l){
-        return l.length > maxLen ? l.substring(0, maxLen-1)+'…' : l;
-      });
       return {
         type: 'bar',
         data:{
-          labels: shortLabels2,
+          labels: shortLabels,
           datasets:[{
             data: values, backgroundColor: bgColors,
             borderRadius: 6, borderSkipped: false,
-            barPercentage: .65, categoryPercentage: .8
+            barPercentage: .7, categoryPercentage: .8
           }]
         },
         plugins: [ChartDataLabels],
         options:{
           indexAxis: 'y',
           responsive: true, maintainAspectRatio: false,
-          layout:{ padding:{ top:4, right:55, left:0, bottom:4 } },
+          layout:{ padding:{ top:4, right:50, left:4, bottom:4 } },
           plugins:{
             legend:{ display:false },
             datalabels:{
               anchor:'end', align:'right', color:'#2d3748',
-              font:{ size:isMobile ? 9 : 10, weight:'700' },
+              font:{ size:10, weight:'700' },
               formatter: function(v){ return v.toLocaleString('id-ID'); }
             },
             tooltip:{
               callbacks:{
                 title: function(items){
-                  // Tooltip tampilkan nama lengkap
-                  return labels[items[0].dataIndex];
-                },
-                label: function(item){
-                  return ' ' + item.raw.toLocaleString('id-ID') + ' pallet';
+                  return skus[items[0].dataIndex];
                 }
               }
             }
@@ -200,11 +191,7 @@ function _applyChartZoom() {
             x:{ display:false, grid:{ display:false } },
             y:{
               grid:{ display:false }, border:{ display:false },
-              ticks:{
-                color:'#2d3748',
-                font:{ size: isMobile ? 9 : 10, weight:'600' },
-                maxTicksLimit: 10,
-              }
+              ticks:{ color:'#2d3748', font:{ size:10, weight:'600' } }
             }
           },
           animation:{ duration:700, easing:'easeOutQuart', delay: function(ctx){ return ctx.dataIndex * 80; } },
