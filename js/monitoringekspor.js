@@ -379,8 +379,14 @@ function mekParseWa() {
   var ct = document.getElementById('mekParseCount');
   if (ct) ct.textContent = rows.length + ' baris';
 
-  if (rows.length) showToast(rows.length + ' baris berhasil di-parse!', 'success');
-  else showToast('Tidak ada data yang bisa di-parse. Periksa format teks.', 'warning');
+  if (rows.length) {
+    showToast(rows.length + ' baris berhasil di-parse!', 'success');
+    // Di mobile: otomatis pindah ke tab preview
+    var toggle = document.getElementById('mekMobilePaneToggle');
+    if (toggle && toggle.style.display !== 'none') mekMobilePane('preview');
+  } else {
+    showToast('Tidak ada data yang bisa di-parse. Periksa format teks.', 'warning');
+  }
 }
 
 function mekClearWa() {
@@ -565,6 +571,34 @@ function mekSavePlanning() {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Simpan'; }
     showToast('Koneksi gagal. Coba lagi.', 'error');
   });
+}
+
+// ════════════════════════════════════════════════════════════
+// MOBILE PANE TOGGLE (paste ↔ preview)
+// ════════════════════════════════════════════════════════════
+function mekMobilePane(pane) {
+  var pasteEl   = document.getElementById('mekPastePanel');
+  var previewEl = document.getElementById('mekPreviewPanel');
+  var tabPaste  = document.getElementById('mekMobileTabPaste');
+  var tabPrev   = document.getElementById('mekMobileTabPreview');
+  if (!pasteEl || !previewEl) return;
+
+  var ac = '#1a3a5c';
+  var in_ = '#718096';
+
+  if (pane === 'paste') {
+    pasteEl.style.display   = 'flex';
+    previewEl.style.display = 'none';
+    if (tabPaste) { tabPaste.style.color  = ac;  tabPaste.style.borderBottomColor  = ac; }
+    if (tabPrev)  { tabPrev.style.color   = in_; tabPrev.style.borderBottomColor   = 'transparent'; }
+    // Fokus textarea supaya keyboard muncul
+    setTimeout(function(){ var ta = document.getElementById('mekWaTextarea'); if(ta) ta.focus(); }, 100);
+  } else {
+    pasteEl.style.display   = 'none';
+    previewEl.style.display = 'flex';
+    if (tabPaste) { tabPaste.style.color  = in_; tabPaste.style.borderBottomColor  = 'transparent'; }
+    if (tabPrev)  { tabPrev.style.color   = ac;  tabPrev.style.borderBottomColor   = ac; }
+  }
 }
 
 // ════════════════════════════════════════════════════════════
