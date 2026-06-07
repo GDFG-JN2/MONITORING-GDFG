@@ -307,9 +307,7 @@ function switchView(view) {
   document.getElementById('btnToggleTable').classList.toggle('active',      view === 'table');
   document.getElementById('btnTogglePie').classList.toggle('active',        view === 'pie');
   document.getElementById('btnToggleTrend').classList.toggle('active',      view === 'trend');
-  // Tampilkan zoom control hanya saat chart aktif
-  var zoomCtrl = document.getElementById('chartZoomCtrl');
-  if (zoomCtrl) zoomCtrl.classList.toggle('show', view === 'chart' || view === 'horizontal');
+
 
   document.getElementById('viewChart').style.display      = (view === 'chart')      ? 'grid'  : 'none';
   document.getElementById('viewHorizontal').style.display = (view === 'horizontal') ? 'grid'  : 'none';
