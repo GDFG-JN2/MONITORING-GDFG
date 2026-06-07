@@ -108,7 +108,7 @@ function _applyChartZoom() {
         plugins: [ChartDataLabels],
         options:{
           responsive: true, maintainAspectRatio: false,
-          layout:{ padding:{ top:28, right:8, left:4, bottom:4 } },
+          layout:{ padding:{ top:4, right:50, left:4, bottom:4 } },
           plugins:{
             legend:{ display:false },
             datalabels:{
@@ -191,7 +191,7 @@ function _applyChartZoom() {
             x:{ display:false, grid:{ display:false } },
             y:{
               grid:{ display:false }, border:{ display:false },
-              ticks:{ color:'#2d3748', font:{ size:10, weight:'600' } }
+              ticks:{ color:'#2d3748', font:{ size:10, weight:'600' }, padding:4 }
             }
           },
           animation:{ duration:700, easing:'easeOutQuart', delay: function(ctx){ return ctx.dataIndex * 80; } },
