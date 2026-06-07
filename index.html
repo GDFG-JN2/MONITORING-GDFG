@@ -4532,8 +4532,19 @@
     <!-- ════ TAB SUMMARY ════ -->
     <div id="mekSummaryPane" style="overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;height:calc(100vh - 112px);">
 
-      <!-- Filter bar -->
-      <div style="padding:10px 14px 0;">
+      <!-- Toggle ALL / CAPAIAN PLANNING -->
+      <div style="display:flex;gap:6px;padding:10px 14px 0;">
+        <button id="mekSumViewAll" class="sum-view-btn active" onclick="mekSwitchSumView('all')">
+          <i class="fas fa-list"></i> All
+        </button>
+        <button id="mekSumViewCapaian" class="sum-view-btn" onclick="mekSwitchSumView('capaian')">
+          <i class="fas fa-chart-pie"></i> Capaian Planning
+        </button>
+      </div>
+
+      <!-- ════ PANE ALL ════ -->
+      <div id="mekPaneAll">
+      <div style="padding:6px 14px 0;">
 
         <!-- Toggle mode: Tanggal / Week -->
         <div style="display:flex;gap:6px;margin-bottom:8px;">
@@ -4660,6 +4671,85 @@
           </table>
         </div>
       </div>
+      </div><!-- /mekPaneAll -->
+
+      <!-- ════ PANE CAPAIAN PLANNING ════ -->
+      <div id="mekPaneCapaian" style="display:none;">
+
+        <!-- Filter Capaian -->
+        <div class="real-filter-bar" style="padding:10px 14px;flex-wrap:wrap;">
+          <label>Dari</label>
+          <input type="date" id="mekCapFrom">
+          <label>Sampai</label>
+          <input type="date" id="mekCapTo">
+          <label>SKU / Nama</label>
+          <input type="text" id="mekCapSku" placeholder="kode atau nama..."
+            style="width:150px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+          <label>No. SO/DOC</label>
+          <input type="text" id="mekCapDoc" placeholder="no. SO..."
+            style="width:120px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+          <label>Tujuan</label>
+          <input type="text" id="mekCapTujuan" placeholder="tujuan..."
+            style="width:110px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+          <button class="btn-filter" onclick="mekLoadCapaian()"><i class="fas fa-search"></i> Tampilkan</button>
+          <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
+        </div>
+
+        <!-- Summary cards capaian -->
+        <div class="mek-card-grid" style="padding:10px 14px 6px;">
+          <div class="mek-card">
+            <div class="mek-card-ico" style="background:#c6f6d5;color:#276749;"><i class="fas fa-check-circle"></i></div>
+            <div><div class="mek-card-val" id="mekCapCardKeluar">—</div><div class="mek-card-lbl">Sudah Keluar</div></div>
+          </div>
+          <div class="mek-card">
+            <div class="mek-card-ico" style="background:#bee3f8;color:#2b6cb0;"><i class="fas fa-truck-loading"></i></div>
+            <div><div class="mek-card-val" id="mekCapCardDaftar">—</div><div class="mek-card-lbl">Sedang Proses</div></div>
+          </div>
+          <div class="mek-card">
+            <div class="mek-card-ico" style="background:#fed7d7;color:#9b2c2c;"><i class="fas fa-clock"></i></div>
+            <div><div class="mek-card-val" id="mekCapCardBelum">—</div><div class="mek-card-lbl">Belum Daftar</div></div>
+          </div>
+          <div class="mek-card">
+            <div class="mek-card-ico" style="background:#fefcbf;color:#744210;"><i class="fas fa-percentage"></i></div>
+            <div><div class="mek-card-val" id="mekCapCardPct">—</div><div class="mek-card-lbl">% Terealisasi</div></div>
+          </div>
+        </div>
+
+        <!-- Tabel capaian -->
+        <div class="opname-view-card" style="margin:0 14px 14px;">
+          <div class="opname-view-header" style="background:linear-gradient(135deg,#0f2027,#1a3a5c);">
+            <span style="font-size:13px;font-weight:800;"><i class="fas fa-chart-pie" style="margin-right:6px;"></i>Capaian Planning Ekspor</span>
+            <span id="mekCapRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 data</span>
+          </div>
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+            <table class="mek-sum-tbl" id="mekCapTbl">
+              <thead>
+                <tr>
+                  <th style="width:32px;text-align:center;">#</th>
+                  <th>Tgl Planning</th>
+                  <th>SKU</th>
+                  <th>Nama</th>
+                  <th style="text-align:right;">Plan Cont</th>
+                  <th>Tujuan</th>
+                  <th>No. SO</th>
+                  <th>No. Pol</th>
+                  <th>Waktu Daftar</th>
+                  <th>Waktu Keluar</th>
+                  <th style="text-align:center;">Status</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="mekCapTbody">
+                <tr><td colspan="12" style="text-align:center;padding:50px;color:#a0aec0;font-size:13px;">
+                  <i class="fas fa-chart-pie" style="font-size:30px;display:block;margin-bottom:10px;opacity:.2;"></i>
+                  Pilih rentang tanggal lalu klik <b>Tampilkan</b>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /mekPaneCapaian -->
 
     </div><!-- /mekSummaryPane -->
 
@@ -4759,14 +4849,14 @@
       </div><!-- /mekWaPanel -->
 
       <!-- ════ PANEL SI ════ -->
-      <div id="mekSiPanel" style="display:none;height:calc(100vh - 148px);overflow:hidden;flex-direction:column;">
+      <div id="mekSiPanel" style="display:none;height:calc(100vh - 148px);overflow:hidden;flex-direction:column;" onpaste="mekHandleSiPaste(event)">
 
         <!-- Toolbar SI -->
         <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;">
           <span style="font-size:12px;font-weight:700;color:#1a3a5c;">
             <i class="fas fa-file-alt" style="color:#e53e3e;"></i> Upload Shipping Instruction (PDF / Screenshot)
           </span>
-          <span style="font-size:11px;color:#a0aec0;"><i class="fas fa-info-circle"></i> Bisa upload beberapa PDF sekaligus</span>
+          <span style="font-size:11px;color:#a0aec0;"><i class="fas fa-info-circle"></i> Upload file atau <b>Ctrl+V</b> untuk paste screenshot</span>
           <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
             <button id="mekSiBtnSave" onclick="mekSavePlanning()"
               style="padding:6px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#0f2027,#1a3a5c);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
@@ -4803,7 +4893,7 @@
             ondragleave="this.style.borderColor='#cbd5e0';this.style.background='';"
             ondrop="event.preventDefault();this.style.borderColor='#cbd5e0';this.style.background='';mekHandleSiFiles(event.dataTransfer.files);">
             <i class="fas fa-file-pdf" style="font-size:40px;display:block;margin-bottom:12px;color:#fc8181;opacity:.5;"></i>
-            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Klik atau drag & drop PDF / Screenshot di sini</div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Klik, drag & drop, atau Ctrl+V paste screenshot</div>
             <div style="font-size:12px;margin-top:4px;color:#a0aec0;">PDF, PNG, JPG, WEBP — bisa beberapa file</div>
           </div>
 
