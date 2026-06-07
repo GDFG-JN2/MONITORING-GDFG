@@ -358,9 +358,14 @@ var _mekParsedRows = [];
 // ── Inisialisasi (dipanggil mekInitPage) ─────────────────────
 function _mekInitPlanningWa() {
   _mekParsedRows = [];
+  _mekSiRows     = [];
+  _mekPlanMode   = 'wa';
   var ta = document.getElementById('mekWaTextarea');
   if (ta) ta.value = '';
+  var tj = document.getElementById('mekWaTujuan');
+  if (tj) { tj.value = ''; tj.style.borderColor = '#fc8181'; tj.style.background = '#fff5f5'; }
   _mekRenderPreview([]);
+  mekSwitchPlanMode('wa');
 
   // Set tahun default
   var elYear = document.getElementById('mekWaYear');
@@ -369,10 +374,18 @@ function _mekInitPlanningWa() {
 
 // ── Parse tombol ─────────────────────────────────────────────
 function mekParseWa() {
-  var ta = document.getElementById('mekWaTextarea');
-  if (!ta || !ta.value.trim()) { showToast('Textarea kosong, paste dulu teks WA-nya.', 'warning'); return; }
+  var ta     = document.getElementById('mekWaTextarea');
+  var tujuan = ((document.getElementById('mekWaTujuan') || {}).value || '').trim();
 
-  var rows = _mekParseWaText(ta.value);
+  if (!ta || !ta.value.trim()) { showToast('Textarea kosong, paste dulu teks WA-nya.', 'warning'); return; }
+  if (!tujuan) {
+    showToast('Tujuan wajib diisi sebelum Parse!', 'error');
+    var el = document.getElementById('mekWaTujuan');
+    if (el) { el.focus(); el.style.borderColor = '#fc8181'; el.style.background = '#fff5f5'; }
+    return;
+  }
+
+  var rows = _mekParseWaText(ta.value, tujuan);
   _mekParsedRows = rows;
   _mekRenderPreview(rows);
 
@@ -392,6 +405,8 @@ function mekParseWa() {
 function mekClearWa() {
   var ta = document.getElementById('mekWaTextarea');
   if (ta) ta.value = '';
+  var tj = document.getElementById('mekWaTujuan');
+  if (tj) { tj.value = ''; tj.style.borderColor = '#fc8181'; tj.style.background = '#fff5f5'; }
   _mekParsedRows = [];
   _mekRenderPreview([]);
   var ct = document.getElementById('mekParseCount');
@@ -399,7 +414,7 @@ function mekClearWa() {
 }
 
 // ── Inti parser teks WA ──────────────────────────────────────
-function _mekParseWaText(raw) {
+function _mekParseWaText(raw, tujuan) {
   var lines = raw.split('\n').map(function(l){ return l.trim(); });
 
   // ── 1. Deteksi week & tahun ──────────────────────────────
@@ -501,7 +516,9 @@ function _mekParseWaText(raw) {
           sku:     curSku,
           nama:    curItem,
           jumlah:  jumlah,
-          ket:     ket
+          tujuan:  tujuan || '',
+          ket:     ket,
+          source:  'WA'
         });
       }
       continue;
@@ -517,7 +534,7 @@ function _mekRenderPreview(rows) {
   if (!tbody) return;
 
   if (!rows || !rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:50px;color:#a0aec0;font-size:12px;">' +
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:50px;color:#a0aec0;font-size:12px;">' +
       '<i class="fas fa-magic" style="font-size:28px;display:block;margin-bottom:10px;opacity:.2;"></i>' +
       'Paste teks WA lalu klik <b>Parse</b></td></tr>';
     return;
@@ -534,6 +551,7 @@ function _mekRenderPreview(rows) {
       '<td><b style="font-size:12px;">' + _mekEsc(r.sku) + '</b></td>' +
       '<td style="font-size:12px;">' + _mekEsc(r.nama) + '</td>' +
       '<td style="text-align:right;font-weight:700;font-size:13px;">' + _mekEsc(r.jumlah || '—') + '</td>' +
+      '<td style="font-size:12px;font-weight:600;color:#276749;">' + _mekEsc(r.tujuan || '—') + '</td>' +
       '<td style="font-size:11px;color:#718096;">' + _mekEsc(r.ket) + '</td>' +
       '<td style="text-align:center;">' +
         '<button onclick="_mekDeletePreviewRow(' + i + ')" style="background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;">' +
@@ -553,17 +571,31 @@ function _mekDeletePreviewRow(idx) {
 
 // ── Simpan ke GAS ────────────────────────────────────────────
 function mekSavePlanning() {
-  var rows = _mekParsedRows;
-  if (!rows || !rows.length) { showToast('Belum ada data. Parse dulu teks WA-nya.', 'warning'); return; }
+  var rows = _mekPlanMode === 'si' ? _mekSiRows : _mekParsedRows;
+  if (!rows || !rows.length) {
+    showToast(_mekPlanMode === 'si' ? 'Belum ada data SI. Upload PDF dulu.' : 'Belum ada data. Parse dulu teks WA-nya.', 'warning');
+    return;
+  }
 
-  var btn = document.getElementById('mekBtnSave');
+  var btnId = _mekPlanMode === 'si' ? 'mekSiBtnSave' : 'mekBtnSave';
+  var btn   = document.getElementById(btnId);
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...'; }
 
   API.run('saveMekPlanningData', { rows: rows }, function (res) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Simpan'; }
     if (res && res.success) {
       showToast(res.message || 'Berhasil disimpan!', 'success');
-      mekClearWa();
+      if (_mekPlanMode === 'si') {
+        _mekSiRows = [];
+        _mekRenderSiPreview([]);
+        var dz = document.getElementById('mekSiDropZone');
+        var rw = document.getElementById('mekSiResultWrap');
+        if (dz) dz.style.display = '';
+        if (rw) rw.style.display = 'none';
+        var ct = document.getElementById('mekSiParseCount'); if (ct) ct.style.display = 'none';
+      } else {
+        mekClearWa();
+      }
     } else {
       showToast('Gagal: ' + (res && res.message ? res.message : 'error'), 'error');
     }
@@ -599,6 +631,366 @@ function mekMobilePane(pane) {
     if (tabPaste) { tabPaste.style.color  = in_; tabPaste.style.borderBottomColor  = 'transparent'; }
     if (tabPrev)  { tabPrev.style.color   = ac;  tabPrev.style.borderBottomColor   = ac; }
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// TOGGLE MODE: WA / SI
+// ════════════════════════════════════════════════════════════
+var _mekPlanMode   = 'wa';  // 'wa' | 'si'
+var _mekSiRows     = [];    // baris hasil parse SI
+var _mekStdCache   = null;  // cache sheet STD {nama_lower: {sku, nama}}
+
+// ── Load STD dari GAS sekali, cache di browser ───────────────
+function _mekLoadStd(callback) {
+  if (_mekStdCache) { callback(_mekStdCache); return; }
+  API.run('getStandarPalet', {}, function(res) {
+    _mekStdCache = {};
+    ((res && res.data) || []).forEach(function(r) {
+      var key = String(r.nama || '').toLowerCase().trim();
+      if (key) _mekStdCache[key] = { sku: String(r.sku || ''), nama: String(r.nama || '') };
+    });
+    callback(_mekStdCache);
+  }, function() { _mekStdCache = {}; callback({}); });
+}
+
+// ── Fuzzy match nama item SI ke sheet STD ────────────────────
+// Strategi: tokenize kedua string → hitung token yang overlap → pilih skor tertinggi
+function _mekFuzzyMatchStd(itemText, stdCache) {
+  if (!itemText || !stdCache) return null;
+  var query = itemText.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')   // hapus simbol
+    .replace(/\s+/g, ' ').trim();
+  var qTokens = query.split(' ').filter(Boolean);
+  if (!qTokens.length) return null;
+
+  var best = null, bestScore = 0;
+  Object.keys(stdCache).forEach(function(key) {
+    var kTokens = key.replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+    // Hitung berapa token query yang ada di key
+    var hit = qTokens.filter(function(t){ return kTokens.indexOf(t) >= 0; }).length;
+    // Normalisasi: hit / max(qLen, kLen) agar tidak bias ke string panjang
+    var score = hit / Math.max(qTokens.length, kTokens.length);
+    if (score > bestScore) { bestScore = score; best = stdCache[key]; }
+  });
+  // Threshold minimal 40% token match
+  return bestScore >= 0.4 ? best : null;
+}
+
+// ════════════════════════════════════════════════════════════
+// TOGGLE MODE: WA / SI
+// ════════════════════════════════════════════════════════════
+function mekSwitchPlanMode(mode) {
+  _mekPlanMode = mode;
+  var waPanel = document.getElementById('mekWaPanel');
+  var siPanel = document.getElementById('mekSiPanel');
+  var btnWa   = document.getElementById('mekPlanModeWa');
+  var btnSi   = document.getElementById('mekPlanModeSi');
+  var ac = '#1a3a5c', in_ = '#718096';
+
+  if (waPanel) waPanel.style.display = mode === 'wa' ? 'flex' : 'none';
+  if (siPanel) siPanel.style.display = mode === 'si' ? 'flex' : 'none';
+  if (btnWa) { btnWa.style.color = mode==='wa'?ac:in_; btnWa.style.borderBottomColor = mode==='wa'?ac:'transparent'; }
+  if (btnSi) { btnSi.style.color = mode==='si'?ac:in_; btnSi.style.borderBottomColor = mode==='si'?ac:'transparent'; }
+
+  // Preload STD saat mode SI dibuka
+  if (mode === 'si') _mekLoadStd(function(){});
+}
+
+// ════════════════════════════════════════════════════════════
+// PANEL SI — Upload PDF atau Gambar (screenshot)
+// ════════════════════════════════════════════════════════════
+
+function mekHandleSiFiles(files) {
+  if (!files || !files.length) return;
+
+  var tujuan = ((document.getElementById('mekSiTujuan') || {}).value || '').trim();
+  if (!tujuan) {
+    showToast('Tujuan wajib diisi sebelum upload!', 'error');
+    var el = document.getElementById('mekSiTujuan');
+    if (el) { el.focus(); el.style.borderColor='#fc8181'; el.style.background='#fff5f5'; }
+    var fi = document.getElementById('mekSiFileInput'); if (fi) fi.value = '';
+    return;
+  }
+
+  var dz = document.getElementById('mekSiDropZone');
+  var rw = document.getElementById('mekSiResultWrap');
+  if (dz) dz.style.display = 'none';
+  if (rw) rw.style.display = 'block';
+
+  _mekSiRows = [];
+  var fileLog = document.getElementById('mekSiFileLog');
+  if (fileLog) fileLog.innerHTML = '';
+
+  var ALLOWED = ['application/pdf','image/png','image/jpeg','image/jpg','image/webp','image/gif'];
+  var fileArr = Array.from(files).filter(function(f){
+    var ok = ALLOWED.indexOf(f.type) >= 0 ||
+      /\.(pdf|png|jpg|jpeg|webp|gif)$/i.test(f.name);
+    return ok;
+  });
+  if (!fileArr.length) { showToast('Pilih file PDF atau gambar (PNG/JPG/WEBP).', 'error'); return; }
+
+  // Preload STD dulu, baru proses file
+  _mekLoadStd(function(stdCache) {
+    var done = 0;
+    fileArr.forEach(function(file) {
+      _mekAddSiFileStatus(file.name, 'loading');
+      var isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+      if (isPdf) {
+        _mekReadPdfText(file, function(text) {
+          if (!text) {
+            _mekUpdateSiFileStatus(file.name, 'error', 'Gagal baca PDF');
+            done++; if (done === fileArr.length) _mekFinalizeSiRows();
+            return;
+          }
+          _mekUpdateSiFileStatus(file.name, 'parsing', 'Menganalisis...');
+          _mekParseSiText(text, null, tujuan, stdCache, function(rows) {
+            _mekSiRows = _mekSiRows.concat(rows);
+            _mekUpdateSiFileStatus(file.name, rows.length ? 'ok' : 'warn',
+              rows.length ? rows.length + ' baris' : 'Tidak ada data');
+            done++; if (done === fileArr.length) _mekFinalizeSiRows();
+          });
+        });
+      } else {
+        // Gambar → langsung kirim ke Claude API as image
+        _mekUpdateSiFileStatus(file.name, 'parsing', 'Menganalisis gambar...');
+        _mekFileToBase64(file, function(b64, mimeType) {
+          if (!b64) {
+            _mekUpdateSiFileStatus(file.name, 'error', 'Gagal baca gambar');
+            done++; if (done === fileArr.length) _mekFinalizeSiRows();
+            return;
+          }
+          _mekParseSiText(null, {b64:b64, mime:mimeType}, tujuan, stdCache, function(rows) {
+            _mekSiRows = _mekSiRows.concat(rows);
+            _mekUpdateSiFileStatus(file.name, rows.length ? 'ok' : 'warn',
+              rows.length ? rows.length + ' baris' : 'Tidak ada data');
+            done++; if (done === fileArr.length) _mekFinalizeSiRows();
+          });
+        });
+      }
+    });
+  });
+}
+
+// ── Helper: file → base64 ────────────────────────────────────
+function _mekFileToBase64(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataUrl = e.target.result;
+    var b64 = dataUrl.split(',')[1];
+    callback(b64, file.type || 'image/jpeg');
+  };
+  reader.onerror = function() { callback(null, null); };
+  reader.readAsDataURL(file);
+}
+
+// ── Baca teks dari PDF pakai PDF.js ─────────────────────────
+function _mekReadPdfText(file, callback) {
+  if (!window.pdfjsLib) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = function() {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      _mekExtractPdfText(file, callback);
+    };
+    s.onerror = function() { callback(null); };
+    document.head.appendChild(s);
+  } else {
+    _mekExtractPdfText(file, callback);
+  }
+}
+
+function _mekExtractPdfText(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise
+    .then(function(pdf) {
+      var ps = [];
+      for (var p = 1; p <= pdf.numPages; p++) ps.push(pdf.getPage(p));
+      return Promise.all(ps);
+    })
+    .then(function(pages) {
+      return Promise.all(pages.map(function(page) {
+        return page.getTextContent().then(function(tc) {
+          return tc.items.map(function(i){ return i.str; }).join(' ');
+        });
+      }));
+    })
+    .then(function(texts) { callback(texts.join('\n')); })
+    .catch(function() { callback(null); });
+  };
+  reader.onerror = function() { callback(null); };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Parse SI via Claude API (text atau image) ────────────────
+function _mekParseSiText(text, image, tujuan, stdCache, callback) {
+  var weekOverride = ((document.getElementById('mekSiWeek') || {}).value || '').trim();
+
+  var instruction = 'Kamu adalah parser dokumen Shipping Instruction (SI) ekspor PT. Mayora Indah.\n' +
+    'Ekstrak data berikut:\n' +
+    '1. TANGGAL: dari "STUFFING : ..." ambil tanggalnya (format dd.MM.yyyy)\n' +
+    '2. NO_SO: dari "SO : XXXXXXXXX" ambil angkanya saja\n' +
+    '3. ITEMS: dari tabel dengan kolom NO / QTY / UNIT / DESCRIPTION:\n' +
+    '   - Setiap baris item yang punya QTY dan DESCRIPTION adalah satu item\n' +
+    '   - Baris duplikat (QTY dan DESCRIPTION sama persis) = satu item, bukan dua\n' +
+    '   - item_qty = nilai QTY (angka, contoh 1154)\n' +
+    '   - item_unit = UNIT (contoh CAR)\n' +
+    '   - item_desc = DESCRIPTION lengkap\n' +
+    '4. JUMLAH_CONT: dari "NO. CONT : NxTIPE" ambil N saja (contoh "2X40HC" → 2)\n' +
+    '5. DESTINATION: dari "DESTINATION :" ambil tujuan akhir (kota/negara)\n' +
+    (weekOverride ? '6. WEEK: ' + weekOverride + '\n' : '6. WEEK: kosong\n') +
+    '\nATURAN PENTING:\n' +
+    '- Jika ada baris item duplikat (same QTY + DESCRIPTION), jadikan 1 baris saja\n' +
+    '- Satu baris per unique item\n' +
+    '- jumlah_cont adalah jumlah container untuk SEMUA item (tidak dibagi per item)\n' +
+    '\nBalas HANYA JSON, tidak ada teks lain:\n' +
+    '{"tanggal":"dd.MM.yyyy","no_so":"...","week":"","jumlah_cont":N,"destination":"...",' +
+    '"items":[{"desc":"...","qty":1154,"unit":"CAR"}]}\n';
+
+  var msgContent;
+  if (image) {
+    msgContent = [
+      { type: 'image', source: { type: 'base64', media_type: image.mime, data: image.b64 } },
+      { type: 'text', text: instruction }
+    ];
+  } else {
+    msgContent = instruction + '\n\nTeks SI:\n' + text.substring(0, 4000);
+  }
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: msgContent }]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    var raw = (data.content || []).map(function(c){ return c.text||''; }).join('');
+    try {
+      var clean = raw.replace(/```json|```/g,'').trim();
+      var parsed = JSON.parse(clean);
+
+      // Normalisasi tanggal dd.MM.yyyy → yyyy-MM-dd
+      var tgl = String(parsed.tanggal || '').trim();
+      var tm  = tgl.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+      if (tm) tgl = tm[3] + '-' + ('0'+tm[2]).slice(-2) + '-' + ('0'+tm[1]).slice(-2);
+
+      var noSo       = String(parsed.no_so       || '');
+      var jumlahCont = Number(parsed.jumlah_cont) || 0;
+      var dest       = String(parsed.destination  || '');
+      var week       = weekOverride || String(parsed.week || '');
+      var items      = parsed.items || [];
+
+      // Deduplikasi items (QTY + DESC sama persis)
+      var seen = {}, uniqueItems = [];
+      items.forEach(function(it) {
+        var key = String(it.qty) + '|' + String(it.desc);
+        if (!seen[key]) { seen[key] = true; uniqueItems.push(it); }
+      });
+
+      // Fuzzy match ke STD
+      var rows = uniqueItems.map(function(it) {
+        var match  = _mekFuzzyMatchStd(String(it.desc || ''), stdCache);
+        var sku    = match ? match.sku  : '';
+        var nama   = match ? match.nama : String(it.desc || '');
+        var qtyStr = String(it.qty || '') + (it.unit ? ' ' + it.unit : '');
+        return {
+          week:    week,
+          tanggal: tgl,
+          sku:     sku,
+          nama:    nama,
+          jumlah:  String(jumlahCont),
+          tujuan:  tujuan,
+          ket:     noSo ? 'SO:' + noSo + (dest ? ' | ' + dest : '') : dest,
+          // Extra info untuk display
+          _qtyKar: qtyStr,
+          _noSo:   noSo,
+          _desc:   String(it.desc || ''),
+          source:  'SI'
+        };
+      });
+
+      callback(rows);
+    } catch(e) {
+      callback([]);
+    }
+  })
+  .catch(function() { callback([]); });
+}
+
+// ── Finalize: render tabel SI ────────────────────────────────
+function _mekFinalizeSiRows() {
+  _mekRenderSiPreview(_mekSiRows);
+  var ct = document.getElementById('mekSiParseCount');
+  if (ct) { ct.textContent = _mekSiRows.length + ' baris'; ct.style.display = ''; }
+  if (_mekSiRows.length) showToast(_mekSiRows.length + ' baris dari SI berhasil di-parse!', 'success');
+  var fi = document.getElementById('mekSiFileInput'); if (fi) fi.value = '';
+}
+
+function _mekRenderSiPreview(rows) {
+  var tbody = document.getElementById('mekSiPreviewTbody');
+  if (!tbody) return;
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(function(r, i) {
+    var skuOk = r.sku && r.sku !== r._desc;
+    return '<tr>' +
+      '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">' + (i+1) + '</td>' +
+      '<td style="text-align:center;">' + (r.week ? '<span style="background:#ebf8ff;color:#2b6cb0;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">W'+r.week+'</span>' : '<span style="color:#cbd5e0;">—</span>') + '</td>' +
+      '<td style="white-space:nowrap;font-size:12px;">' + _mekEsc(_mekFmtTglDisplay(r.tanggal)||r.tanggal) + '</td>' +
+      '<td>' +
+        (skuOk
+          ? '<b style="font-size:12px;">' + _mekEsc(r.sku) + '</b>'
+          : '<span style="color:#fc8181;font-size:11px;" title="SKU tidak ditemukan di STD"><i class="fas fa-exclamation-triangle"></i> tidak ditemukan</span>') +
+      '</td>' +
+      '<td style="font-size:12px;">' + _mekEsc(r.nama) +
+        (r._qtyKar ? '<br><span style="font-size:10px;color:#a0aec0;">'+_mekEsc(r._qtyKar)+'</span>' : '') +
+      '</td>' +
+      '<td style="text-align:right;font-weight:700;font-size:13px;">' + _mekEsc(r.jumlah||'—') + '</td>' +
+      '<td style="font-size:12px;font-weight:600;color:#276749;">' + _mekEsc(r.tujuan||'—') + '</td>' +
+      '<td style="font-size:11px;color:#718096;">' + _mekEsc(r.ket) + '</td>' +
+      '<td style="text-align:center;"><button onclick="_mekDeleteSiRow('+i+')" style="background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;"><i class="fas fa-times"></i></button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function _mekDeleteSiRow(idx) {
+  _mekSiRows.splice(idx, 1);
+  _mekRenderSiPreview(_mekSiRows);
+  var ct = document.getElementById('mekSiParseCount');
+  if (ct) ct.textContent = _mekSiRows.length + ' baris';
+}
+
+// ── File status log ──────────────────────────────────────────
+function _mekAddSiFileStatus(name, state) {
+  var log = document.getElementById('mekSiFileLog'); if (!log) return;
+  var icons  = { loading:'fa-spinner fa-spin', parsing:'fa-robot', ok:'fa-check-circle', warn:'fa-exclamation-circle', error:'fa-times-circle' };
+  var colors = { loading:'#a0aec0', parsing:'#2b6cb0', ok:'#276749', warn:'#744210', error:'#9b2c2c' };
+  var id = 'mekSiLog_' + name.replace(/[^a-z0-9]/gi,'_');
+  var div = document.createElement('div');
+  div.id = id;
+  div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;border-bottom:1px solid #f0f0f0;';
+  div.innerHTML = '<i class="fas '+(icons[state]||'fa-file')+'" style="color:'+(colors[state]||'#a0aec0')+';width:14px;"></i>' +
+    '<span style="flex:1;font-weight:600;color:#2d3748;">'+_mekEsc(name)+'</span>' +
+    '<span id="mekSiLogMsg_'+name.replace(/[^a-z0-9]/gi,'_')+'" style="color:'+(colors[state]||'#a0aec0')+';font-size:11px;">'+state+'</span>';
+  log.appendChild(div);
+}
+
+function _mekUpdateSiFileStatus(name, state, msg) {
+  var icons  = { loading:'fa-spinner fa-spin', parsing:'fa-robot', ok:'fa-check-circle', warn:'fa-exclamation-circle', error:'fa-times-circle' };
+  var colors = { loading:'#a0aec0', parsing:'#2b6cb0', ok:'#276749', warn:'#744210', error:'#9b2c2c' };
+  var el  = document.getElementById('mekSiLog_'+name.replace(/[^a-z0-9]/gi,'_')); if (!el) return;
+  var ico = el.querySelector('i');
+  var msgEl = document.getElementById('mekSiLogMsg_'+name.replace(/[^a-z0-9]/gi,'_'));
+  if (ico) { ico.className = 'fas '+(icons[state]||'fa-file'); ico.style.color = colors[state]||'#a0aec0'; }
+  if (msgEl) { msgEl.textContent = msg||state; msgEl.style.color = colors[state]||'#a0aec0'; }
 }
 
 // ════════════════════════════════════════════════════════════
