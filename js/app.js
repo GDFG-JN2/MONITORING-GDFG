@@ -204,7 +204,7 @@ function showPage(page) {
   if (page !== 'opnamePage')   _opClearSel();
   if (page !== 'inputPage')    _inResetSel();
 
-  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage'];
+  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage'];
   pages.forEach(function (p) {
     var el = document.getElementById(p);
     if (!el) return;
@@ -225,8 +225,9 @@ function showPage(page) {
   document.getElementById('menuOpname').classList.toggle('active-page',     page === 'opnamePage');
   document.getElementById('menuRdc').classList.toggle('active-page',        page === 'rdcPage');
   document.getElementById('menuStockJalur').classList.toggle('active-page', page === 'stockJalurPage');
-  document.getElementById('menuBinLoc').classList.toggle('active-page',     page === 'binLocPage');
-  document.getElementById('menuApps').classList.toggle('active-page',      page === 'appsPage');
+  document.getElementById('menuBinLoc').classList.toggle('active-page',            page === 'binLocPage');
+  document.getElementById('menuMonitoringEkspor').classList.toggle('active-page',  page === 'monitoringEksporPage');
+  document.getElementById('menuApps').classList.toggle('active-page',              page === 'appsPage');
 
   // Page-specific init
   if (page === 'dashboard') {
@@ -238,7 +239,8 @@ function showPage(page) {
   if (page === 'opnamePage')   { initOpnamePage(); switchOpnameTab('input'); }
   if (page === 'rdcPage')      rdcInitPage();
   if (page === 'stockJalurPage') sjInitPage();
-  if (page === 'binLocPage')   blInitPage();
+  if (page === 'binLocPage')           blInitPage();
+  if (page === 'monitoringEksporPage') mekInitPage();
   if (page === 'realisasiPage') {
     initRealForm();
     var today   = new Date();
@@ -451,7 +453,7 @@ window.addEventListener('popstate', function(e) {
     // Kembali ke halaman sebelumnya tanpa push history baru
     var page = e.state.page;
     var pages = ['dashboard','inputPage','realisasiPage','opnamePage',
-                 'rdcPage','stockJalurPage','binLocPage','appsPage'];
+                 'rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage'];
     pages.forEach(function(p) {
       var el = document.getElementById(p);
       if (el) { el.style.display = 'none'; el.classList.remove('page-enter'); }
