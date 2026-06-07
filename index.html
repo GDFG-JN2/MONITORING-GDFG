@@ -2302,7 +2302,7 @@
     @media(max-width:600px){#monitoringEksporPage .mek-card-grid{grid-template-columns:repeat(2,1fr);}}
     /* Landscape mobile: cards lebih compact, summary bisa scroll penuh */
     @media(max-height:500px){
-      #mekSummaryPane{ height:calc(100vh - 96px); }
+      #mekSummaryPane{ flex:1; min-height:0; }
       #monitoringEksporPage .mek-card-grid{ grid-template-columns:repeat(4,1fr); gap:6px; padding:6px 10px; }
       #monitoringEksporPage .mek-card{ padding:8px 10px; gap:8px; }
       #monitoringEksporPage .mek-card-ico{ width:28px; height:28px; font-size:13px; }
@@ -4530,17 +4530,17 @@
     </div>
 
     <!-- ════ TAB SUMMARY ════ -->
-    <div id="mekSummaryPane" style="overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;height:calc(100vh - 112px);">
+    <!-- Toggle ALL / CAPAIAN — di luar scrollable area supaya selalu bisa diklik -->
+    <div style="display:flex;gap:6px;padding:8px 14px 0;background:#fff;flex-shrink:0;">
+      <button id="mekSumViewAll" class="sum-view-btn active" onclick="mekSwitchSumView('all')">
+        <i class="fas fa-list"></i> All
+      </button>
+      <button id="mekSumViewCapaian" class="sum-view-btn" onclick="mekSwitchSumView('capaian')">
+        <i class="fas fa-chart-pie"></i> Capaian Planning
+      </button>
+    </div>
 
-      <!-- Toggle ALL / CAPAIAN PLANNING -->
-      <div style="display:flex;gap:6px;padding:10px 14px 0;">
-        <button id="mekSumViewAll" class="sum-view-btn active" onclick="mekSwitchSumView('all')">
-          <i class="fas fa-list"></i> All
-        </button>
-        <button id="mekSumViewCapaian" class="sum-view-btn" onclick="mekSwitchSumView('capaian')">
-          <i class="fas fa-chart-pie"></i> Capaian Planning
-        </button>
-      </div>
+    <div id="mekSummaryPane" style="overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;flex:1;min-height:0;">
 
       <!-- ════ PANE ALL ════ -->
       <div id="mekPaneAll">
