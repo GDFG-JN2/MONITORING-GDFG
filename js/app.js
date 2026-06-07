@@ -46,47 +46,46 @@ function toggleShowPassword() {
   }
 }
 
-function login() {
-  var u     = document.getElementById('username').value.trim();
-  var pwEl  = document.getElementById('password');
-  var pwElV = document.getElementById('passwordVisible');
-  var p     = (pwEl && pwEl.style.display !== 'none' ? pwEl : pwElV).value;
-  var btn   = document.querySelector('.btn-login');
-
-  if (!u || !p) {
-    showLoginError('Username dan password tidak boleh kosong.');
+function login(){
+  var u   = document.getElementById("username").value.trim();
+  var pwEl = document.getElementById("password"); var pwElV = document.getElementById("passwordVisible"); var p = (pwEl&&pwEl.style.display!=="none"?pwEl:pwElV).value;
+  var btn = document.querySelector(".btn-login");
+  if(!u || !p){
+    showLoginError("Username dan password tidak boleh kosong.");
     return;
   }
+  document.getElementById("loginMsg").style.display = "none";
 
-  document.getElementById('loginMsg').style.display = 'none';
-  btn.classList.add('loading');
+  // Loading state di tombol
+  btn.classList.add("loading");
   btn.innerHTML = '<span class="btn-spinner"></span> Memuat...';
 
-  API.verifyLogin(u, p,
-    function (res) {
-      if (res.success) {
-        _currentUser   = u;
-        _userRole      = res.role || 'admin';
-        _patternLoaded = false;
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res.success){
+        _currentUser = u;
+        _userRole    = res.role || 'admin';
+        _patternLoaded = false; // reset cache saat login user baru
         _patternCache  = null;
-        document.getElementById('loginWrap').style.display  = 'none';
-        document.getElementById('dashboard').style.display  = 'block';
+        document.getElementById("loginWrap").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
         applyRoleRestrictions(_userRole);
         refreshData();
         switchView('horizontal');
-        _patternLoadAsync(function () {});
+        // Preload pola di background — supaya tidak lag saat pertama kali klik
+        _patternLoadAsync(function(){});
       } else {
-        btn.classList.remove('loading');
-        btn.innerHTML = 'Login';
-        showLoginError(res.message || 'Login gagal.');
+        btn.classList.remove("loading");
+        btn.innerHTML = "Login";
+        showLoginError(res.message || "Login gagal.");
       }
-    },
-    function () {
-      btn.classList.remove('loading');
-      btn.innerHTML = 'Login';
-      showLoginError('Terjadi kesalahan. Coba lagi.');
-    }
-  );
+    })
+    .withFailureHandler(function(){
+      btn.classList.remove("loading");
+      btn.innerHTML = "Login";
+      showLoginError("Terjadi kesalahan. Coba lagi.");
+    })
+    .verifyLogin(u, p);
 }
 
 function showLoginError(msg) {
@@ -112,44 +111,64 @@ function logout() {
 // ============================================================
 // ROLE-BASED ACCESS CONTROL
 // ============================================================
-function applyRoleRestrictions(role) {
+function applyRoleRestrictions(role){
+  var isAdmin   = (role === 'admin');
   var isViewer  = (role === 'viewer' || role === 'visitor');
   var isVisitor = (role === 'visitor');
 
-  function hide(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; }
+  function hide(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
+  function hideEl(el){ if(el) el.style.display='none'; }
+  function hideAll(sel){ document.querySelectorAll(sel).forEach(function(el){el.style.display='none';}); }
 
-  if (isViewer) {
-    // Kapasitas: sembunyikan Input Data & Spreadsheet
-    document.querySelectorAll('.gdrm-header-btns .btn-hdr').forEach(function (btn) {
-      var oc = btn.getAttribute('onclick') || '';
-      if (oc.indexOf('inputPage') >= 0 || oc.indexOf('updateStock') >= 0)
-        btn.style.display = 'none';
+  if(isViewer){
+    // ── Kapasitas: sembunyikan tombol Input Data & Spreadsheet ──────
+    document.querySelectorAll('.gdrm-header-btns .btn-hdr').forEach(function(btn){
+      if(btn.getAttribute('onclick') && (
+        btn.getAttribute('onclick').indexOf('inputPage')>=0 ||
+        btn.getAttribute('onclick').indexOf('updateStock')>=0
+      )) btn.style.display='none';
     });
 
-    // Realisasi: hanya Summary & Planning
-    document.querySelectorAll('.real-tab').forEach(function (btn) {
-      var oc = btn.getAttribute('onclick') || '';
-      if (oc.indexOf('summaryReal') < 0 && oc.indexOf('planningReal') < 0)
-        btn.style.display = 'none';
+    // ── Realisasi SPE: hanya tampilkan Summary & Planning ────────────
+    document.querySelectorAll('.real-tab').forEach(function(btn){
+      var oc = btn.getAttribute('onclick')||'';
+      if(oc.indexOf('summaryReal')<0 && oc.indexOf('planningReal')<0){
+        btn.style.display='none';
+      }
     });
 
-    // Stock Opname: sembunyikan Input & Setting PIN
+    // ── Stock Opname: sembunyikan tombol Input & Setting PIN ─────────
     hide('btnOpInput');
-    document.querySelectorAll('#opnamePage .btn-hdr').forEach(function (btn) {
-      var oc = btn.getAttribute('onclick') || '';
-      if (oc.indexOf('_psOpen') >= 0) btn.style.display = 'none';
+    // Setting PIN button (fa-shield-alt)
+    document.querySelectorAll('#opnamePage .btn-hdr').forEach(function(btn){
+      if(btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf('_psOpen')>=0)
+        btn.style.display='none';
     });
 
-    // RDC: sembunyikan Input Data
+    // ── RDC: sembunyikan tab Input Data ─────────────────────────────
     hide('rdcTabInput');
     hide('btnRdcInput');
 
-    // Stock Jalur: sembunyikan Input & Output
+    // ── Stock Jalur: sembunyikan tombol Input & Output ───────────────
     hide('btnSjInput');
     hide('btnSjOutput');
   }
 
-  if (isVisitor) {
+  // ── Default tab setelah login untuk viewer/visitor ──────────────────
+  if(isViewer){
+    // Stock Opname → langsung ke Riwayat (tanpa PIN)
+    setTimeout(function(){
+      _doSwitchOpnameTab('view');
+    }, 500);
+
+    // Stock Jalur → langsung ke Rekap (tanpa PIN)
+    setTimeout(function(){
+      sjSwitchTab('rekap');
+    }, 500);
+  }
+
+  // ── Visitor: kolom tabel Stock Opname dibatasi 4 kolom ──────────────
+  if(isVisitor){
     window._visitorMode = true;
   }
 }
@@ -288,6 +307,9 @@ function switchView(view) {
   document.getElementById('btnToggleTable').classList.toggle('active',      view === 'table');
   document.getElementById('btnTogglePie').classList.toggle('active',        view === 'pie');
   document.getElementById('btnToggleTrend').classList.toggle('active',      view === 'trend');
+  // Tampilkan zoom control hanya saat chart aktif
+  var zoomCtrl = document.getElementById('chartZoomCtrl');
+  if (zoomCtrl) zoomCtrl.classList.toggle('show', view === 'chart' || view === 'horizontal');
 
   document.getElementById('viewChart').style.display      = (view === 'chart')      ? 'grid'  : 'none';
   document.getElementById('viewHorizontal').style.display = (view === 'horizontal') ? 'grid'  : 'none';
