@@ -2300,6 +2300,13 @@
     #monitoringEksporPage .mek-plan-tbl tbody input,#monitoringEksporPage .mek-plan-tbl tbody select{min-height:30px;width:100%;border:none;background:transparent;font-size:12px;padding:5px 7px;outline:none;box-sizing:border-box;}
     #monitoringEksporPage .mek-plan-tbl tbody input:focus,#monitoringEksporPage .mek-plan-tbl tbody select:focus{background:#fffbeb;outline:2px solid #f6ad55;}
     @media(max-width:600px){#monitoringEksporPage .mek-card-grid{grid-template-columns:repeat(2,1fr);}}
+    /* Mobile: layout input planning jadi satu kolom vertikal dengan tab toggle */
+    @media(max-width:700px){
+      #mekMobilePaneToggle{ display:flex !important; }
+      #mekPlanLayout{ flex-direction:column; height:calc(100vh - 178px); }
+      #mekPastePanel{ width:100% !important; min-width:0 !important; border-right:none !important; border-bottom:2px solid #e2e8f0; height:50%; flex-shrink:0; }
+      #mekPreviewPanel{ flex:1; min-height:0; }
+    }
 </style>
 </head>
 <body>
@@ -4649,11 +4656,21 @@
     <!-- ════ TAB INPUT PLANNING ════ -->
     <div id="mekInputPane" style="display:none;">
 
-      <!-- Layout dua kolom: kiri textarea, kanan preview -->
-      <div style="display:flex;height:calc(100vh - 130px);overflow:hidden;">
+      <!-- ── Mobile: tab toggle Paste / Preview ── -->
+      <div id="mekMobilePaneToggle" style="display:none;background:#f7fafc;border-bottom:2px solid #e2e8f0;">
+        <button id="mekMobileTabPaste"   onclick="mekMobilePane('paste')"   style="width:50%;padding:10px;border:none;background:none;font-size:12px;font-weight:700;color:#1a3a5c;border-bottom:3px solid #1a3a5c;margin-bottom:-2px;cursor:pointer;">
+          <i class="fab fa-whatsapp" style="color:#25d366;margin-right:5px;"></i> Paste WA
+        </button>
+        <button id="mekMobileTabPreview" onclick="mekMobilePane('preview')" style="width:50%;padding:10px;border:none;background:none;font-size:12px;font-weight:700;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;">
+          <i class="fas fa-table" style="margin-right:5px;"></i> Preview
+        </button>
+      </div>
 
-        <!-- ── KIRI: Textarea paste WA ── -->
-        <div style="width:42%;min-width:260px;display:flex;flex-direction:column;border-right:2px solid #e2e8f0;">
+      <!-- Layout: dua kolom di desktop, satu kolom di mobile -->
+      <div id="mekPlanLayout" style="display:flex;height:calc(100vh - 130px);overflow:hidden;">
+
+        <!-- ── KIRI / ATAS: Textarea paste WA ── -->
+        <div id="mekPastePanel" style="width:42%;min-width:260px;display:flex;flex-direction:column;border-right:2px solid #e2e8f0;">
           <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;">
             <span style="font-size:12px;font-weight:700;color:#1a3a5c;">
               <i class="fab fa-whatsapp" style="color:#25d366;"></i> Paste Teks WA
@@ -4673,17 +4690,17 @@
             <label style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.4px;">Tahun</label>
             <input type="number" id="mekWaYear" min="2020" max="2099" placeholder="2025"
               style="width:72px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-            <span style="font-size:10px;color:#a0aec0;margin-left:2px;">
-              <i class="fas fa-info-circle"></i> Akan di-parse dari teks jika kosong
+            <span style="font-size:10px;color:#a0aec0;">
+              <i class="fas fa-info-circle"></i> Auto-detect jika kosong
             </span>
           </div>
           <textarea id="mekWaTextarea"
             placeholder="Paste teks WA di sini...&#10;&#10;Contoh:&#10;SKU : 421170&#10;ITEM : Choki Stix 16g&#10;kesanggupan 1 cont&#10;11 Jun : 1 cont"
-            style="flex:1;border:none;outline:none;resize:none;padding:12px 14px;font-size:12px;font-family:monospace;line-height:1.6;color:#2d3748;background:#fff;"></textarea>
+            style="flex:1;border:none;outline:none;resize:none;padding:12px 14px;font-size:12px;font-family:monospace;line-height:1.6;color:#2d3748;background:#fff;-webkit-overflow-scrolling:touch;"></textarea>
         </div>
 
-        <!-- ── KANAN: Preview hasil parse ── -->
-        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <!-- ── KANAN / BAWAH: Preview hasil parse ── -->
+        <div id="mekPreviewPanel" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
           <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;">
             <span style="font-size:12px;font-weight:700;color:#1a3a5c;">
               <i class="fas fa-table"></i> Preview Hasil Parse
@@ -4696,7 +4713,7 @@
               </button>
             </div>
           </div>
-          <div style="overflow:auto;flex:1;">
+          <div style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
             <table class="mek-plan-tbl" id="mekPreviewTbl">
               <thead>
                 <tr>
@@ -4723,6 +4740,7 @@
       </div>
 
     </div><!-- /mekInputPane -->
+
 
 
   </div><!-- /monitoringEksporPage -->
