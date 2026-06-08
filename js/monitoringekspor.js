@@ -592,7 +592,22 @@ function mekSavePlanning() {
   var btn   = document.getElementById(btnId);
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...'; }
 
-  API.run('saveMekPlanningData', { rows: rows }, function (res) {
+  // Fill down: baris lanjutan ambil week/tanggal/noSo/jumlah/tujuan dari baris pertama grup
+  var lastFirst = null;
+  var filledRows = rows.map(function(r) {
+    if (r._isFirst !== false) { lastFirst = r; return r; }
+    // Baris lanjutan: copy field yang kosong dari baris pertama
+    return Object.assign({}, r, {
+      week:    lastFirst ? lastFirst.week    : r.week,
+      tanggal: lastFirst ? lastFirst.tanggal : r.tanggal,
+      noSo:    lastFirst ? lastFirst.noSo    : r.noSo,
+      jumlah:  lastFirst ? lastFirst.jumlah  : r.jumlah,
+      tujuan:  lastFirst ? lastFirst.tujuan  : r.tujuan,
+      ket:     lastFirst ? lastFirst.ket     : r.ket,
+    });
+  });
+
+  API.run('saveMekPlanningData', { rows: filledRows }, function (res) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Simpan'; }
     if (res && res.success) {
       showToast(res.message || 'Berhasil disimpan!', 'success');
@@ -953,24 +968,27 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
   var uniqueItems = result.items;
 
   var finalTujuan = tujuan || destShort;
-  var rows = uniqueItems.map(function(it) {
+  var rows = uniqueItems.map(function(it, idx) {
     var match  = _mekFuzzyMatchStd(it.desc, stdCache);
     var sku    = match ? match.sku  : '';
     var nama   = match ? match.nama : it.desc;
     var qtyStr = String(it.qty || '') + (it.unit ? ' ' + it.unit : '');
+    var isFirst = (idx === 0);
     return {
-      week:    week,
-      tanggal: tgl,
-      sku:     sku,
-      noSo:    noSo,
-      nama:    nama,
-      jumlah:  String(jumlahCont),
-      tujuan:  finalTujuan,
-      ket:     noSo ? 'SO:' + noSo + (dest ? ' | ' + dest : '') : dest,
-      _qtyKar: qtyStr,
-      _noSo:   noSo,
-      _desc:   it.desc,
-      source:  'SI'
+      week:       isFirst ? week    : '',
+      tanggal:    isFirst ? tgl     : '',
+      sku:        sku,
+      noSo:       isFirst ? noSo   : '',
+      nama:       nama,
+      jumlah:     isFirst ? String(jumlahCont) : '',
+      tujuan:     isFirst ? finalTujuan : '',
+      ket:        isFirst ? (noSo ? 'SO:' + noSo + (dest ? ' | ' + dest : '') : dest) : '',
+      _qtyKar:    qtyStr,
+      _noSo:      noSo,
+      _desc:      it.desc,
+      _isFirst:   isFirst,
+      _groupSize: uniqueItems.length,
+      source:     'SI'
     };
   });
 
@@ -1216,27 +1234,64 @@ function _mekRenderSiPreview(rows) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</td></tr>';
     return;
   }
+  // Hitung nomor grup untuk penomoran baris pertama
+  var groupNums = [], gNum = 0;
+  rows.forEach(function(r) { if (r._isFirst !== false || r._groupSize === undefined) gNum++; groupNums.push(gNum); });
+
   tbody.innerHTML = rows.map(function(r, i) {
-    var skuOk = r.sku && r.sku !== r._desc;
-    return '<tr>' +
-      '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">' + (i+1) + '</td>' +
-      '<td style="text-align:center;">' + (r.week ? '<span style="background:#ebf8ff;color:#2b6cb0;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">W'+r.week+'</span>' : '<span style="color:#cbd5e0;">—</span>') + '</td>' +
-      '<td style="white-space:nowrap;font-size:12px;">' + _mekEsc(_mekFmtTglDisplay(r.tanggal)||r.tanggal) + '</td>' +
-      '<td style="font-size:12px;font-weight:600;color:#2d3748;">' + _mekEsc(r.noSo||'—') + '</td>' +
+    var skuOk   = r.sku && r.sku !== r._desc;
+    var isFirst = r._isFirst !== false;
+    // Border kiri biru untuk baris lanjutan (grup yang sama)
+    var contStyle = !isFirst ? 'border-left:3px solid #bee3f8;' : '';
+
+    return '<tr style="' + (!isFirst ? 'background:#f7faff;' : '') + '">' +
+      // # — nomor grup hanya di baris pertama
+      '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;' + contStyle + '">' +
+        (isFirst ? groupNums[i] : '') +
+      '</td>' +
+      // Week
+      '<td style="text-align:center;">' +
+        (isFirst
+          ? (r.week ? '<span style="background:#ebf8ff;color:#2b6cb0;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">W'+r.week+'</span>' : '<span style="color:#cbd5e0;">—</span>')
+          : '') +
+      '</td>' +
+      // Tanggal
+      '<td style="white-space:nowrap;font-size:12px;">' + (isFirst ? _mekEsc(_mekFmtTglDisplay(r.tanggal)||r.tanggal) : '') + '</td>' +
+      // No. SO
+      '<td style="font-size:12px;font-weight:600;color:#2d3748;">' + (isFirst ? _mekEsc(r.noSo||'—') : '') + '</td>' +
+      // SKU — selalu tampil
       '<td>' +
         (skuOk
           ? '<b style="font-size:12px;">' + _mekEsc(r.sku) + '</b>'
-          : '<span style="color:#fc8181;font-size:11px;" title="SKU tidak ditemukan di STD"><i class="fas fa-exclamation-triangle"></i> tidak ditemukan</span>') +
+          : '<span style="color:#fc8181;font-size:11px;" title="SKU tidak ditemukan di STD"><i class="fas fa-exclamation-triangle"></i></span>') +
       '</td>' +
+      // Nama Item — selalu tampil
       '<td style="font-size:12px;">' + _mekEsc(r.nama) +
         (r._qtyKar ? '<br><span style="font-size:10px;color:#a0aec0;">'+_mekEsc(r._qtyKar)+'</span>' : '') +
       '</td>' +
-      '<td style="text-align:right;font-weight:700;font-size:13px;">' + _mekEsc(r.jumlah||'—') + '</td>' +
-      '<td style="font-size:12px;font-weight:600;color:#276749;">' + _mekEsc(r.tujuan||'—') + '</td>' +
-      '<td style="font-size:11px;color:#718096;">' + _mekEsc(r.ket) + '</td>' +
-      '<td style="text-align:center;"><button onclick="_mekDeleteSiRow('+i+')" style="background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;"><i class="fas fa-times"></i></button></td>' +
+      // Cont — hanya baris pertama
+      '<td style="text-align:right;font-weight:700;font-size:13px;">' + (isFirst ? _mekEsc(r.jumlah||'—') : '') + '</td>' +
+      // Tujuan — hanya baris pertama
+      '<td style="font-size:12px;font-weight:600;color:#276749;">' + (isFirst ? _mekEsc(r.tujuan||'—') : '') + '</td>' +
+      // Keterangan — hanya baris pertama
+      '<td style="font-size:11px;color:#718096;">' + (isFirst ? _mekEsc(r.ket) : '') + '</td>' +
+      // Tombol hapus — hanya baris pertama
+      '<td style="text-align:center;">' +
+        (isFirst ? '<button onclick="_mekDeleteSiGroup('+i+')" style="background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;"><i class="fas fa-times"></i></button>' : '') +
+      '</td>' +
       '</tr>';
   }).join('');
+}
+
+function _mekDeleteSiGroup(idx) {
+  // Hapus baris pertama + semua baris lanjutan (baris setelahnya yang _isFirst=false)
+  var end = idx + 1;
+  while (end < _mekSiRows.length && _mekSiRows[end]._isFirst === false) end++;
+  _mekSiRows.splice(idx, end - idx);
+  // Re-tandai _isFirst untuk grup berikutnya (tidak berubah, splice sudah benar)
+  _mekRenderSiPreview(_mekSiRows);
+  var ct = document.getElementById('mekSiParseCount');
+  if (ct) ct.textContent = _mekSiRows.length + ' baris';
 }
 
 function mekSiClear() {
