@@ -914,7 +914,11 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
 
   fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
@@ -1081,11 +1085,11 @@ function mekSwitchSumView(view) {
 // CAPAIAN PLANNING
 // ════════════════════════════════════════════════════════════
 function mekLoadCapaian() {
-  var from   = (document.getElementById('mekCapFrom')   || {}).value || '';
-  var to     = (document.getElementById('mekCapTo')     || {}).value || '';
-  var sku    = ((document.getElementById('mekCapSku')   || {}).value || '').trim().toLowerCase();
+  var from   = (document.getElementById('mekCapFrom')    || {}).value || '';
+  var to     = (document.getElementById('mekCapTo')      || {}).value || '';
+  var sku    = ((document.getElementById('mekCapSku')    || {}).value || '').trim().toLowerCase();
   var doc    = _mekStripLeadingZero(((document.getElementById('mekCapDoc') || {}).value || '').trim());
-  var tujuan = ((document.getElementById('mekCapTujuan')|| {}).value || '').trim().toLowerCase();
+  var tujuan = ((document.getElementById('mekCapTujuan') || {}).value || '').trim().toLowerCase();
 
   var tbody = document.getElementById('mekCapTbody');
   if (!tbody) return;
@@ -1100,79 +1104,189 @@ function mekLoadCapaian() {
     }
     var data = res.data || [];
 
-    // Filter lokal
-    if (sku)    data = data.filter(function(r){ return (r.sku||'').toLowerCase().indexOf(sku)>=0 || (r.nama||'').toLowerCase().indexOf(sku)>=0; });
-    if (doc)    data = data.filter(function(r){ return _mekStripLeadingZero(r.noSo||'').indexOf(doc)>=0 || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0; });
-    if (tujuan) data = data.filter(function(r){ return (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0; });
+    // Filter lokal teks
+    if (sku || doc || tujuan) {
+      // Filter per grup planning (cek di baris pertama saja)
+      var planKeys = {};
+      data.forEach(function(r) {
+        if (!r.isFirstRow) return;
+        var skuOk  = !sku    || (r.sku||'').toLowerCase().indexOf(sku)>=0 || (r.nama||'').toLowerCase().indexOf(sku)>=0;
+        var docOk  = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
+        var tujOk  = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
+        if (skuOk && docOk && tujOk) planKeys[r._planKey] = true;
+        else planKeys[r._planKey] = planKeys[r._planKey] || false;
+      });
+      data = data.filter(function(r){ return planKeys[r._planKey]; });
+    }
 
-    _mekRenderCapaian(data);
+    _mekCapData = data;
+    _mekRenderCapaian(data, _mekCapFilter);
   }, function() {
     tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#fc8181;">Koneksi gagal.</td></tr>';
   });
 }
 
+var _mekCapData   = [];
+var _mekCapFilter = 'all';  // 'all' | 'datang' | 'belum'
+
+function mekCapSetFilter(f) {
+  _mekCapFilter = f;
+  var btns = ['mekCapFAll','mekCapFDatang','mekCapFBelum'];
+  btns.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('active', id === 'mekCapF' + (f==='all'?'All':f==='datang'?'Datang':'Belum'));
+  });
+  _mekRenderCapaian(_mekCapData, f);
+}
+
+function mekCapSwitchFilterMode(mode) {
+  var divDate = document.getElementById('mekCapFilterDate');
+  var divWeek = document.getElementById('mekCapFilterWeek');
+  var btnDate = document.getElementById('mekCapBtnDate');
+  var btnWeek = document.getElementById('mekCapBtnWeek');
+  var info    = document.getElementById('mekCapWeekInfo');
+  if (divDate) divDate.style.display = mode === 'date' ? '' : 'none';
+  if (divWeek) divWeek.style.display = mode === 'week' ? '' : 'none';
+  if (btnDate) btnDate.classList.toggle('active', mode === 'date');
+  if (btnWeek) btnWeek.classList.toggle('active', mode === 'week');
+  if (info)    info.style.display = 'none';
+}
+
+function mekCapApplyWeek() {
+  var wFrom = parseInt((document.getElementById('mekCapWeekFrom') || {}).value) || 0;
+  var wTo   = parseInt((document.getElementById('mekCapWeekTo')   || {}).value) || wFrom;
+  var year  = parseInt((document.getElementById('mekCapWeekYear') || {}).value) || new Date().getFullYear();
+  if (!wFrom) { showToast('Isi nomor Week', 'warning'); return; }
+  if (wFrom > wTo) { showToast('Week dari harus ≤ Week sampai', 'warning'); return; }
+  var rf = _mekGetISOWeekRange(wFrom, year);
+  var rt = _mekGetISOWeekRange(wTo,   year);
+  var ef  = document.getElementById('mekCapFrom'); if (ef)  ef.value  = rf.from;
+  var et  = document.getElementById('mekCapTo');   if (et)  et.value  = rt.to;
+  var es  = document.getElementById('mekCapSku');    if (es)  es.value  = (document.getElementById('mekCapSkuW')||{}).value||'';
+  var ed  = document.getElementById('mekCapDoc');    if (ed)  ed.value  = (document.getElementById('mekCapDocW')||{}).value||'';
+  var etj = document.getElementById('mekCapTujuan'); if (etj) etj.value = (document.getElementById('mekCapTujuanW')||{}).value||'';
+  var infoTxt = document.getElementById('mekCapWeekInfoText');
+  if (infoTxt) infoTxt.innerText = 'Week '+wFrom+(wFrom!==wTo?' – Week '+wTo:'')+' '+year+' = '+_mekFmtTglDisplay(rf.from)+' s/d '+_mekFmtTglDisplay(rt.to);
+  var info = document.getElementById('mekCapWeekInfo'); if (info) info.style.display='block';
+  mekLoadCapaian();
+}
+
 function mekResetCapaian() {
-  ['mekCapSku','mekCapDoc','mekCapTujuan'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  ['mekCapSku','mekCapDoc','mekCapTujuan','mekCapSkuW','mekCapDocW','mekCapTujuanW',
+   'mekCapWeekFrom','mekCapWeekTo'].forEach(function(id){ var e=document.getElementById(id); if(e)e.value=''; });
   var today=new Date(), yyyy=today.getFullYear(), mm=String(today.getMonth()+1).padStart(2,'0'), dd=String(today.getDate()).padStart(2,'0');
   var ef=document.getElementById('mekCapFrom'); if(ef) ef.value=yyyy+'-'+mm+'-01';
   var et=document.getElementById('mekCapTo');   if(et) et.value=yyyy+'-'+mm+'-'+dd;
+  var info=document.getElementById('mekCapWeekInfo'); if(info) info.style.display='none';
 }
 
-function _mekRenderCapaian(data) {
-  var tbody   = document.getElementById('mekCapTbody');
-  var ctEl    = document.getElementById('mekCapRowCount');
+function _mekRenderCapaian(data, statusFilter) {
+  var tbody  = document.getElementById('mekCapTbody');
+  var ctEl   = document.getElementById('mekCapRowCount');
   if (!tbody) return;
+  statusFilter = statusFilter || 'all';
 
-  // Hitung summary cards
-  var keluar=0, daftar=0, belum=0;
-  data.forEach(function(r){
-    if (r.status==='keluar') keluar++;
-    else if (r.status==='daftar') daftar++;
-    else belum++;
+  // Hitung summary berdasarkan planning (baris pertama saja), per container bukan per baris
+  var totalCont=0, keluarCont=0, daftarCont=0, loadingCont=0, belumCont=0;
+  var seenPlanKey = {};
+
+  data.forEach(function(r) {
+    if (!seenPlanKey[r._planKey]) {
+      seenPlanKey[r._planKey] = { jumlah: r._jumlahCont||0, realisasi: r._realisasi||0 };
+    }
   });
-  var total = data.length || 1;
-  var pct   = Math.round((keluar / total) * 100);
 
-  _mekSetCard('mekCapCardKeluar', keluar);
-  _mekSetCard('mekCapCardDaftar', daftar);
-  _mekSetCard('mekCapCardBelum',  belum);
+  Object.keys(seenPlanKey).forEach(function(k) {
+    var p = seenPlanKey[k];
+    totalCont  += p.jumlah;
+    keluarCont += Math.min(p.realisasi, p.jumlah); // realisasi tidak melebihi planning
+    belumCont  += Math.max(0, p.jumlah - p.realisasi);
+  });
+
+  // Hitung per status dari data rows
+  data.forEach(function(r) {
+    if      (r.status === 'keluar')  keluarCont = 0; // reset, hitung ulang dari rows
+    else if (r.status === 'loading') loadingCont = 0;
+  });
+  // Hitung ulang dari rows langsung
+  keluarCont=0; loadingCont=0; daftarCont=0; belumCont=0; totalCont=0;
+  var seenPlanKey2 = {};
+  data.forEach(function(r) {
+    if (!seenPlanKey2[r._planKey]) { seenPlanKey2[r._planKey]=true; totalCont+=(r._jumlahCont||0); }
+    if (r.status==='keluar')       keluarCont++;
+    else if (r.status==='loading') loadingCont++;
+    else if (r.status==='daftar')  daftarCont++;
+    else                           belumCont++;
+  });
+  var sudahCont = keluarCont + loadingCont + daftarCont;
+  var pct = totalCont > 0 ? Math.round((keluarCont/totalCont)*100) : 0;
+
+  _mekSetCard('mekCapCardKeluar',  keluarCont);
+  _mekSetCard('mekCapCardDaftar',  loadingCont + daftarCont);
+  _mekSetCard('mekCapCardBelum',   belumCont);
+  _mekSetCard('mekCapCardTotal',   totalCont);
   var pctEl = document.getElementById('mekCapCardPct');
-  if (pctEl) pctEl.textContent = (data.length ? pct : '—') + (data.length ? '%' : '');
+  if (pctEl) pctEl.textContent = (totalCont ? pct : '—') + (totalCont ? '%' : '');
   if (ctEl)  ctEl.textContent  = data.length + ' data';
 
-  if (!data.length) {
+  // Filter tampilan
+  var filtered = data;
+  if (statusFilter === 'datang') {
+    // Tampilkan hanya planning yang punya minimal 1 realisasi + semua baris realisasinya
+    var keysWithRealisasi = {};
+    data.forEach(function(r){ if(r.status!=='belum') keysWithRealisasi[r._planKey]=true; });
+    filtered = data.filter(function(r){ return keysWithRealisasi[r._planKey]; });
+  } else if (statusFilter === 'belum') {
+    // Tampilkan hanya planning yang semua barisnya belum
+    var keysWithRealisasi2 = {};
+    data.forEach(function(r){ if(r.status!=='belum') keysWithRealisasi2[r._planKey]=true; });
+    filtered = data.filter(function(r){ return !keysWithRealisasi2[r._planKey]; });
+  }
+
+  if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#a0aec0;">' +
       '<i class="fas fa-box-open" style="font-size:28px;display:block;margin-bottom:8px;opacity:.2;"></i>Tidak ada data</td></tr>';
     return;
   }
 
-  // Status badge
   var STATUS = {
-    keluar: { label:'✅ Keluar',  bg:'#c6f6d5', color:'#276749' },
-    daftar: { label:'🚛 Proses',  bg:'#bee3f8', color:'#2b6cb0' },
-    belum:  { label:'⏳ Belum',   bg:'#fed7d7', color:'#9b2c2c' }
+    keluar:  { label:'✅ Keluar',  bg:'#c6f6d5', color:'#276749' },
+    loading: { label:'🔄 Loading', bg:'#e9d8fd', color:'#6b46c1' },
+    daftar:  { label:'🚛 Daftar',  bg:'#bee3f8', color:'#2b6cb0' },
+    belum:   { label:'⏳ Belum',   bg:'#fed7d7', color:'#9b2c2c' }
   };
 
-  tbody.innerHTML = data.map(function(r, i) {
-    var st = STATUS[r.status] || STATUS.belum;
-    var sourceBadge = r.source === 'SI'
+  var rows = '';
+  filtered.forEach(function(r, i) {
+    var st  = STATUS[r.status] || STATUS.belum;
+    var src = r.source === 'SI'
       ? '<span style="background:#e9d8fd;color:#6b46c1;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;">SI</span>'
-      : '<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;">WA</span>';
-    return '<tr>' +
-      '<td style="text-align:center;color:#a0aec0;font-size:11px;background:#f8fafc;">' + (i+1) + '</td>' +
-      '<td style="white-space:nowrap;font-size:12px;">' + _mekEsc(_mekFmtTglDisplay(r.tanggal)||r.tanggal) + '</td>' +
-      '<td><b style="font-size:12px;">' + _mekEsc(r.sku||'—') + '</b></td>' +
-      '<td style="font-size:12px;">' + _mekEsc(r.nama) + '</td>' +
-      '<td style="text-align:right;font-weight:700;">' + (r.jumlahCont||'—') + '</td>' +
-      '<td style="font-size:12px;">' + _mekEsc(r.tujuan) + '</td>' +
-      '<td style="font-size:11px;font-family:monospace;color:#6b46c1;">' + _mekEsc(r.noSo||r.noDoc||'—') + '</td>' +
+      : (r.source === 'WA'
+        ? '<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;">WA</span>'
+        : '');
+
+    // Border atas tebal untuk setiap baris pertama planning baru
+    var borderTop = r.isFirstRow && i > 0 ? 'border-top:2px solid #e2e8f0;' : '';
+
+    rows += '<tr style="' + borderTop + '">' +
+      '<td style="text-align:center;color:#a0aec0;font-size:11px;background:#f8fafc;' + borderTop + '">' + (i+1) + '</td>' +
+      // Kolom planning — hanya diisi di baris pertama
+      '<td style="white-space:nowrap;font-size:12px;' + borderTop + '">' + (r.tanggal ? _mekEsc(_mekFmtTglDisplay(r.tanggal)) : '') + '</td>' +
+      '<td style="' + borderTop + '"><b style="font-size:12px;">' + _mekEsc(r.sku||'') + '</b></td>' +
+      '<td style="font-size:12px;' + borderTop + '">' + _mekEsc(r.nama||'') + '</td>' +
+      '<td style="text-align:right;font-weight:700;' + borderTop + '">' + (r.jumlahCont !== null ? r.jumlahCont : '') + '</td>' +
+      '<td style="font-size:12px;' + borderTop + '">' + _mekEsc(r.tujuan||'') + '</td>' +
+      // Kolom realisasi — semua baris
+      '<td style="font-size:11px;font-family:monospace;color:#6b46c1;">' + _mekEsc(r.noDoc||'—') + '</td>' +
       '<td style="font-size:12px;">' + _mekEsc(r.nopol||'—') + '</td>' +
       '<td style="white-space:nowrap;font-size:11px;color:#4a5568;">' + _mekEsc(r.waktuDaftar||'—') + '</td>' +
+      '<td style="white-space:nowrap;font-size:11px;color:#4a5568;">' + _mekEsc(r.prosesLoading||'—') + '</td>' +
       '<td style="white-space:nowrap;font-size:11px;color:#4a5568;">' + _mekEsc(r.waktuKeluar||'—') + '</td>' +
-      '<td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span></td>' +
-      '<td style="text-align:center;">' + sourceBadge + '</td>' +
+      '<td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;background:'+st.bg+';color:'+st.color+';">'+st.label+'</span></td>' +
+      '<td style="text-align:center;">' + src + '</td>' +
       '</tr>';
-  }).join('');
+  });
+  tbody.innerHTML = rows;
 }
 
 // ════════════════════════════════════════════════════════════
