@@ -584,13 +584,23 @@ function _mekDeletePreviewRow(idx) {
 
 // ── Simpan ke GAS ────────────────────────────────────────────
 function mekSavePlanning() {
-  var rows = _mekPlanMode === 'si'    ? _mekSiRows
-           : _mekPlanMode === 'email' ? _mekEmailRows
-           : _mekParsedRows;
+  var rows;
+  if (_mekPlanMode === 'si') {
+    rows = _mekSiRows;
+  } else if (_mekPlanMode === 'email') {
+    // Kalau mode manual, collect dari tabel
+    if (_mekEmailInputMode === 'manual') {
+      rows = _mekCollectManualRows();
+    } else {
+      rows = _mekEmailRows;
+    }
+  } else {
+    rows = _mekParsedRows;
+  }
 
   if (!rows || !rows.length) {
     var msg = _mekPlanMode === 'si'    ? 'Belum ada data SI. Upload PDF dulu.'
-            : _mekPlanMode === 'email' ? 'Belum ada data Email. Upload file dulu.'
+            : _mekPlanMode === 'email' ? (_mekEmailInputMode === 'manual' ? 'Isi tabel dulu.' : 'Belum ada data Email. Upload file dulu.')
             : 'Belum ada data. Parse dulu teks WA-nya.';
     showToast(msg, 'warning'); return;
   }
@@ -875,91 +885,148 @@ function mekHandleEmailFiles(files) {
   });
 }
 
-// ── Handler Excel / CSV ─────────────────────────────────────
-function mekHandleEmailXls(files) {
-  if (!files || !files.length) return;
-  var fileArr = Array.from(files).filter(function(f) {
-    return /\.(xlsx|xls|csv)$/i.test(f.name);
-  });
-  if (!fileArr.length) { showToast('Pilih file Excel (.xlsx/.xls) atau CSV.', 'error'); return; }
+// ── Switch mode Upload / Manual ─────────────────────────────
+var _mekEmailInputMode = 'upload';
 
-  var dz = document.getElementById('mekEmailDropZone');
-  var rw = document.getElementById('mekEmailResultWrap');
-  if (dz) dz.style.display = 'none';
-  if (rw) rw.style.display = 'block';
+function mekEmailSwitchMode(mode) {
+  _mekEmailInputMode = mode;
+  var up  = document.getElementById('mekEmailUploadPanel');
+  var man = document.getElementById('mekEmailManualPanel');
+  var btnU = document.getElementById('mekEmailModeUpload');
+  var btnM = document.getElementById('mekEmailModeManual');
+  if (!up || !man) return;
+  if (mode === 'upload') {
+    up.style.display  = ''; man.style.display = 'none';
+    btnU.style.color  = '#1a3a5c'; btnU.style.borderBottomColor = '#1a3a5c';
+    btnM.style.color  = '#718096'; btnM.style.borderBottomColor = 'transparent';
+  } else {
+    up.style.display  = 'none'; man.style.display = '';
+    btnM.style.color  = '#1a3a5c'; btnM.style.borderBottomColor = '#1a3a5c';
+    btnU.style.color  = '#718096'; btnU.style.borderBottomColor = 'transparent';
+    // Init tabel kalau kosong
+    var tbody = document.getElementById('mekEmailManualTbody');
+    if (tbody && !tbody.rows.length) mekEmailManualAddRow();
+  }
+}
 
-  var log = document.getElementById('mekEmailFileLog');
-  if (log) log.innerHTML = '';
-  _mekEmailRows = [];
+// Kolom tabel manual: stuffing_date, so, qt, negara, kode, material, qty, plant, keterangan
+var _MEK_MAN_COLS = ['stuffing_date','so','qt','negara','kode','material','qty','plant','keterangan'];
 
-  _mekLoadStd(function(stdCache) {
-    var done = 0;
-    fileArr.forEach(function(file) {
-      _mekAddEmailLog(file.name, 'loading');
+function mekEmailManualAddRow(vals) {
+  var tbody = document.getElementById('mekEmailManualTbody');
+  if (!tbody) return;
+  var idx = tbody.rows.length;
+  var tr = document.createElement('tr');
+  tr.dataset.idx = idx;
 
-      var isCsv = /\.csv$/i.test(file.name);
-      var reader = new FileReader();
+  // Nomor baris
+  var tdNum = document.createElement('td');
+  tdNum.style.cssText = 'text-align:center;color:#a0aec0;font-size:11px;background:#f8fafc;';
+  tdNum.textContent = idx + 1;
+  tr.appendChild(tdNum);
 
-      if (isCsv) {
-        // CSV: baca sebagai teks langsung
-        reader.onload = function(e) {
-          var text = e.target.result;
-          _mekUpdateEmailLog(file.name, 'parsing', 'Parsing CSV...');
-          var rows = _mekParseEmailXlsData(text, stdCache, true);
-          _mekEmailRows = _mekEmailRows.concat(rows);
-          _mekUpdateEmailLog(file.name, rows.length?'ok':'warn', rows.length?rows.length+' baris':'Tidak ada data');
-          done++; if (done === fileArr.length) _mekFinalizeEmail();
-        };
-        reader.onerror = function() {
-          _mekUpdateEmailLog(file.name, 'error', 'Gagal baca CSV');
-          done++; if (done === fileArr.length) _mekFinalizeEmail();
-        };
-        reader.readAsText(file);
-      } else {
-        // Excel: pakai SheetJS — load dulu kalau belum ada
-        reader.onload = function(e) {
-          _mekEnsureXLSX(function() {
-          try {
-            _mekUpdateEmailLog(file.name, 'parsing', 'Parsing Excel...');
-            var data = new Uint8Array(e.target.result);
-            var workbook = XLSX.read(data, { type: 'array', cellDates: false });
-            // Ambil sheet pertama
-            var sheetName = workbook.SheetNames[0];
-            var sheet = workbook.Sheets[sheetName];
-            // Convert ke CSV text untuk pakai parser yang sama
-            var csv = XLSX.utils.sheet_to_csv(sheet);
-            var rows = _mekParseEmailXlsData(csv, stdCache, true);
-            _mekEmailRows = _mekEmailRows.concat(rows);
-            _mekUpdateEmailLog(file.name, rows.length?'ok':'warn', rows.length?rows.length+' baris':'Tidak ada data');
-          } catch(err) {
-            _mekUpdateEmailLog(file.name, 'error', 'Gagal baca Excel: ' + err.message);
-          }
-          done++; if (done === fileArr.length) _mekFinalizeEmail();
-          }); // end _mekEnsureXLSX
-        };
-        reader.onerror = function() {
-          _mekUpdateEmailLog(file.name, 'error', 'Gagal baca file');
-          done++; if (done === fileArr.length) _mekFinalizeEmail();
-        };
-        reader.readAsArrayBuffer(file);
+  // Cell per kolom
+  _MEK_MAN_COLS.forEach(function(col, ci) {
+    var td = document.createElement('td');
+    td.contentEditable = 'true';
+    td.dataset.col = col;
+    td.style.cssText = 'outline:none;padding:5px 6px;font-size:12px;min-width:60px;white-space:nowrap;cursor:text;';
+    td.style.textAlign = col === 'qty' ? 'right' : 'left';
+    if (vals && vals[col] !== undefined) td.textContent = vals[col];
+
+    // Highlight saat fokus
+    td.addEventListener('focus', function() { td.style.background = '#fffde7'; });
+    td.addEventListener('blur',  function() { td.style.background = ''; });
+
+    // Tab ke cell berikutnya
+    td.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        var cells = tr.querySelectorAll('[contenteditable]');
+        var pos = Array.from(cells).indexOf(td);
+        if (pos < cells.length - 1) {
+          cells[pos + 1].focus();
+        } else {
+          // Tab di kolom terakhir → tambah baris baru
+          mekEmailManualAddRow();
+          setTimeout(function() {
+            var rows = tbody.rows;
+            if (rows.length > 1) rows[rows.length-1].cells[1].focus();
+          }, 50);
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        mekEmailManualAddRow();
+        setTimeout(function() {
+          var rows = tbody.rows;
+          if (rows.length > 1) rows[rows.length-1].cells[1].focus();
+        }, 50);
       }
     });
+
+    // Paste dari Excel (tab-separated)
+    td.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var text = (e.clipboardData || window.clipboardData).getData('text');
+      if (!text) return;
+      var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(Boolean);
+      if (lines.length === 1 && lines[0].indexOf('	') < 0) {
+        // Single cell paste
+        document.execCommand('insertText', false, lines[0]);
+        return;
+      }
+      // Multi-cell paste: fill dari posisi ini ke bawah
+      var colStart = ci;
+      lines.forEach(function(line, li) {
+        var cellVals = line.split('	');
+        var targetRow;
+        if (li === 0) {
+          targetRow = tr;
+        } else {
+          // Tambah baris kalau perlu
+          while (tbody.rows.length <= idx + li) mekEmailManualAddRow();
+          targetRow = tbody.rows[idx + li];
+        }
+        cellVals.forEach(function(val, vi) {
+          var colIdx = colStart + vi;
+          if (colIdx >= _MEK_MAN_COLS.length) return;
+          var cell = targetRow.querySelector('[data-col="' + _MEK_MAN_COLS[colIdx] + '"]');
+          if (cell) cell.textContent = val.trim();
+        });
+      });
+    });
+
+    tr.appendChild(td);
   });
+
+  // Tombol hapus baris
+  var tdDel = document.createElement('td');
+  tdDel.style.cssText = 'text-align:center;padding:2px;';
+  var btn = document.createElement('button');
+  btn.innerHTML = '<i class="fas fa-times"></i>';
+  btn.style.cssText = 'background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;';
+  btn.onclick = function() {
+    tr.parentNode.removeChild(tr);
+    // Re-number
+    Array.from(tbody.rows).forEach(function(r, i) { r.cells[0].textContent = i+1; });
+  };
+  tdDel.appendChild(btn);
+  tr.appendChild(tdDel);
+
+  tbody.appendChild(tr);
 }
 
-// ── Load SheetJS jika belum ada ──────────────────────────────
-function _mekEnsureXLSX(cb) {
-  if (window.XLSX) { cb(); return; }
-  var s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-  s.onload = cb;
-  s.onerror = function() { showToast('Gagal load SheetJS', 'error'); };
-  document.head.appendChild(s);
+function mekEmailManualClear() {
+  var tbody = document.getElementById('mekEmailManualTbody');
+  if (tbody) tbody.innerHTML = '';
+  mekEmailManualAddRow();
 }
 
-// ── Parser Excel/CSV — pisah kolom by comma/tab ──────────────
-function _mekParseEmailXlsData(text, stdCache, isCsv) {
-  if (!text) return [];
+// Kumpulkan rows dari tabel manual → format internal email
+function _mekCollectManualRows() {
+  var tbody = document.getElementById('mekEmailManualTbody');
+  if (!tbody) return [];
+  var weekOverride = parseInt((document.getElementById('mekEmailWeek')||{}).value||'')||0;
   var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 
   function parseTgl(s) {
@@ -967,21 +1034,15 @@ function _mekParseEmailXlsData(text, stdCache, isCsv) {
     s = String(s).trim();
     var m = s.match(/^(\d{1,2})[\/\-.]([A-Za-z]{3})[\/\-.](\d{2,4})$/);
     if (m) {
-      var mon = MONTHS[(m[2]||'').toLowerCase()] || 0;
+      var mon = MONTHS[(m[2]||'').toLowerCase()]||0;
       if (!mon) return '';
-      var yr = m[3].length === 2 ? '20'+m[3] : m[3];
+      var yr = m[3].length===2?'20'+m[3]:m[3];
       return yr+'-'+('0'+mon).slice(-2)+'-'+('0'+m[1]).slice(-2);
     }
     var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if (m2) return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
-    // Excel serial date
-    if (/^\d{5}$/.test(s)) {
-      var d = new Date(Math.round((parseInt(s)-25569)*86400*1000));
-      return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);
-    }
     return '';
   }
-
   function weekFromTgl(ymd) {
     if (!ymd) return '';
     var d = new Date(ymd+'T00:00:00Z');
@@ -991,91 +1052,28 @@ function _mekParseEmailXlsData(text, stdCache, isCsv) {
     return String(Math.ceil(((d-y0)/86400000+1)/7));
   }
 
-  var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
-  var weekOverride = parseInt((document.getElementById('mekEmailWeek')||{}).value||'')||0;
-  var yearOverride = parseInt((document.getElementById('mekEmailYear')||{}).value||'')||new Date().getFullYear();
-
-  // Deteksi separator: tab atau comma
-  var sep = '	';
-  if (lines[0] && lines[0].indexOf('	') < 0) sep = ',';
-
-  // Cari baris header
-  var headerIdx = -1;
-  var colMap = {keterangan:-1,so:-1,qt:-1,negara:-1,kode:-1,material:-1,stuffing_date:-1,qty:-1,plant:-1,note:-1};
-
-  for (var h = 0; h < Math.min(lines.length, 5); h++) {
-    var up = lines[h].toUpperCase();
-    if (up.indexOf('SO') >= 0 && (up.indexOf('KODE') >= 0 || up.indexOf('MATERIAL') >= 0 || up.indexOf('STUFFING') >= 0)) {
-      headerIdx = h;
-      var cols = lines[h].split(sep).map(function(s){return s.replace(/^"|"$/g,'').trim().toLowerCase();});
-      cols.forEach(function(h2, i) {
-        if (/keterangan|remark/i.test(h2))         colMap.keterangan  = i;
-        else if (/^so$/.test(h2))                   colMap.so          = i;
-        else if (/^qt$|^qti$/.test(h2))             colMap.qt          = i;
-        else if (/negara|country|nation/i.test(h2)) colMap.negara       = i;
-        else if (/^kode$|^sku$|^code$/.test(h2))   colMap.kode         = i;
-        else if (/material|deskripsi|desc/i.test(h2)) colMap.material   = i;
-        else if (/stuffing.*date|tgl.*stuff/i.test(h2)) colMap.stuffing_date = i;
-        else if (/^qty$|^jumlah$/.test(h2))         colMap.qty          = i;
-        else if (/plant|stuffing.*plant/i.test(h2)) colMap.plant        = i;
-        else if (/note|catatan/i.test(h2))          colMap.note         = i;
-      });
-      break;
-    }
-  }
-
   var rows = [];
-  var start = headerIdx >= 0 ? headerIdx + 1 : 0;
-
-  for (var i = start; i < lines.length; i++) {
-    var line = lines[i];
-    if (!line || line.trim().length < 3) continue;
-    var cols2 = line.split(sep).map(function(s){ return s.replace(/^"|"$/g,'').trim(); });
-
-    // Ambil nilai per kolom
-    function col(k) { var idx=colMap[k]; return idx>=0 ? (cols2[idx]||'') : ''; }
-
-    var so   = col('so').replace(/\D/g,'');
-    var qt   = col('qt').replace(/\D/g,'');
-    var kode = col('kode').replace(/\D/g,'');
-    var tglRaw = col('stuffing_date');
-    var qty  = parseInt((col('qty')||'0').replace(/\D/g,'')) || 0;
-
-    // Kalau tidak ada kolom map, coba regex
-    if (!so && !kode) {
-      var soM = line.match(/(1\d{8,11})/g);
-      if (soM) { so = soM[0]; qt = soM[1]||''; }
-      var kodeM = line.match(/([34]\d{5})/);
-      if (kodeM) kode = kodeM[1];
-      var tglM = line.match(/(\d{1,2})[\/\-]([A-Za-z]{3})[\/\-](\d{2,4})/);
-      if (tglM) tglRaw = tglM[0];
-      var qtyM = line.match(/(\d{3,4})/g);
-      if (qtyM) qty = parseInt(qtyM[qtyM.length-1])||0;
+  Array.from(tbody.rows).forEach(function(tr) {
+    function g(col) {
+      var el = tr.querySelector('[data-col="'+col+'"]');
+      return el ? el.textContent.trim() : '';
     }
-
-    if (!so && !kode) continue; // skip baris kosong
-    if (so && so.length < 8) continue;
-
-    var tgl   = parseTgl(tglRaw);
-    var week  = weekOverride || (tgl ? weekFromTgl(tgl) : '');
-    var negara = (col('negara')||'').toUpperCase();
-    var matRaw = col('material') || line.split(sep).find(function(s){ return s.length > 15 && /[A-Z]{3}/.test(s); }) || '';
-    var plant  = col('plant') || '';
-    var ket    = col('keterangan') || '';
-    var note   = col('note') || '';
-
-    // Fuzzy match SKU dari kode atau material
-    var sku = kode || '';
-    var nama = matRaw;
-
+    var so  = g('so').replace(/\D/g,'');
+    var kode = g('kode').replace(/\D/g,'');
+    if (!so && !kode) return;
+    var tgl  = parseTgl(g('stuffing_date'));
+    var wk   = weekOverride ? String(weekOverride) : weekFromTgl(tgl);
+    var qty  = parseInt(g('qty').replace(/\D/g,''))||0;
     rows.push({
-      week: week, tanggal: tgl, sku: sku, noSo: so, noQt: qt,
-      nama: nama, negara: negara, qty: qty, plant: plant,
-      ket: ket, note: note, source: 'EMAIL',
-      _isFirst: true, _groupSize: 1
+      week: wk, tanggal: tgl,
+      sku: kode, noSo: so, noQt: g('qt').replace(/\D/g,''),
+      nama: g('material'),
+      negara: g('negara').toUpperCase(),
+      qty: qty, plant: g('plant'),
+      ket: g('keterangan'), note: '',
+      source: 'EMAIL', _isFirst: true, _groupSize: 1
     });
-  }
-
+  });
   return rows;
 }
 
@@ -1084,8 +1082,76 @@ function _mekParseEmailXlsData(text, stdCache, isCsv) {
 // Deteksi header dulu, lalu parse baris per baris
 var _MEK_EMAIL_COLS = ['keterangan','so','qt','negara','kode','material','stuffing_date','qty','plant','note'];
 
+// Map JSON rows dari Claude Vision ke format internal email
+function _mekMapAiRowsToEmail(aiRows, stdCache) {
+  var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  var weekOverride = parseInt((document.getElementById('mekEmailWeek')||{}).value||'')||0;
+
+  function parseTgl(s) {
+    if (!s) return '';
+    s = String(s).trim();
+    var m = s.match(/^(\d{1,2})[\/\-.]([A-Za-z]{3})[\/\-.](\d{2,4})$/);
+    if (m) {
+      var mon = MONTHS[(m[2]||'').toLowerCase()]||0;
+      if (!mon) return '';
+      var yr = m[3].length===2 ? '20'+m[3] : m[3];
+      return yr+'-'+('0'+mon).slice(-2)+'-'+('0'+m[1]).slice(-2);
+    }
+    var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m2) return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
+    return '';
+  }
+  function weekFromTgl(ymd) {
+    if (!ymd) return '';
+    var d = new Date(ymd+'T00:00:00Z');
+    var day = d.getUTCDay()||7;
+    d.setUTCDate(d.getUTCDate()+4-day);
+    var y0 = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return String(Math.ceil(((d-y0)/86400000+1)/7));
+  }
+
+  var rows = [];
+  aiRows.forEach(function(r) {
+    var so  = String(r.so||'').replace(/\D/g,'');
+    var qt  = String(r.qt||'').replace(/\D/g,'');
+    var tgl = parseTgl(r.stuffing_date);
+    var wk  = weekOverride ? String(weekOverride) : weekFromTgl(tgl);
+    var sku = String(r.kode||'').replace(/\D/g,'');
+    var qty = parseInt(String(r.qty||'0').replace(/\D/g,''))||0;
+    if (!so && !sku) return; // skip baris kosong
+    rows.push({
+      week: wk, tanggal: tgl,
+      sku: sku, noSo: so, noQt: qt,
+      nama: String(r.material||'').trim(),
+      negara: String(r.negara||'').trim().toUpperCase(),
+      qty: qty, plant: String(r.plant||'').trim(),
+      ket: String(r.keterangan||'').trim(),
+      note: String(r.note||'').trim(),
+      source: 'EMAIL', _isFirst: true, _groupSize: 1
+    });
+  });
+  return rows;
+}
+
 function _mekParseEmailTable(text, stdCache) {
   if (!text) return [];
+
+  // ── Cek apakah response adalah JSON dari Claude Vision ───
+  var trimmed = text.trim();
+  if (trimmed.startsWith('[') || trimmed.startsWith('```')) {
+    // Claude return JSON array — parse langsung
+    try {
+      var jsonStr = trimmed.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+      var aiRows = JSON.parse(jsonStr);
+      if (Array.isArray(aiRows) && aiRows.length > 0) {
+        console.log('[MEK-EMAIL AI-JSON] parsed', aiRows.length, 'rows');
+        return _mekMapAiRowsToEmail(aiRows, stdCache);
+      }
+    } catch(e) {
+      console.warn('[MEK-EMAIL AI-JSON parse fail]', e.message);
+      // fallback ke parser teks biasa
+    }
+  }
 
   // ── Debug: tampilkan teks mentah OCR di file log ─────────
   console.log('[MEK-EMAIL RAW TEXT]\n' + text.slice(0, 1000));
@@ -1809,28 +1875,86 @@ function _mekRegexParseSi(text, weekOverride) {
   };
 }
 
-// ── OCR gambar via Google Drive (GAS) ───────────────────────
-// Lebih akurat dari Tesseract untuk tabel & angka kecil
-// Alur: base64 → GAS → Drive upload → convert Google Doc → baca teks → hapus
+// ── OCR via Claude API Vision ───────────────────────────────
+// Kirim gambar langsung ke Claude — baca tabel dan return JSON
 function _mekOcrImage(image, callback) {
   if (!image || !image.b64) { callback(null); return; }
 
-  // Tampilkan progress
   var logs = document.querySelectorAll('[id^="mekEmailLogMsg_"],[id^="mekSiLogMsg_"]');
-  if (logs.length) logs[logs.length-1].textContent = 'OCR via Google Drive...';
+  function setLog(msg) { if (logs.length) logs[logs.length-1].textContent = msg; }
+  setLog('Membaca tabel dengan AI...');
 
-  API.run('ocrImageEmail', { b64: image.b64, mimeType: image.mime }, function(res) {
-    if (res && res.success && res.text) {
-      console.log('[MEK-DRIVE-OCR]\n' + res.text.slice(0, 800));
-      callback(res.text);
-    } else {
-      console.warn('[MEK-DRIVE-OCR FAIL]', res && res.message);
+  _mekResizeImgB64(image.b64, image.mime, 1600, function(b64r, mimer) {
+    console.log('[MEK-OCR] size:', Math.round(b64r.length/1024), 'KB');
+
+    var prompt = 'Ini adalah tabel planning ekspor. Ekstrak SEMUA baris data (bukan baris header) sebagai JSON array. ' +
+      'Tiap baris adalah object dengan field berikut: ' +
+      'keterangan (kolom pertama, bisa kosong), ' +
+      'so (angka ~12 digit kolom SO), ' +
+      'qt (angka ~12 digit kolom QT/QTI), ' +
+      'negara (kolom NEGARA), ' +
+      'kode (angka 6 digit kolom KODE), ' +
+      'material (teks kolom MATERIAL/DESKRIPSI), ' +
+      'stuffing_date (teks tanggal kolom STUFFING DATE, format asli dari tabel misalnya 08-Jun-26), ' +
+      'qty (angka kolom QTY), ' +
+      'plant (kolom STUFFING PLANT), ' +
+      'note (kolom NOTE, bisa kosong). ' +
+      'Return HANYA JSON array tanpa teks lain dan tanpa markdown.';
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: mimer, data: b64r } },
+          { type: 'text', text: prompt }
+        ]}]
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (!res || res.error) {
+        var msg = res && res.error ? res.error.message : 'API error';
+        setLog('Gagal: ' + msg); showToast('Gagal baca gambar: ' + msg, 'error');
+        callback(null); return;
+      }
+      var text = (res.content||[]).map(function(b){ return b.text||''; }).join('');
+      console.log('[MEK-OCR-AI]', text.slice(0,300));
+      setLog('Selesai ✓');
+      callback(text);
+    })
+    .catch(function(err){
+      setLog('Error: ' + err.message);
+      showToast('Error: ' + err.message, 'error');
       callback(null);
-    }
-  }, function() {
-    callback(null);
+    });
   });
 }
+
+// Resize gambar via Canvas sebelum kirim ke API
+function _mekResizeImgB64(b64, mime, maxPx, cb) {
+  try {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      var s = Math.min(1, maxPx / Math.max(w, h, 1));
+      var cv = document.createElement('canvas');
+      cv.width = Math.round(w*s); cv.height = Math.round(h*s);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      var out = cv.toDataURL('image/jpeg', 0.85);
+      cb(out.split(',')[1], 'image/jpeg');
+    };
+    img.onerror = function() { cb(b64, mime); };
+    img.src = 'data:' + mime + ';base64,' + b64;
+  } catch(e) { cb(b64, mime); }
+}
+
 
 // ── Finalize: render tabel SI ────────────────────────────────
 function _mekFinalizeSiRows() {
