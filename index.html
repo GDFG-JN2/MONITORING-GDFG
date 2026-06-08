@@ -4676,6 +4676,20 @@
       <!-- ════ PANE CAPAIAN PLANNING ════ -->
       <div id="mekPaneCapaian" style="display:none;">
 
+        <!-- Toggle mode: By Cont (WA) / By SO (SI) / Semua -->
+        <div style="padding:8px 14px 4px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.4px;">Mode:</span>
+          <button id="mekCapModeAll" class="sum-view-btn active" onclick="mekCapSwitchMode('all')">
+            <i class="fas fa-layer-group"></i> Semua
+          </button>
+          <button id="mekCapModeWA" class="sum-view-btn" onclick="mekCapSwitchMode('wa')" style="border-color:#68d391;">
+            <i class="fab fa-whatsapp" style="color:#25D366;"></i> By Cont (WA)
+          </button>
+          <button id="mekCapModeSI" class="sum-view-btn" onclick="mekCapSwitchMode('si')" style="border-color:#9f7aea;">
+            <i class="fas fa-file-pdf" style="color:#fc8181;"></i> By SO (SI)
+          </button>
+        </div>
+
         <!-- Toggle mode filter Capaian: Tanggal / Week -->
         <div style="padding:8px 14px 0;">
           <div style="display:flex;gap:6px;margin-bottom:8px;">
