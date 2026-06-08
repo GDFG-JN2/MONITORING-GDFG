@@ -882,6 +882,19 @@ var _MEK_EMAIL_COLS = ['keterangan','so','qt','negara','kode','material','stuffi
 
 function _mekParseEmailTable(text, stdCache) {
   if (!text) return [];
+
+  // ── Debug: tampilkan teks mentah OCR di file log ─────────
+  console.log('[MEK-EMAIL RAW TEXT]\n' + text.slice(0, 1000));
+  var logEl = document.getElementById('mekEmailFileLog');
+  if (logEl) {
+    var dbg = document.createElement('details');
+    dbg.style.cssText = 'margin:6px 0;padding:6px;background:#fffff0;border:1px solid #f6d860;border-radius:8px;font-size:11px;';
+    dbg.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#744210;">📧 Teks yang terbaca OCR (klik untuk buka)</summary>' +
+      '<pre style="white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto;margin:6px 0;padding:8px;background:#fff;border-radius:6px;font-size:10px;line-height:1.4;">' +
+      text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0, 3000) + '</pre>';
+    logEl.appendChild(dbg);
+  }
+
   var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n')
     .map(function(l){ return l.trim(); }).filter(Boolean);
 
@@ -938,64 +951,116 @@ function _mekParseEmailTable(text, stdCache) {
     });
   }
 
+  // ── Pendekatan 2: parse baris per baris dengan regex pattern ─
+  // Lebih robust untuk OCR yang tidak menghasilkan tab/spasi ganda konsisten
+  // Pola per field:
+  //   SO  = angka 9-12 digit (misal 102167393)
+  //   QT  = angka 9-12 digit berbeda dari SO
+  //   KODE = angka 6 digit (misal 421919, 422053)
+  //   STUFFING DATE = dd-Mon-yy atau dd-Mon-yyyy
+  //   QTY = angka 3-4 digit (1700, 1154, 1152)
+  //   PLANT = JAYANTI 1/2/3, TANGERANG, dll
+  //   NEGARA = kata INDIA/VIETNAM/MALAYSIA/CHINA dll
+  //   MATERIAL = deskripsi produk uppercase panjang
+  //   KETERANGAN = teks di awal baris (sebelum SO) atau kosong
+  //   CANCEL = ada kata CANCEL di mana saja
+
+  var NEGARA_LIST = ['INDIA','VIETNAM','MALAYSIA','CHINA','PHILIPPINES','MYANMAR',
+                     'THAILAND','SINGAPORE','CAMBODIA','BANGLADESH','AFRICA','AUSTRALIA'];
+
   var dataStart = headerIdx >= 0 ? headerIdx + 1 : 0;
 
   for (var i = dataStart; i < lines.length; i++) {
     var line = lines[i];
-    // Split by tab dulu, fallback ke multiple spaces
-    var cells = line.indexOf('\t') >= 0
-      ? line.split('\t').map(function(s){ return s.trim(); })
-      : line.split(/\s{2,}/).map(function(s){ return s.trim(); });
+    if (!line || line.length < 10) continue;
+    // Skip baris yang pure header
+    if (/^(keterangan|so|qt|negara|kode|material|stuffing|note)/i.test(line.trim())) continue;
 
-    if (cells.length < 5) continue; // baris terlalu pendek, skip
+    // 1. Cari SO (angka 9-12 digit, biasanya mulai 10/11/12)
+    var soMatch = line.match(/(1\d{8,11})/g);
+    if (!soMatch || soMatch.length < 1) continue;
+    var so = soMatch[0];
+    var qt = soMatch.length >= 2 ? soMatch[1] : '';
 
-    function cell(key) { var idx = colMap[key]; return idx !== undefined && idx < cells.length ? (cells[idx]||'').trim() : ''; }
+    // 2. Cari KODE (angka 6 digit, biasanya 4xxxxx)
+    var kodeMatch = line.match(/([34]\d{5})/);
+    var kode = kodeMatch ? kodeMatch[1] : '';
 
-    var ket     = cell('keterangan');
-    var so      = cell('so');
-    var qt      = cell('qt');
-    var negara  = cell('negara');
-    var kode    = cell('kode');
-    var material= cell('material');
-    var tglRaw  = cell('stuffing_date');
-    var qty     = cell('qty');
-    var plant   = cell('plant');
-    var note    = cell('note');
+    // 3. Cari STUFFING DATE (dd-Mon-yy/yyyy)
+    var tglMatch = line.match(/(\d{1,2})[\/\-]([A-Za-z]{3})[\/\-](\d{2,4})/);
+    var tglRaw   = tglMatch ? tglMatch[0] : '';
+    var tgl      = parseTgl(tglRaw);
 
-    // Skip baris kosong atau header ulang
+    // 4. Cari QTY (angka 3-4 digit setelah tanggal, atau standalone)
+    var qty = '';
+    if (tglRaw) {
+      var afterDate = line.slice(line.indexOf(tglRaw) + tglRaw.length);
+      var qtyM = afterDate.match(/(\d{3,5})/);
+      if (qtyM) qty = qtyM[1];
+    }
+
+    // 5. Cari NEGARA
+    var negara = '';
+    for (var n = 0; n < NEGARA_LIST.length; n++) {
+      if (line.toUpperCase().indexOf(NEGARA_LIST[n]) >= 0) { negara = NEGARA_LIST[n]; break; }
+    }
+
+    // 6. Cari PLANT (JAYANTI 1/2/3 atau nama plant lain)
+    var plantMatch = line.match(/(JAYANTI\s*\d|TANGERANG|KEJAYAN|CIBITUNG|BEKASI)/i);
+    var plant = plantMatch ? plantMatch[0].trim() : '';
+
+    // 7. Deteksi CANCEL
+    var isCancel = /CANCEL/i.test(line);
+
+    // 8. Ambil MATERIAL — panjang, uppercase, setelah KODE
+    var material = '';
+    if (kode) {
+      var afterKode = line.slice(line.indexOf(kode) + kode.length).trim();
+      // Material sampai sebelum tanggal atau sampai akhir baris sebelum angka qty/plant
+      var matEnd = tglRaw ? afterKode.indexOf(tglRaw) : afterKode.length;
+      if (matEnd < 0) matEnd = afterKode.length;
+      material = afterKode.slice(0, matEnd)
+        .replace(/^[A-Z]{2,}\s+/, '') // hapus negara di depan kalau ada
+        .replace(/\s+/g, ' ').trim();
+    }
+    if (!material) {
+      // Fallback: ambil uppercase panjang yang bukan angka
+      var matMatch = line.match(/([A-Z][A-Z\s\d().\-]{10,}[A-Z\d])/);
+      if (matMatch) material = matMatch[1].replace(/\s+/g,' ').trim();
+    }
+
+    // 9. KETERANGAN = teks sebelum SO (di kiri baris)
+    var soIdx = line.indexOf(so);
+    var ket   = soIdx > 2 ? line.slice(0, soIdx).replace(/\s+/g,' ').trim() : '';
+
+    // Skip kalau tidak ada data minimal
     if (!so && !kode && !material) continue;
-    if (/^(so|kode|material|stuffing)$/i.test(so)) continue;
 
-    var tgl = parseTgl(tglRaw);
     var week = weekOverride
       ? String(weekOverride)
       : (tgl ? String(_mekDateToISOWeek(tgl)) : '');
 
-    // Fuzzy match SKU dari KODE (kalau KODE bukan angka bersih, coba dari material)
-    var sku  = kode && /^\d+$/.test(kode) ? kode : '';
-    var nama = material;
-    if (!sku && material) {
-      var match = _mekFuzzyMatchStd(material, stdCache);
-      if (match) sku = match.sku;
+    // Fuzzy match SKU
+    var sku = kode && /^\d{5,6}$/.test(kode) ? kode : '';
+    if (!sku && material && stdCache) {
+      var matchStd = _mekFuzzyMatchStd(material, stdCache);
+      if (matchStd) sku = matchStd.sku;
     }
 
-    // Deteksi cancel
-    var isCancel = /cancel/i.test(ket);
-    var source   = isCancel ? 'EMAIL_CANCEL' : 'EMAIL';
-
-    // Keterangan = gabungan ket + note (jika ada)
-    var ketFull = [ket, note].filter(Boolean).join(' | ');
+    var source  = isCancel ? 'EMAIL_CANCEL' : 'EMAIL';
+    var ketFull = [ket, (plant||'')].filter(function(s){ return s && s.length > 2; }).join(' | ');
+    // Jangan duplikasi plant ke keterangan kalau sama persis
+    if (ketFull === plant) ketFull = ket;
 
     rows.push({
       week:    week,
       tanggal: tgl,
       sku:     sku,
-      nama:    nama,
-      jumlah:  '1',           // 1 baris = 1 container
+      nama:    material,
+      jumlah:  '1',
       tujuan:  negara || '',
       ket:     ketFull,
       source:  source,
-      // Extra display
       _so:    so,
       _qt:    qt,
       _qty:   qty,
