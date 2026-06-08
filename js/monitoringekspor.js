@@ -28,6 +28,7 @@ function mekInitPage() {
   mekSwitchFilterMode('date');
   mekSwitchTab('summary');
   mekSwitchSumView('all');
+  _mekCapMode = 'all';
   _mekInitPlanningWa();
 }
 
@@ -682,24 +683,45 @@ function _mekLoadStd(callback) {
 // ── Fuzzy match nama item SI ke sheet STD ────────────────────
 // Strategi: tokenize kedua string → hitung token yang overlap → pilih skor tertinggi
 function _mekFuzzyMatchStd(itemText, stdCache) {
-  if (!itemText || !stdCache) return null;
-  var query = itemText.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')   // hapus simbol
-    .replace(/\s+/g, ' ').trim();
-  var qTokens = query.split(' ').filter(Boolean);
-  if (!qTokens.length) return null;
+  if (!itemText || !stdCache || !Object.keys(stdCache).length) return null;
+
+  function normalize(s) {
+    return s.toLowerCase()
+      .replace(/\([^)]*\)/g, ' ')   // hapus kata dalam kurung: (BISCUITS) → spasi
+      .replace(/[^a-z0-9\s]/g, ' ')  // hapus simbol lain
+      .replace(/\s+/g, ' ').trim();
+  }
+  function tokenize(s) { return normalize(s).split(' ').filter(Boolean); }
+
+  var qRaw    = tokenize(itemText);           // token dari PDF (tanpa kata kurung)
+  var qFull   = itemText.toLowerCase()        // juga coba dengan kata kurung dipertahankan
+    .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+
+  if (!qRaw.length) return null;
 
   var best = null, bestScore = 0;
   Object.keys(stdCache).forEach(function(key) {
-    var kTokens = key.replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
-    // Hitung berapa token query yang ada di key
-    var hit = qTokens.filter(function(t){ return kTokens.indexOf(t) >= 0; }).length;
-    // Normalisasi: hit / max(qLen, kLen) agar tidak bias ke string panjang
-    var score = hit / Math.max(qTokens.length, kTokens.length);
+    var kTokens = tokenize(key);
+    if (!kTokens.length) return;
+
+    // Skor 1: query tanpa kurung vs STD
+    var hit1 = qRaw.filter(function(t){ return kTokens.indexOf(t) >= 0; }).length;
+    var s1   = hit1 / Math.max(qRaw.length, kTokens.length);
+
+    // Skor 2: query lengkap vs STD (token STD yg match di query)
+    var hit2 = kTokens.filter(function(t){ return qFull.indexOf(t) >= 0; }).length;
+    var s2   = hit2 / Math.max(qFull.length, kTokens.length);
+
+    // Skor 3: berapa % token STD yang ada di query (recall)
+    var recall = hit2 / kTokens.length;
+
+    // Ambil skor terbaik dari ketiga cara
+    var score = Math.max(s1, s2, recall * 0.9);
     if (score > bestScore) { bestScore = score; best = stdCache[key]; }
   });
-  // Threshold minimal 40% token match
-  return bestScore >= 0.4 ? best : null;
+
+  // Threshold 35% — lebih rendah karena sudah ada 3 cara hitung
+  return bestScore >= 0.55 ? best : null;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -722,16 +744,30 @@ function mekSwitchPlanMode(mode) {
   if (mode === 'si') {
     _mekLoadStd(function(){});
     document.addEventListener('paste', _mekGlobalSiPaste);
+    // Fokus ke drop zone supaya Ctrl+V langsung tertangkap
+    setTimeout(function() {
+      var dz = document.getElementById('mekSiDropZone');
+      if (dz && dz.style.display !== 'none') { dz.setAttribute('tabindex','0'); dz.focus(); }
+    }, 100);
   } else {
     document.removeEventListener('paste', _mekGlobalSiPaste);
   }
 }
 
 function _mekGlobalSiPaste(e) {
+  if (_mekPlanMode !== 'si') return;
   // Jangan intercept kalau user sedang ketik di input/textarea
   var tag = (e.target && e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea') return;
-  if (_mekPlanMode === 'si') mekHandleSiPaste(e);
+  // Cek ada gambar di clipboard
+  var items = (e.clipboardData || {}).items;
+  if (!items) return;
+  var hasImage = false;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type && items[i].type.indexOf('image') === 0) { hasImage = true; break; }
+  }
+  if (!hasImage) return; // bukan gambar, jangan intercept teks
+  mekHandleSiPaste(e);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -971,7 +1007,7 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
   var rows = uniqueItems.map(function(it, idx) {
     var match  = _mekFuzzyMatchStd(it.desc, stdCache);
     var sku    = match ? match.sku  : '';
-    var nama   = match ? match.nama : it.desc;
+    var nama   = it.desc;  // selalu pakai nama dari PDF/SI
     var qtyStr = String(it.qty || '') + (it.unit ? ' ' + it.unit : '');
     var isFirst = (idx === 0);
     return {
@@ -1238,49 +1274,54 @@ function _mekRenderSiPreview(rows) {
   var groupNums = [], gNum = 0;
   rows.forEach(function(r) { if (r._isFirst !== false || r._groupSize === undefined) gNum++; groupNums.push(gNum); });
 
+  var ES = 'outline:none;min-width:40px;display:inline-block;border-radius:4px;padding:1px 3px;transition:background .15s;cursor:text;';
+
   tbody.innerHTML = rows.map(function(r, i) {
     var skuOk   = r.sku && r.sku !== r._desc;
     var isFirst = r._isFirst !== false;
-    // Border kiri biru untuk baris lanjutan (grup yang sama)
     var contStyle = !isFirst ? 'border-left:3px solid #bee3f8;' : '';
+    var skuColor  = skuOk ? '#2d3748' : '#e53e3e';
+    var skuVal    = _mekEsc(r.sku || '');
+    var namaVal   = _mekEsc(r.nama || '');
+    var warnIcon  = !skuOk
+      ? '<i class="fas fa-exclamation-triangle" style="color:#f6ad55;font-size:10px;margin-left:3px;" title="Isi SKU manual"></i>'
+      : '';
 
     return '<tr style="' + (!isFirst ? 'background:#f7faff;' : '') + '">' +
-      // # — nomor grup hanya di baris pertama
-      '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;' + contStyle + '">' +
-        (isFirst ? groupNums[i] : '') +
-      '</td>' +
-      // Week
+      '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;' + contStyle + '">' + (isFirst ? groupNums[i] : '') + '</td>' +
       '<td style="text-align:center;">' +
-        (isFirst
-          ? (r.week ? '<span style="background:#ebf8ff;color:#2b6cb0;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">W'+r.week+'</span>' : '<span style="color:#cbd5e0;">—</span>')
-          : '') +
+        (isFirst ? (r.week ? '<span style="background:#ebf8ff;color:#2b6cb0;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">W'+r.week+'</span>' : '<span style="color:#cbd5e0;">—</span>') : '') +
       '</td>' +
-      // Tanggal
       '<td style="white-space:nowrap;font-size:12px;">' + (isFirst ? _mekEsc(_mekFmtTglDisplay(r.tanggal)||r.tanggal) : '') + '</td>' +
-      // No. SO
       '<td style="font-size:12px;font-weight:600;color:#2d3748;">' + (isFirst ? _mekEsc(r.noSo||'—') : '') + '</td>' +
-      // SKU — selalu tampil
-      '<td>' +
-        (skuOk
-          ? '<b style="font-size:12px;">' + _mekEsc(r.sku) + '</b>'
-          : '<span style="color:#fc8181;font-size:11px;" title="SKU tidak ditemukan di STD"><i class="fas fa-exclamation-triangle"></i></span>') +
-      '</td>' +
-      // Nama Item — selalu tampil
-      '<td style="font-size:12px;">' + _mekEsc(r.nama) +
-        (r._qtyKar ? '<br><span style="font-size:10px;color:#a0aec0;">'+_mekEsc(r._qtyKar)+'</span>' : '') +
-      '</td>' +
-      // Cont — hanya baris pertama
+      '<td data-idx="'+i+'" data-field="sku" contenteditable="true" ' +
+        'style="'+ES+'font-size:12px;font-weight:700;color:'+skuColor+';" ' +
+        'onblur="_mekSiEditCell(' + i + ',\'sku\',this.innerText.trim())" ' +
+        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" ' +
+        'title="Klik untuk edit SKU">' + skuVal + '</td>' +
+      (skuOk ? '<td style="display:none"></td>' : '<td style="padding:0;vertical-align:middle;">' + warnIcon + '</td>') +
+      '<td data-idx="'+i+'" data-field="nama" contenteditable="true" ' +
+        'style="'+ES+'font-size:12px;" ' +
+        'onblur="_mekSiEditCell(' + i + ',\'nama\',this.innerText.trim())" ' +
+        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" ' +
+        'title="Klik untuk edit nama">' + namaVal + '</td>' +
       '<td style="text-align:right;font-weight:700;font-size:13px;">' + (isFirst ? _mekEsc(r.jumlah||'—') : '') + '</td>' +
-      // Tujuan — hanya baris pertama
       '<td style="font-size:12px;font-weight:600;color:#276749;">' + (isFirst ? _mekEsc(r.tujuan||'—') : '') + '</td>' +
-      // Keterangan — hanya baris pertama
       '<td style="font-size:11px;color:#718096;">' + (isFirst ? _mekEsc(r.ket) : '') + '</td>' +
-      // Tombol hapus — hanya baris pertama
       '<td style="text-align:center;">' +
         (isFirst ? '<button onclick="_mekDeleteSiGroup('+i+')" style="background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;"><i class="fas fa-times"></i></button>' : '') +
       '</td>' +
       '</tr>';
   }).join('');
+}
+
+// Update _mekSiRows saat cell di-edit langsung di tabel
+function _mekSiEditCell(idx, field, val) {
+  if (!_mekSiRows[idx]) return;
+  if (!val || val === _mekSiRows[idx][field]) return; // tidak ada perubahan
+  _mekSiRows[idx][field] = val;
+  // Kalau SKU diisi, hapus warning — re-render ringan hanya update style cell yg bersangkutan
+  // (tidak perlu re-render seluruh tabel)
 }
 
 function _mekDeleteSiGroup(idx) {
@@ -1308,6 +1349,11 @@ function mekSiClear() {
   if (fi) fi.value = '';
   var fl = document.getElementById('mekSiFileLog'); if (fl) fl.innerHTML = '';
   var tb = document.getElementById('mekSiPreviewTbody'); if (tb) tb.innerHTML = '';
+  // Reset field Tujuan dan Week
+  var tj = document.getElementById('mekSiTujuan');
+  if (tj) { tj.value = ''; tj.style.borderColor = '#fc8181'; tj.style.background = '#fff5f5'; }
+  var wk = document.getElementById('mekSiWeek');
+  if (wk) wk.value = '';
 }
 
 function _mekDeleteSiRow(idx) {
@@ -1387,7 +1433,7 @@ function mekLoadCapaian() {
   tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#a0aec0;">' +
     '<i class="fas fa-spinner fa-spin" style="font-size:22px;"></i></td></tr>';
 
-  API.run('getMekCapaianPlanning', { from: from, to: to }, function(res) {
+  API.run('getMekCapaianPlanning', { from: from, to: to, mode: _mekCapMode }, function(res) {
     if (!res || !res.success) {
       tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#fc8181;">Gagal: ' +
         (res && res.message ? res.message : 'error') + '</td></tr>';
@@ -1419,6 +1465,19 @@ function mekLoadCapaian() {
 
 var _mekCapData   = [];
 var _mekCapFilter = 'all';  // 'all' | 'datang' | 'belum'
+var _mekCapMode   = 'all';  // 'all' | 'wa' | 'si'
+
+function mekCapSwitchMode(mode) {
+  _mekCapMode = mode;
+  ['mekCapModeAll','mekCapModeWA','mekCapModeSI'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('active',
+      (mode==='all' && id==='mekCapModeAll') ||
+      (mode==='wa'  && id==='mekCapModeWA')  ||
+      (mode==='si'  && id==='mekCapModeSI'));
+  });
+  mekLoadCapaian();
+}
 
 function mekCapSetFilter(f) {
   _mekCapFilter = f;
