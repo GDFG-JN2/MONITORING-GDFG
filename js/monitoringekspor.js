@@ -631,7 +631,28 @@ function mekSavePlanning() {
     weekOverride = ((document.getElementById('mekEmailWeek')||{}).value||'').trim();
   }
 
-  API.run('saveMekPlanningData', { rows: filledRows, weekOverride: weekOverride }, function (res) {
+  // Sanitize: hapus karakter yang bisa merusak JSON (newline, tab, quotes aneh dari Excel)
+  var cleanRows = filledRows.map(function(r) {
+    function san(v) {
+      if (!v && v !== 0) return '';
+      return String(v).replace(/[\r\n\t]/g,' ').replace(/[\x00-\x1f\x7f]/g,'').trim();
+    }
+    return {
+      week:    san(r.week),
+      tanggal: san(r.tanggal),
+      sku:     san(r.sku),
+      nama:    san(r.nama),
+      jumlah:  san(r.jumlah) || '1',
+      tujuan:  san(r.tujuan),
+      ket:     san(r.ket),
+      noSo:    san(r.noSo),
+      source:  san(r.source) || 'EMAIL',
+      _isFirst:   r._isFirst,
+      _groupSize: r._groupSize
+    };
+  });
+
+  API.run('saveMekPlanningData', { rows: cleanRows, weekOverride: weekOverride }, function (res) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Simpan'; }
     if (res && res.success) {
       showToast(res.message || 'Berhasil disimpan!', 'success');
