@@ -833,8 +833,7 @@ function _mekAutoFillTujuan(dest) {
 
   // Ekstrak: "TG. PRIOK, JKT - KATTUPALLI, INDIA" → "India"
   var dParts = dest.trim().split(/[,\-]\s*/);
-  var last   = dParts[dParts.length - 1].trim();
-  last = last.charAt(0).toUpperCase() + last.slice(1).toLowerCase();
+  var last   = dParts[dParts.length - 1].trim().toUpperCase();
 
   el.value = last;
   el.style.borderColor = '#68d391';
@@ -914,7 +913,8 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
   if (image && !text) {
     _mekOcrImage(image, function(ocrText) {
       if (!ocrText || ocrText.length < 20) { callback([]); return; }
-      // Rekursif: sekarang punya teks, parse biasa
+      // DEBUG: tampilkan teks OCR di console agar bisa dicek
+      console.log('[MEK-OCR RAW TEXT]\n' + ocrText);
       _mekParseSiText(ocrText, null, tujuan, stdCache, callback);
     });
     return;
@@ -923,7 +923,9 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
   // ── Parse teks SI dengan regex ─────────────────────────────
   if (!text) { callback([]); return; }
 
+  console.log('[MEK-PARSE INPUT TEXT]\n' + text.slice(0, 500));
   var result = _mekRegexParseSi(text, weekOverride);
+  console.log('[MEK-PARSE RESULT]', JSON.stringify(result));
   if (!result) { callback([], ''); return; }
 
   var tgl        = result.tanggal;
@@ -938,13 +940,13 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
     if (w) week = String(w);
   }
 
-  // Tujuan pendek: ambil kata terakhir setelah koma/dash terakhir
-  // "TG. PRIOK, JKT - KATTUPALLI, INDIA" → "India"
+  // Tujuan pendek: ambil kata terakhir setelah koma/dash terakhir → UPPERCASE
+  // "TG. PRIOK, JKT - KATTUPALLI, INDIA" → "INDIA"
+  // "CAT LAI, HO CHI MINH - VIETNAM" → "VIETNAM"
   var destShort = dest;
   if (dest) {
     var dParts = dest.split(/[,\-]\s*/);
-    destShort = dParts[dParts.length - 1].trim();
-    destShort = destShort.charAt(0).toUpperCase() + destShort.slice(1).toLowerCase();
+    destShort = dParts[dParts.length - 1].trim().toUpperCase();
   }
 
   // Deduplikasi sudah dilakukan di _mekRegexParseSi
@@ -1095,23 +1097,19 @@ function _mekRegexParseSi(text, weekOverride) {
   var uniqueDescCount = Object.keys(freqMap).length;
 
   var items;
-  if (uniqueDescCount === 1 && rawItems.length > 1 && jumlahCont === 0) {
-    // Semua baris identik DAN tidak ada NO.CONT di header → count baris = jumlah cont
+  if (uniqueDescCount === 1 && rawItems.length > 1) {
+    // Semua baris identik → format lama (1 item N container)
+    // Ambil jumlahCont dari header kalau ada, fallback ke count baris
     var k0 = Object.keys(freqMap)[0];
-    jumlahCont = freqMap[k0];
-    items = [{ qty: firstItem[k0].qty, unit: firstItem[k0].unit, desc: firstItem[k0].desc }];
-  } else if (uniqueDescCount === 1 && rawItems.length > 1 && rawItems.length === jumlahCont) {
-    // Semua baris identik DAN count baris = NO.CONT dari header → konfirmasi, deduplikasi
-    var k0 = Object.keys(freqMap)[0];
+    if (!jumlahCont) jumlahCont = freqMap[k0];
     items = [{ qty: firstItem[k0].qty, unit: firstItem[k0].unit, desc: firstItem[k0].desc }];
   } else {
-    // Format multi-item: tiap baris = item berbeda, jumlah cont dari header
-    // Hanya deduplikasi kalau desc IDENTIK persis (bukan fuzzy), untuk handle OCR repeat
+    // Format multi-item: tiap desc unik = 1 baris, jumlah cont dari header
+    // Deduplikasi exact desc saja (handle OCR baca baris 2x)
     var seenExact = {};
     items = [];
     rawItems.forEach(function(it) {
-      var k = it.desc; // key exact, bukan normKey
-      if (!seenExact[k]) { seenExact[k] = true; items.push({ qty: it.qty, unit: it.unit, desc: it.desc }); }
+      if (!seenExact[it.desc]) { seenExact[it.desc] = true; items.push({ qty: it.qty, unit: it.unit, desc: it.desc }); }
     });
   }
 
@@ -1171,6 +1169,7 @@ function _mekFinalizeSiRows() {
   var ct = document.getElementById('mekSiParseCount');
   if (ct) { ct.textContent = _mekSiRows.length + ' baris'; ct.style.display = ''; }
   if (_mekSiRows.length) showToast(_mekSiRows.length + ' baris dari SI berhasil di-parse!', 'success');
+  var cb = document.getElementById('mekSiClearBtn'); if (cb) cb.style.display = '';
   var fi = document.getElementById('mekSiFileInput'); if (fi) fi.value = '';
 }
 
@@ -1202,6 +1201,22 @@ function _mekRenderSiPreview(rows) {
       '<td style="text-align:center;"><button onclick="_mekDeleteSiRow('+i+')" style="background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;"><i class="fas fa-times"></i></button></td>' +
       '</tr>';
   }).join('');
+}
+
+function mekSiClear() {
+  _mekSiRows = [];
+  var dz = document.getElementById('mekSiDropZone');
+  var rw = document.getElementById('mekSiResultWrap');
+  var ct = document.getElementById('mekSiParseCount');
+  var cb = document.getElementById('mekSiClearBtn');
+  var fi = document.getElementById('mekSiFileInput');
+  if (dz) dz.style.display = '';
+  if (rw) rw.style.display = 'none';
+  if (ct) { ct.textContent = '0 baris'; ct.style.display = 'none'; }
+  if (cb) cb.style.display = 'none';
+  if (fi) fi.value = '';
+  var fl = document.getElementById('mekSiFileLog'); if (fl) fl.innerHTML = '';
+  var tb = document.getElementById('mekSiPreviewTbody'); if (tb) tb.innerHTML = '';
 }
 
 function _mekDeleteSiRow(idx) {
