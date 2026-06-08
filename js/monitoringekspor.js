@@ -1026,15 +1026,15 @@ function _mekRegexParseSi(text, weekOverride) {
   var contLabel = t.match(/NO\.?\s*CONT\s*[:：]\s*(\d+)\s*[xX×]/i);
   if (contLabel) jumlahCont = parseInt(contLabel[1]) || 0;
 
-  // Pola 2: "Jumlah Container : 1XCONTAINER 40 HC FT" atau "Jumlah Container : 2"
+  // Pola 2: "Jumlah Container : 1XCONTAINER" atau "Jumlah Container 1XCONTAINER" (titik dua optional)
   if (!jumlahCont) {
-    var contJml = t.match(/Jumlah\s*Container\s*[:：]\s*(\d+)/i);
+    var contJml = t.match(/Jumlah\s*Container\s*[:：]?\s*(\d+)/i);
     if (contJml) jumlahCont = parseInt(contJml[1]) || 0;
   }
 
-  // Pola 3: "NXhh HC CONTAINER" atau "N X 40HC CONTAINER"
+  // Pola 3: "NXhh HC CONTAINER", "2X40HC CONTAINER", "1XCONTAINER 40 HC FT"
   if (!jumlahCont) {
-    var contHc = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF|FT)\s*(?:CONTAINER)?/i);
+    var contHc = t.match(/(\d+)\s*[xX×]\s*(?:CONTAINER\s+)?\d*['"]?\s*(?:HC|GP|OT|FR|RF|FT)/i);
     if (contHc) jumlahCont = parseInt(contHc[1]) || 0;
   }
 
@@ -1068,7 +1068,9 @@ function _mekRegexParseSi(text, weekOverride) {
     return s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 25);
   }
 
-  var itemRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(CAR|KAR|CTN|PCS|BOX|SET|UNIT|KG|PC)\s+([^\n]+)/gi;
+  // Pattern item: nomor baris + optional kolom extra (DO Portal) + qty + unit + desc
+  // Handle: "1  1.250  KAR  ROMA..." dan "1  01195/DO-SHP/05/2026/MYOR  1.250  KAR  ROMA..."
+  var itemRegex = /(?:^|\n)\s*\d+\s+(?:\S+\/\S+\s+)?(\d[\d.,]*)\s+(CAR|KAR|CTN|PCS|BOX|SET|UNIT|KG|PC)\s+([^\n]+)/gi;
   var im;
   while ((im = itemRegex.exec(t)) !== null) {
     var qty  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
@@ -1078,7 +1080,7 @@ function _mekRegexParseSi(text, weekOverride) {
   }
 
   if (!rawItems.length) {
-    var looseRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(\w{2,5})\s+([A-Z][A-Z\s\d().\/]+)/gm;
+    var looseRegex = /(?:^|\n)\s*\d+\s+(?:\S+\/\S+\s+)?(\d[\d.,]*)\s+(\w{2,5})\s+([A-Z][A-Z\s\d().\/]+)/gm;
     while ((im = looseRegex.exec(t)) !== null) {
       var qty2  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
       var unit2 = im[2].toUpperCase();
@@ -1098,14 +1100,13 @@ function _mekRegexParseSi(text, weekOverride) {
 
   var items;
   if (uniqueDescCount === 1 && rawItems.length > 1) {
-    // Semua baris identik → format lama (1 item N container)
-    // Ambil jumlahCont dari header kalau ada, fallback ke count baris
-    var k0 = Object.keys(freqMap)[0];
-    if (!jumlahCont) jumlahCont = freqMap[k0];
-    items = [{ qty: firstItem[k0].qty, unit: firstItem[k0].unit, desc: firstItem[k0].desc }];
+    // Format lama: semua baris identik → tampilkan SEMUA baris (masing-masing = 1 item)
+    // jumlahCont total dari header, tidak dipecah per baris
+    if (!jumlahCont) jumlahCont = rawItems.length;
+    items = rawItems; // tampilkan semua, tidak deduplikasi
   } else {
-    // Format multi-item: tiap desc unik = 1 baris, jumlah cont dari header
-    // Deduplikasi exact desc saja (handle OCR baca baris 2x)
+    // Format multi-item: tiap baris = item berbeda
+    // Deduplikasi hanya kalau desc PERSIS sama (handle OCR baca baris 2x)
     var seenExact = {};
     items = [];
     rawItems.forEach(function(it) {
