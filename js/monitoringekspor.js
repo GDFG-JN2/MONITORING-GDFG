@@ -7,6 +7,10 @@
 // ── State ────────────────────────────────────────────────────
 var _mekFilterMode  = 'date';   // 'date' | 'week'
 var _mekSummaryData = [];
+// FIX: deklarasi dipindah ke atas agar tidak dipakai sebelum var
+var _mekCapMode     = 'all';    // 'all' | 'wa' | 'si' | 'email'
+var _mekCapData     = [];
+var _mekCapFilter   = 'all';    // 'all' | 'datang' | 'belum'
 
 // ── Inisialisasi halaman ─────────────────────────────────────
 function mekInitPage() {
@@ -138,10 +142,18 @@ function mekSwitchTab(tab) {
   var hideEl = tab === 'summary' ? ipEl : spEl;
   if (!showEl || !hideEl) return;
 
-  hideEl.style.opacity = '0'; hideEl.style.transition = 'opacity .18s ease';
+  // FIX: tambah pointer-events:none agar elemen yang sedang fade-out
+  // tidak menghalangi klik pada elemen di bawahnya
+  hideEl.style.opacity      = '0';
+  hideEl.style.pointerEvents = 'none';
+  hideEl.style.transition   = 'opacity .18s ease';
   setTimeout(function () {
-    hideEl.style.display = 'none';
-    showEl.style.opacity = '0'; showEl.style.display = 'block'; showEl.style.transition = 'opacity .2s ease';
+    hideEl.style.display      = 'none';
+    hideEl.style.pointerEvents = '';   // reset untuk saat ditampilkan lagi
+    showEl.style.opacity      = '0';
+    showEl.style.display      = 'block';
+    showEl.style.pointerEvents = '';   // pastikan elemen baru bisa diklik
+    showEl.style.transition   = 'opacity .2s ease';
     requestAnimationFrame(function () { requestAnimationFrame(function () { showEl.style.opacity = '1'; }); });
   }, 180);
 
@@ -767,6 +779,11 @@ function mekSwitchPlanMode(mode) {
     btn.style.borderBottomColor = isActive ? ac : 'transparent';
   });
 
+  // FIX: selalu hapus dulu listener lama sebelum pasang yang baru,
+  // agar tidak ada duplikasi listener yang bisa mengganggu event lain
+  document.removeEventListener('paste', _mekGlobalSiPaste);
+  document.removeEventListener('paste', _mekGlobalEmailPaste);
+
   if (mode === 'si') {
     _mekLoadStd(function(){});
     document.addEventListener('paste', _mekGlobalSiPaste);
@@ -774,8 +791,6 @@ function mekSwitchPlanMode(mode) {
       var dz = document.getElementById('mekSiDropZone');
       if (dz && dz.style.display !== 'none') { dz.setAttribute('tabindex','0'); dz.focus(); }
     }, 100);
-  } else {
-    document.removeEventListener('paste', _mekGlobalSiPaste);
   }
 
   if (mode === 'email') {
@@ -787,8 +802,6 @@ function mekSwitchPlanMode(mode) {
       var dz = document.getElementById('mekEmailDropZone');
       if (dz && dz.style.display !== 'none') { dz.setAttribute('tabindex','0'); dz.focus(); }
     }, 100);
-  } else {
-    document.removeEventListener('paste', _mekGlobalEmailPaste);
   }
 }
 
@@ -1044,14 +1057,8 @@ function mekCapEmailSwitchView(view) {
   var btnA = document.getElementById('mekCapEmailByAktual');
   if (btnP) btnP.classList.toggle('active', view === 'plan');
   if (btnA) btnA.classList.toggle('active', view === 'aktual');
-  if (view === 'aktual') {
-    _mekRenderCapaianEmailAktual(_mekCapEmailData);
-  } else {
-    var sku = ((document.getElementById('mekCapSku')||{}).value||'').toLowerCase();
-    var doc = ((document.getElementById('mekCapDoc')||{}).value||'').trim();
-    var tuj = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase();
-    _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tuj);
-  }
+  // Reload dari GAS karena filter antrian berbeda per mode
+  mekLoadCapaian();
 }
 
 function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
@@ -2105,7 +2112,7 @@ function mekLoadCapaian() {
   if (emailToggle) emailToggle.style.display = _mekCapMode === 'email' ? '' : 'none';
 
   if (_mekCapMode === 'email') {
-    API.run('getMekCapaianEmail', { from: from, to: to }, function(res) {
+    API.run('getMekCapaianEmail', { from: from, to: to, viewMode: _mekCapEmailView }, function(res) {
       if (!res || !res.success) {
         tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
         return;
@@ -2151,9 +2158,7 @@ function mekLoadCapaian() {
   });
 }
 
-var _mekCapData   = [];
-var _mekCapFilter = 'all';  // 'all' | 'datang' | 'belum'
-var _mekCapMode   = 'all';  // 'all' | 'wa' | 'si'
+// _mekCapData, _mekCapFilter, _mekCapMode sudah dideklarasikan di atas file
 
 function mekCapSwitchMode(mode) {
   _mekCapMode = mode;
