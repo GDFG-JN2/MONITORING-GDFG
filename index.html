@@ -5005,9 +5005,9 @@
         <!-- Toolbar -->
         <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;">
           <span style="font-size:12px;font-weight:700;color:#1a3a5c;">
-            <i class="fas fa-envelope" style="color:#d69e2e;"></i> Upload Tabel Planning Email (PDF / Screenshot)
+            <i class="fas fa-envelope" style="color:#d69e2e;"></i> Input Planning Email
           </span>
-          <span style="font-size:11px;color:#a0aec0;"><i class="fas fa-info-circle"></i> Upload file atau <b>Ctrl+V</b> paste screenshot</span>
+          <span style="font-size:11px;color:#a0aec0;"><i class="fas fa-info-circle"></i> Upload Excel/CSV atau input manual (Ctrl+V dari Excel)</span>
           <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
             <button id="mekEmailBtnSave" onclick="mekSavePlanning()"
               style="padding:6px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#0f2027,#1a3a5c);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
@@ -5024,12 +5024,6 @@
           <label style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.4px;">Tahun</label>
           <input type="number" id="mekEmailYear" min="2020" max="2099" placeholder="2026"
             style="width:72px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-          <label for="mekEmailFileInput"
-            style="padding:6px 16px;border-radius:8px;border:2px dashed #cbd5e0;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#4a5568;display:flex;align-items:center;gap:6px;transition:border-color .2s;"
-            onmouseover="this.style.borderColor='#d69e2e'" onmouseout="this.style.borderColor='#cbd5e0'">
-            <i class="fas fa-upload"></i> Pilih PDF / Gambar
-          </label>
-          <input type="file" id="mekEmailFileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple style="display:none;" onchange="mekHandleEmailFiles(this.files)">
           <label for="mekEmailXlsInput"
             style="padding:6px 16px;border-radius:8px;border:2px dashed #9ae6b4;background:#f0fff4;font-size:12px;font-weight:700;cursor:pointer;color:#276749;display:flex;align-items:center;gap:6px;transition:border-color .2s;"
             onmouseover="this.style.borderColor='#38a169'" onmouseout="this.style.borderColor='#9ae6b4'">
@@ -5054,19 +5048,19 @@
           </button>
         </div>
 
-        <!-- ── PANEL UPLOAD ── -->
+        <!-- ── PANEL UPLOAD (Excel/CSV only) ── -->
         <div id="mekEmailUploadPanel" style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
 
-          <!-- Drop zone -->
+          <!-- Drop zone Excel only -->
           <div id="mekEmailDropZone"
-            style="margin:20px;border:2px dashed #f6d860;border-radius:16px;padding:50px 20px;text-align:center;color:#a0aec0;cursor:pointer;transition:border-color .2s,background .2s;"
-            onclick="document.getElementById('mekEmailFileInput').click()"
-            ondragover="event.preventDefault();this.style.borderColor='#d69e2e';this.style.background='#fffff0';"
-            ondragleave="this.style.borderColor='#f6d860';this.style.background='';"
-            ondrop="event.preventDefault();this.style.borderColor='#f6d860';this.style.background='';mekHandleEmailFiles(event.dataTransfer.files);">
-            <i class="fas fa-envelope-open-text" style="font-size:40px;display:block;margin-bottom:12px;color:#d69e2e;opacity:.5;"></i>
-            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Klik, drag & drop, atau Ctrl+V paste screenshot</div>
-            <div style="font-size:12px;color:#a0aec0;margin-top:4px;">PDF, PNG, JPG, WEBP — atau <span style="color:#38a169;font-weight:700;">Excel / CSV</span></div>
+            style="margin:20px;border:2px dashed #9ae6b4;border-radius:16px;padding:50px 20px;text-align:center;color:#a0aec0;cursor:pointer;transition:border-color .2s,background .2s;"
+            onclick="document.getElementById('mekEmailXlsInput').click()"
+            ondragover="event.preventDefault();this.style.borderColor='#38a169';this.style.background='#f0fff4';"
+            ondragleave="this.style.borderColor='#9ae6b4';this.style.background='';"
+            ondrop="event.preventDefault();this.style.borderColor='#9ae6b4';this.style.background='';mekHandleEmailXls(event.dataTransfer.files);">
+            <i class="fas fa-file-excel" style="font-size:40px;display:block;margin-bottom:12px;color:#38a169;opacity:.7;"></i>
+            <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#276749;">Klik atau drag & drop file Excel / CSV</div>
+            <div style="font-size:12px;color:#a0aec0;margin-top:4px;">.xlsx, .xls, .csv</div>
           </div>
 
           <!-- Log + tabel preview -->
