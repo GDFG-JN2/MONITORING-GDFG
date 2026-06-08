@@ -371,6 +371,7 @@ var _mekParsedRows = [];
 function _mekInitPlanningWa() {
   _mekParsedRows = [];
   _mekSiRows     = [];
+  _mekEmailRows  = [];
   _mekPlanMode   = 'wa';
   var ta = document.getElementById('mekWaTextarea');
   if (ta) ta.value = '';
@@ -583,21 +584,27 @@ function _mekDeletePreviewRow(idx) {
 
 // ── Simpan ke GAS ────────────────────────────────────────────
 function mekSavePlanning() {
-  var rows = _mekPlanMode === 'si' ? _mekSiRows : _mekParsedRows;
+  var rows = _mekPlanMode === 'si'    ? _mekSiRows
+           : _mekPlanMode === 'email' ? _mekEmailRows
+           : _mekParsedRows;
+
   if (!rows || !rows.length) {
-    showToast(_mekPlanMode === 'si' ? 'Belum ada data SI. Upload PDF dulu.' : 'Belum ada data. Parse dulu teks WA-nya.', 'warning');
-    return;
+    var msg = _mekPlanMode === 'si'    ? 'Belum ada data SI. Upload PDF dulu.'
+            : _mekPlanMode === 'email' ? 'Belum ada data Email. Upload file dulu.'
+            : 'Belum ada data. Parse dulu teks WA-nya.';
+    showToast(msg, 'warning'); return;
   }
 
-  var btnId = _mekPlanMode === 'si' ? 'mekSiBtnSave' : 'mekBtnSave';
-  var btn   = document.getElementById(btnId);
+  var btnId = _mekPlanMode === 'si'    ? 'mekSiBtnSave'
+            : _mekPlanMode === 'email' ? 'mekEmailBtnSave'
+            : 'mekBtnSave';
+  var btn = document.getElementById(btnId);
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...'; }
 
   // Fill down: baris lanjutan ambil week/tanggal/noSo/jumlah/tujuan dari baris pertama grup
   var lastFirst = null;
   var filledRows = rows.map(function(r) {
     if (r._isFirst !== false) { lastFirst = r; return r; }
-    // Baris lanjutan: copy field yang kosong dari baris pertama
     return Object.assign({}, r, {
       week:    lastFirst ? lastFirst.week    : r.week,
       tanggal: lastFirst ? lastFirst.tanggal : r.tanggal,
@@ -608,21 +615,19 @@ function mekSavePlanning() {
     });
   });
 
-  API.run('saveMekPlanningData', { rows: filledRows }, function (res) {
+  // Kirim weekOverride untuk Email (update logic di GAS)
+  var weekOverride = '';
+  if (_mekPlanMode === 'email') {
+    weekOverride = ((document.getElementById('mekEmailWeek')||{}).value||'').trim();
+  }
+
+  API.run('saveMekPlanningData', { rows: filledRows, weekOverride: weekOverride }, function (res) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Simpan'; }
     if (res && res.success) {
       showToast(res.message || 'Berhasil disimpan!', 'success');
-      if (_mekPlanMode === 'si') {
-        _mekSiRows = [];
-        _mekRenderSiPreview([]);
-        var dz = document.getElementById('mekSiDropZone');
-        var rw = document.getElementById('mekSiResultWrap');
-        if (dz) dz.style.display = '';
-        if (rw) rw.style.display = 'none';
-        var ct = document.getElementById('mekSiParseCount'); if (ct) ct.style.display = 'none';
-      } else {
-        mekClearWa();
-      }
+      if      (_mekPlanMode === 'si')    { _mekSiRows=[]; _mekRenderSiPreview([]); var dz=document.getElementById('mekSiDropZone'),rw=document.getElementById('mekSiResultWrap'); if(dz)dz.style.display=''; if(rw)rw.style.display='none'; var ct=document.getElementById('mekSiParseCount'); if(ct)ct.style.display='none'; }
+      else if (_mekPlanMode === 'email') { mekClearEmail(); }
+      else                               { mekClearWa(); }
     } else {
       showToast('Gagal: ' + (res && res.message ? res.message : 'error'), 'error');
     }
@@ -729,22 +734,28 @@ function _mekFuzzyMatchStd(itemText, stdCache) {
 // ════════════════════════════════════════════════════════════
 function mekSwitchPlanMode(mode) {
   _mekPlanMode = mode;
-  var waPanel = document.getElementById('mekWaPanel');
-  var siPanel = document.getElementById('mekSiPanel');
-  var btnWa   = document.getElementById('mekPlanModeWa');
-  var btnSi   = document.getElementById('mekPlanModeSi');
+  var waPanel    = document.getElementById('mekWaPanel');
+  var siPanel    = document.getElementById('mekSiPanel');
+  var emailPanel = document.getElementById('mekEmailPanel');
+  var btnWa      = document.getElementById('mekPlanModeWa');
+  var btnSi      = document.getElementById('mekPlanModeSi');
+  var btnEmail   = document.getElementById('mekPlanModeEmail');
   var ac = '#1a3a5c', in_ = '#718096';
 
-  if (waPanel) waPanel.style.display = mode === 'wa' ? 'flex' : 'none';
-  if (siPanel) siPanel.style.display = mode === 'si' ? 'flex' : 'none';
-  if (btnWa) { btnWa.style.color = mode==='wa'?ac:in_; btnWa.style.borderBottomColor = mode==='wa'?ac:'transparent'; }
-  if (btnSi) { btnSi.style.color = mode==='si'?ac:in_; btnSi.style.borderBottomColor = mode==='si'?ac:'transparent'; }
+  if (waPanel)    waPanel.style.display    = mode === 'wa'    ? 'flex' : 'none';
+  if (siPanel)    siPanel.style.display    = mode === 'si'    ? 'flex' : 'none';
+  if (emailPanel) emailPanel.style.display = mode === 'email' ? 'flex' : 'none';
 
-  // Preload STD dan pasang global paste saat mode SI dibuka
+  [btnWa, btnSi, btnEmail].forEach(function(btn, i) {
+    if (!btn) return;
+    var isActive = (i===0&&mode==='wa')||(i===1&&mode==='si')||(i===2&&mode==='email');
+    btn.style.color            = isActive ? ac  : in_;
+    btn.style.borderBottomColor = isActive ? ac : 'transparent';
+  });
+
   if (mode === 'si') {
     _mekLoadStd(function(){});
     document.addEventListener('paste', _mekGlobalSiPaste);
-    // Fokus ke drop zone supaya Ctrl+V langsung tertangkap
     setTimeout(function() {
       var dz = document.getElementById('mekSiDropZone');
       if (dz && dz.style.display !== 'none') { dz.setAttribute('tabindex','0'); dz.focus(); }
@@ -752,22 +763,337 @@ function mekSwitchPlanMode(mode) {
   } else {
     document.removeEventListener('paste', _mekGlobalSiPaste);
   }
+
+  if (mode === 'email') {
+    _mekLoadStd(function(){});
+    document.addEventListener('paste', _mekGlobalEmailPaste);
+    var elYear = document.getElementById('mekEmailYear');
+    if (elYear && !elYear.value) elYear.value = new Date().getFullYear();
+    setTimeout(function() {
+      var dz = document.getElementById('mekEmailDropZone');
+      if (dz && dz.style.display !== 'none') { dz.setAttribute('tabindex','0'); dz.focus(); }
+    }, 100);
+  } else {
+    document.removeEventListener('paste', _mekGlobalEmailPaste);
+  }
 }
 
 function _mekGlobalSiPaste(e) {
   if (_mekPlanMode !== 'si') return;
-  // Jangan intercept kalau user sedang ketik di input/textarea
   var tag = (e.target && e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea') return;
-  // Cek ada gambar di clipboard
   var items = (e.clipboardData || {}).items;
   if (!items) return;
   var hasImage = false;
   for (var i = 0; i < items.length; i++) {
     if (items[i].type && items[i].type.indexOf('image') === 0) { hasImage = true; break; }
   }
-  if (!hasImage) return; // bukan gambar, jangan intercept teks
+  if (!hasImage) return;
   mekHandleSiPaste(e);
+}
+
+// ════════════════════════════════════════════════════════════
+// BY EMAIL — Upload/paste tabel planning dari email
+// Format kolom: KETERANGAN|SO|QT|NEGARA|KODE(SKU)|MATERIAL|STUFFING DATE|QTY|STUFFING PLANT|NOTE
+// 1 baris = 1 container
+// ════════════════════════════════════════════════════════════
+var _mekEmailRows = [];
+
+function _mekGlobalEmailPaste(e) {
+  if (_mekPlanMode !== 'email') return;
+  var tag = (e.target && e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;
+  var items = (e.clipboardData || {}).items;
+  if (!items) return;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type && items[i].type.indexOf('image') === 0) {
+      mekHandleEmailPaste(e); return;
+    }
+  }
+}
+
+function mekHandleEmailPaste(e) {
+  var items = (e.clipboardData || e.originalEvent && e.originalEvent.clipboardData || {}).items;
+  if (!items) return;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type && items[i].type.indexOf('image') === 0) {
+      e.preventDefault();
+      var file  = items[i].getAsFile();
+      var ext   = file.type.split('/')[1] || 'png';
+      var named = new File([file], 'email_' + Date.now() + '.' + ext, { type: file.type });
+      mekHandleEmailFiles([named]);
+      return;
+    }
+  }
+}
+
+function mekHandleEmailFiles(files) {
+  if (!files || !files.length) return;
+  var ALLOWED = ['application/pdf','image/png','image/jpeg','image/jpg','image/webp','image/gif'];
+  var fileArr = Array.from(files).filter(function(f){
+    return ALLOWED.indexOf(f.type) >= 0 || /\.(pdf|png|jpg|jpeg|webp|gif)$/i.test(f.name);
+  });
+  if (!fileArr.length) { showToast('Pilih file PDF atau gambar.', 'error'); return; }
+
+  var dz = document.getElementById('mekEmailDropZone');
+  var rw = document.getElementById('mekEmailResultWrap');
+  if (dz) dz.style.display = 'none';
+  if (rw) rw.style.display = 'block';
+
+  var log = document.getElementById('mekEmailFileLog');
+  if (log) log.innerHTML = '';
+  _mekEmailRows = [];
+
+  _mekLoadStd(function(stdCache) {
+    var done = 0;
+    fileArr.forEach(function(file) {
+      _mekAddEmailLog(file.name, 'loading');
+      var isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+      if (isPdf) {
+        _mekReadPdfText(file, function(text) {
+          if (!text) { _mekUpdateEmailLog(file.name,'error','Gagal baca PDF'); done++; if(done===fileArr.length)_mekFinalizeEmail(); return; }
+          _mekUpdateEmailLog(file.name,'parsing','Parsing tabel...');
+          var rows = _mekParseEmailTable(text, stdCache);
+          _mekEmailRows = _mekEmailRows.concat(rows);
+          _mekUpdateEmailLog(file.name, rows.length?'ok':'warn', rows.length?rows.length+' baris':'Tidak ada data');
+          done++; if(done===fileArr.length) _mekFinalizeEmail();
+        });
+      } else {
+        _mekUpdateEmailLog(file.name,'parsing','OCR...');
+        _mekFileToBase64(file, function(b64, mime) {
+          if (!b64) { _mekUpdateEmailLog(file.name,'error','Gagal baca gambar'); done++; if(done===fileArr.length)_mekFinalizeEmail(); return; }
+          _mekOcrImage({b64:b64, mime:mime}, function(ocrText) {
+            if (!ocrText) { _mekUpdateEmailLog(file.name,'warn','OCR gagal'); done++; if(done===fileArr.length)_mekFinalizeEmail(); return; }
+            var rows = _mekParseEmailTable(ocrText, stdCache);
+            _mekEmailRows = _mekEmailRows.concat(rows);
+            _mekUpdateEmailLog(file.name, rows.length?'ok':'warn', rows.length?rows.length+' baris':'Tidak ada data');
+            done++; if(done===fileArr.length) _mekFinalizeEmail();
+          });
+        });
+      }
+    });
+  });
+}
+
+// ── Parser tabel Email ───────────────────────────────────────
+// Header kolom: KETERANGAN|SO|QT|NEGARA|KODE|MATERIAL|STUFFING DATE|QTY|STUFFING PLANT|NOTE
+// Deteksi header dulu, lalu parse baris per baris
+var _MEK_EMAIL_COLS = ['keterangan','so','qt','negara','kode','material','stuffing_date','qty','plant','note'];
+
+function _mekParseEmailTable(text, stdCache) {
+  if (!text) return [];
+  var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n')
+    .map(function(l){ return l.trim(); }).filter(Boolean);
+
+  var rows = [];
+  var weekOverride = parseInt((document.getElementById('mekEmailWeek')||{}).value||'') || 0;
+  var yearOverride = parseInt((document.getElementById('mekEmailYear')||{}).value||'') || new Date().getFullYear();
+
+  // Bulan map
+  var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+
+  function parseTgl(s) {
+    if (!s) return '';
+    s = String(s).trim();
+    // dd-Mon-yy atau dd-Mon-yyyy: "08-Jun-26"
+    var m = s.match(/^(\d{1,2})[\/\-.]([A-Za-z]{3})[\/\-.](\d{2,4})$/);
+    if (m) {
+      var mon = MONTHS[(m[2]||'').toLowerCase()] || 0;
+      if (!mon) return '';
+      var yr  = m[3].length === 2 ? '20' + m[3] : m[3];
+      return yr + '-' + ('0'+mon).slice(-2) + '-' + ('0'+m[1]).slice(-2);
+    }
+    // dd/mm/yyyy
+    var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m2) return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
+    return '';
+  }
+
+  // Cari header baris: harus ada kata STUFFING dan SO dan KODE/MATERIAL
+  var headerIdx = -1;
+  for (var h = 0; h < Math.min(lines.length, 10); h++) {
+    var lup = lines[h].toUpperCase();
+    if ((lup.indexOf('STUFFING') >= 0 || lup.indexOf('KODE') >= 0) &&
+        (lup.indexOf('SO') >= 0 || lup.indexOf('MATERIAL') >= 0)) {
+      headerIdx = h; break;
+    }
+  }
+  // Jika header tidak ditemukan, coba parse buta (asumsi urutan kolom standar)
+  var colMap = { keterangan:0, so:1, qt:2, negara:3, kode:4, material:5, stuffing_date:6, qty:7, plant:8, note:9 };
+
+  if (headerIdx >= 0) {
+    // Parse kolom dari header baris — pisah oleh tab atau multiple spaces
+    var headers = lines[headerIdx].split(/\t+|\s{2,}/).map(function(s){ return s.trim().toLowerCase(); });
+    headers.forEach(function(h, i) {
+      if (/keterangan/.test(h))    colMap.keterangan   = i;
+      else if (/^so$/.test(h))     colMap.so           = i;
+      else if (/^qt$/.test(h))     colMap.qt           = i;
+      else if (/negara/.test(h))   colMap.negara        = i;
+      else if (/kode/.test(h))     colMap.kode          = i;
+      else if (/material/.test(h)) colMap.material      = i;
+      else if (/stuffing.*date|tanggal.*stuffing/.test(h)) colMap.stuffing_date = i;
+      else if (/^qty$/.test(h))    colMap.qty           = i;
+      else if (/plant|stuffing.*plant/.test(h)) colMap.plant = i;
+      else if (/note|catatan/.test(h)) colMap.note      = i;
+    });
+  }
+
+  var dataStart = headerIdx >= 0 ? headerIdx + 1 : 0;
+
+  for (var i = dataStart; i < lines.length; i++) {
+    var line = lines[i];
+    // Split by tab dulu, fallback ke multiple spaces
+    var cells = line.indexOf('\t') >= 0
+      ? line.split('\t').map(function(s){ return s.trim(); })
+      : line.split(/\s{2,}/).map(function(s){ return s.trim(); });
+
+    if (cells.length < 5) continue; // baris terlalu pendek, skip
+
+    function cell(key) { var idx = colMap[key]; return idx !== undefined && idx < cells.length ? (cells[idx]||'').trim() : ''; }
+
+    var ket     = cell('keterangan');
+    var so      = cell('so');
+    var qt      = cell('qt');
+    var negara  = cell('negara');
+    var kode    = cell('kode');
+    var material= cell('material');
+    var tglRaw  = cell('stuffing_date');
+    var qty     = cell('qty');
+    var plant   = cell('plant');
+    var note    = cell('note');
+
+    // Skip baris kosong atau header ulang
+    if (!so && !kode && !material) continue;
+    if (/^(so|kode|material|stuffing)$/i.test(so)) continue;
+
+    var tgl = parseTgl(tglRaw);
+    var week = weekOverride
+      ? String(weekOverride)
+      : (tgl ? String(_mekDateToISOWeek(tgl)) : '');
+
+    // Fuzzy match SKU dari KODE (kalau KODE bukan angka bersih, coba dari material)
+    var sku  = kode && /^\d+$/.test(kode) ? kode : '';
+    var nama = material;
+    if (!sku && material) {
+      var match = _mekFuzzyMatchStd(material, stdCache);
+      if (match) sku = match.sku;
+    }
+
+    // Deteksi cancel
+    var isCancel = /cancel/i.test(ket);
+    var source   = isCancel ? 'EMAIL_CANCEL' : 'EMAIL';
+
+    // Keterangan = gabungan ket + note (jika ada)
+    var ketFull = [ket, note].filter(Boolean).join(' | ');
+
+    rows.push({
+      week:    week,
+      tanggal: tgl,
+      sku:     sku,
+      nama:    nama,
+      jumlah:  '1',           // 1 baris = 1 container
+      tujuan:  negara || '',
+      ket:     ketFull,
+      source:  source,
+      // Extra display
+      _so:    so,
+      _qt:    qt,
+      _qty:   qty,
+      _plant: plant,
+      _cancel: isCancel
+    });
+  }
+  return rows;
+}
+
+function _mekFinalizeEmail() {
+  _mekRenderEmailPreview(_mekEmailRows);
+  var ct = document.getElementById('mekEmailParseCount');
+  if (ct) { ct.textContent = _mekEmailRows.length + ' baris'; ct.style.display = ''; }
+  var clr = document.getElementById('mekEmailBtnClear');
+  if (clr) clr.style.display = '';
+  if (_mekEmailRows.length) showToast(_mekEmailRows.length + ' baris berhasil di-parse!', 'success');
+  var fi = document.getElementById('mekEmailFileInput'); if (fi) fi.value = '';
+}
+
+function _mekRenderEmailPreview(rows) {
+  var tbody = document.getElementById('mekEmailPreviewTbody');
+  if (!tbody) return;
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(function(r, i) {
+    var cancelStyle = r._cancel ? 'text-decoration:line-through;color:#9b2c2c;opacity:.7;' : '';
+    var cancelBadge = r._cancel
+      ? '<span style="background:#fed7d7;color:#9b2c2c;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px;">CANCEL</span>'
+      : '';
+    return '<tr style="' + (r._cancel ? 'background:#fff5f5;' : '') + '">' +
+      '<td style="text-align:center;color:#a0aec0;font-size:11px;background:#f8fafc;">' + (i+1) + '</td>' +
+      '<td style="text-align:center;">' + (r.week ? '<span style="background:#fefcbf;color:#744210;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">W'+r.week+'</span>' : '—') + '</td>' +
+      '<td style="white-space:nowrap;font-size:12px;' + cancelStyle + '">' + _mekEsc(_mekFmtTglDisplay(r.tanggal)||r.tanggal||'—') + '</td>' +
+      '<td><b style="font-size:12px;' + cancelStyle + '">' + _mekEsc(r.sku||'—') + '</b></td>' +
+      '<td style="font-size:12px;' + cancelStyle + '">' + _mekEsc(r.nama||'—') + '</td>' +
+      '<td style="font-size:12px;">' + _mekEsc(r.tujuan||'—') + '</td>' +
+      '<td style="font-size:11px;font-family:monospace;color:#6b46c1;">' + _mekEsc(r._so||'—') + '</td>' +
+      '<td style="font-size:11px;color:#718096;">' + _mekEsc(r._qt||'—') + '</td>' +
+      '<td style="text-align:right;font-size:12px;">' + _mekEsc(r._qty||'—') + '</td>' +
+      '<td style="font-size:11px;">' + _mekEsc(r._plant||'—') + '</td>' +
+      '<td style="font-size:11px;color:#718096;">' + _mekEsc(r.ket||'—') + cancelBadge + '</td>' +
+      '<td style="text-align:center;">' + (r._cancel
+        ? '<span style="background:#fed7d7;color:#9b2c2c;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">CANCEL</span>'
+        : '<span style="background:#c6f6d5;color:#276749;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">AKTIF</span>') +
+      '</td>' +
+      '<td style="text-align:center;"><button onclick="_mekDeleteEmailRow('+i+')" style="background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;"><i class="fas fa-times"></i></button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function _mekDeleteEmailRow(idx) {
+  _mekEmailRows.splice(idx, 1);
+  _mekRenderEmailPreview(_mekEmailRows);
+  var ct = document.getElementById('mekEmailParseCount');
+  if (ct) ct.textContent = _mekEmailRows.length + ' baris';
+}
+
+function mekClearEmail() {
+  _mekEmailRows = [];
+  var dz  = document.getElementById('mekEmailDropZone');
+  var rw  = document.getElementById('mekEmailResultWrap');
+  var ct  = document.getElementById('mekEmailParseCount');
+  var clr = document.getElementById('mekEmailBtnClear');
+  var log = document.getElementById('mekEmailFileLog');
+  if (dz)  dz.style.display  = '';
+  if (rw)  rw.style.display  = 'none';
+  if (ct)  ct.style.display  = 'none';
+  if (clr) clr.style.display = 'none';
+  if (log) log.innerHTML     = '';
+  var tbody = document.getElementById('mekEmailPreviewTbody');
+  if (tbody) tbody.innerHTML = '';
+}
+
+// ── File log Email ───────────────────────────────────────────
+function _mekAddEmailLog(name, state) {
+  var log = document.getElementById('mekEmailFileLog'); if (!log) return;
+  var icons  = {loading:'fa-spinner fa-spin',parsing:'fa-robot',ok:'fa-check-circle',warn:'fa-exclamation-circle',error:'fa-times-circle'};
+  var colors = {loading:'#a0aec0',parsing:'#2b6cb0',ok:'#276749',warn:'#744210',error:'#9b2c2c'};
+  var div = document.createElement('div');
+  div.id = 'mekEmailLog_'+name.replace(/[^a-z0-9]/gi,'_');
+  div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;border-bottom:1px solid #f0f0f0;';
+  div.innerHTML = '<i class="fas '+(icons[state]||'fa-file')+'" style="color:'+(colors[state]||'#a0aec0')+';width:14px;"></i>'+
+    '<span style="flex:1;font-weight:600;color:#2d3748;">'+_mekEsc(name)+'</span>'+
+    '<span id="mekEmailLogMsg_'+name.replace(/[^a-z0-9]/gi,'_')+'" style="color:'+(colors[state]||'#a0aec0')+';font-size:11px;">'+state+'</span>';
+  log.appendChild(div);
+}
+
+function _mekUpdateEmailLog(name, state, msg) {
+  var icons  = {loading:'fa-spinner fa-spin',parsing:'fa-robot',ok:'fa-check-circle',warn:'fa-exclamation-circle',error:'fa-times-circle'};
+  var colors = {loading:'#a0aec0',parsing:'#2b6cb0',ok:'#276749',warn:'#744210',error:'#9b2c2c'};
+  var el  = document.getElementById('mekEmailLog_'+name.replace(/[^a-z0-9]/gi,'_')); if (!el) return;
+  var ico = el.querySelector('i');
+  var msgEl = document.getElementById('mekEmailLogMsg_'+name.replace(/[^a-z0-9]/gi,'_'));
+  if (ico)   { ico.className = 'fas '+(icons[state]||'fa-file'); ico.style.color = colors[state]||'#a0aec0'; }
+  if (msgEl) { msgEl.textContent = msg||state; msgEl.style.color = colors[state]||'#a0aec0'; }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1469,12 +1795,13 @@ var _mekCapMode   = 'all';  // 'all' | 'wa' | 'si'
 
 function mekCapSwitchMode(mode) {
   _mekCapMode = mode;
-  ['mekCapModeAll','mekCapModeWA','mekCapModeSI'].forEach(function(id) {
+  ['mekCapModeAll','mekCapModeWA','mekCapModeSI','mekCapModeEmail'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.classList.toggle('active',
-      (mode==='all' && id==='mekCapModeAll') ||
-      (mode==='wa'  && id==='mekCapModeWA')  ||
-      (mode==='si'  && id==='mekCapModeSI'));
+      (mode==='all'   && id==='mekCapModeAll')   ||
+      (mode==='wa'    && id==='mekCapModeWA')    ||
+      (mode==='si'    && id==='mekCapModeSI')    ||
+      (mode==='email' && id==='mekCapModeEmail'));
   });
   mekLoadCapaian();
 }
@@ -1603,17 +1930,23 @@ function _mekRenderCapaian(data, statusFilter) {
     keluar:  { label:'✅ Keluar',  bg:'#c6f6d5', color:'#276749' },
     loading: { label:'🔄 Loading', bg:'#e9d8fd', color:'#6b46c1' },
     daftar:  { label:'🚛 Daftar',  bg:'#bee3f8', color:'#2b6cb0' },
-    belum:   { label:'⏳ Belum',   bg:'#fed7d7', color:'#9b2c2c' }
+    belum:   { label:'⏳ Belum',   bg:'#fed7d7', color:'#9b2c2c' },
+    cancel:  { label:'❌ Cancel',  bg:'#e2e8f0', color:'#718096' }
   };
 
   var rows = '';
   filtered.forEach(function(r, i) {
     var st  = STATUS[r.status] || STATUS.belum;
-    var src = r.source === 'SI'
+    var srcUp = (r.source||'').toUpperCase();
+    var src = srcUp === 'SI'
       ? '<span style="background:#e9d8fd;color:#6b46c1;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;">SI</span>'
-      : (r.source === 'WA'
+      : srcUp === 'WA'
         ? '<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;">WA</span>'
-        : '');
+        : srcUp === 'EMAIL'
+          ? '<span style="background:#fefcbf;color:#744210;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;">EMAIL</span>'
+          : srcUp === 'EMAIL_CANCEL'
+            ? '<span style="background:#e2e8f0;color:#9b2c2c;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;text-decoration:line-through;">CANCEL</span>'
+            : '';
 
     // Border atas tebal untuk setiap baris pertama planning baru
     var borderTop = r.isFirstRow && i > 0 ? 'border-top:2px solid #e2e8f0;' : '';
