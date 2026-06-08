@@ -1003,16 +1003,51 @@ function _mekRegexParseSi(text, weekOverride) {
   if (!tanggal && stuffM) {
     tanggal = stuffM[3] + '-' + ('0'+stuffM[2]).slice(-2) + '-' + ('0'+stuffM[1]).slice(-2);
   }
+  // Fallback: ETD atau Stuffing Date sebagai tanggal kalau semua gagal
+  if (!tanggal) {
+    var etdM = t.match(/\bETD\s*[:：]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (etdM) {
+      var mNum2 = _MONTHS[(etdM[2]||'').toLowerCase()] || 0;
+      if (mNum2) tanggal = etdM[3]+'-'+('0'+mNum2).slice(-2)+'-'+('0'+etdM[1]).slice(-2);
+    }
+  }
   // Fallback: cari tanggal standalone dd.MM.yyyy
   if (!tanggal) {
     var tglM = t.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
     if (tglM) tanggal = tglM[3]+'-'+('0'+tglM[2]).slice(-2)+'-'+('0'+tglM[1]).slice(-2);
   }
 
-  // 2. NO SO: "SO : 102167499" atau "SO:102167499"
+  // 2. NO SO: beberapa format:
+  //    "SO : 102167499" — format biasa
+  //    "SO\n010260500842" — PDF 2-kolom (label kiri, nilai kanan, sort by Y)
   var noSo = '';
   var soM = t.match(/\bSO\s*[:：]\s*(\d+)/i);
-  if (soM) noSo = soM[1].trim();
+  if (soM) {
+    noSo = soM[1].trim();
+  } else {
+    // Format 2-kolom: cari label SO, lalu pasangkan dengan nilai di blok label-value
+    // Pattern: [ETD, Plant Stuffing, Liner, Quotation, SO] + [val1, val2, val3, val4, val5]
+    var lblBlock = t.match(/((?:(?:ETD|Plant\s*Stuffing|Liner|Quotation|SO|EO\s*Portal)\s*\n)+)/i);
+    if (lblBlock) {
+      var labels = lblBlock[0].trim().split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+      var soLabelIdx = -1;
+      labels.forEach(function(l,i){ if (/^SO$/i.test(l)) soLabelIdx = i; });
+      if (soLabelIdx >= 0) {
+        // Ambil nilai-nilai setelah blok label — urutan sama dengan label
+        var afterBlock = t.slice(t.indexOf(lblBlock[0]) + lblBlock[0].length);
+        var vals = afterBlock.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+        if (vals[soLabelIdx]) noSo = vals[soLabelIdx].replace(/\D/g,'').slice(0, 15);
+      }
+    }
+    // Fallback: cari angka 9+ digit setelah kata SO dalam 300 char, ambil terakhir
+    if (!noSo) {
+      var soIdx = t.search(/\bSO\b/i);
+      if (soIdx >= 0) {
+        var nums = t.slice(soIdx, soIdx+300).match(/\d{9,}/g);
+        if (nums) noSo = nums[nums.length - 1]; // angka terakhir = SO (bukan Quotation)
+      }
+    }
+  }
 
   // 3. NO. CONT — berbagai pola:
   //    "NO. CONT : 2X40HC CONTAINER"
