@@ -881,104 +881,185 @@ function _mekExtractPdfText(file, callback) {
 function _mekParseSiText(text, image, tujuan, stdCache, callback) {
   var weekOverride = ((document.getElementById('mekSiWeek') || {}).value || '').trim();
 
-  var instruction = 'Kamu adalah parser dokumen Shipping Instruction (SI) ekspor PT. Mayora Indah.\n' +
-    'Ekstrak data berikut:\n' +
-    '1. TANGGAL: dari "STUFFING : ..." ambil tanggalnya (format dd.MM.yyyy)\n' +
-    '2. NO_SO: dari "SO : XXXXXXXXX" ambil angkanya saja\n' +
-    '3. ITEMS: dari tabel dengan kolom NO / QTY / UNIT / DESCRIPTION:\n' +
-    '   - Setiap baris item yang punya QTY dan DESCRIPTION adalah satu item\n' +
-    '   - Baris duplikat (QTY dan DESCRIPTION sama persis) = satu item, bukan dua\n' +
-    '   - item_qty = nilai QTY (angka, contoh 1154)\n' +
-    '   - item_unit = UNIT (contoh CAR)\n' +
-    '   - item_desc = DESCRIPTION lengkap\n' +
-    '4. JUMLAH_CONT: dari "NO. CONT : NxTIPE" ambil N saja (contoh "2X40HC" → 2)\n' +
-    '5. DESTINATION: dari "DESTINATION :" ambil tujuan akhir (kota/negara)\n' +
-    (weekOverride ? '6. WEEK: ' + weekOverride + '\n' : '6. WEEK: kosong\n') +
-    '\nATURAN PENTING:\n' +
-    '- Jika ada baris item duplikat (same QTY + DESCRIPTION), jadikan 1 baris saja\n' +
-    '- Satu baris per unique item\n' +
-    '- jumlah_cont adalah jumlah container untuk SEMUA item (tidak dibagi per item)\n' +
-    '\nBalas HANYA JSON, tidak ada teks lain:\n' +
-    '{"tanggal":"dd.MM.yyyy","no_so":"...","week":"","jumlah_cont":N,"destination":"...",' +
-    '"items":[{"desc":"...","qty":1154,"unit":"CAR"}]}\n';
-
-  var msgContent;
-  if (image) {
-    msgContent = [
-      { type: 'image', source: { type: 'base64', media_type: image.mime, data: image.b64 } },
-      { type: 'text', text: instruction }
-    ];
-  } else {
-    msgContent = instruction + '\n\nTeks SI:\n' + text.substring(0, 4000);
+  // ── Jika gambar: OCR dulu dengan Tesseract.js, lalu parse teks ──
+  if (image && !text) {
+    _mekOcrImage(image, function(ocrText) {
+      if (!ocrText || ocrText.length < 20) { callback([]); return; }
+      // Rekursif: sekarang punya teks, parse biasa
+      _mekParseSiText(ocrText, null, tujuan, stdCache, callback);
+    });
+    return;
   }
 
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: msgContent }]
-    })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data) {
-    var raw = (data.content || []).map(function(c){ return c.text||''; }).join('');
-    try {
-      var clean = raw.replace(/```json|```/g,'').trim();
-      var parsed = JSON.parse(clean);
+  // ── Parse teks SI dengan regex ─────────────────────────────
+  if (!text) { callback([]); return; }
 
-      // Normalisasi tanggal dd.MM.yyyy → yyyy-MM-dd
-      var tgl = String(parsed.tanggal || '').trim();
-      var tm  = tgl.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
-      if (tm) tgl = tm[3] + '-' + ('0'+tm[2]).slice(-2) + '-' + ('0'+tm[1]).slice(-2);
+  var result = _mekRegexParseSi(text, weekOverride);
+  if (!result) { callback([], ''); return; }
 
-      var noSo       = String(parsed.no_so       || '');
-      var jumlahCont = Number(parsed.jumlah_cont) || 0;
-      var dest       = String(parsed.destination  || '');
-      var week       = weekOverride || String(parsed.week || '');
-      var items      = parsed.items || [];
+  var tgl        = result.tanggal;
+  var noSo       = result.noSo;
+  var jumlahCont = result.jumlahCont;
+  var dest       = result.destination;
+  var week       = weekOverride || '';
 
-      // Deduplikasi items (QTY + DESC sama persis)
-      var seen = {}, uniqueItems = [];
-      items.forEach(function(it) {
-        var key = String(it.qty) + '|' + String(it.desc);
-        if (!seen[key]) { seen[key] = true; uniqueItems.push(it); }
-      });
+  // Deduplikasi items
+  var seen = {}, uniqueItems = [];
+  result.items.forEach(function(it) {
+    var key = String(it.qty) + '|' + it.desc;
+    if (!seen[key]) { seen[key] = true; uniqueItems.push(it); }
+  });
 
-      // Fuzzy match ke STD
-      var finalTujuan = tujuan || dest; // pakai manual kalau ada, fallback ke dest dari SI
-      var rows = uniqueItems.map(function(it) {
-        var match  = _mekFuzzyMatchStd(String(it.desc || ''), stdCache);
-        var sku    = match ? match.sku  : '';
-        var nama   = match ? match.nama : String(it.desc || '');
-        var qtyStr = String(it.qty || '') + (it.unit ? ' ' + it.unit : '');
-        return {
-          week:    week,
-          tanggal: tgl,
-          sku:     sku,
-          nama:    nama,
-          jumlah:  String(jumlahCont),
-          tujuan:  finalTujuan,
-          ket:     noSo ? 'SO:' + noSo + (dest ? ' | ' + dest : '') : dest,
-          _qtyKar: qtyStr,
-          _noSo:   noSo,
-          _desc:   String(it.desc || ''),
-          source:  'SI'
-        };
-      });
+  var finalTujuan = tujuan || dest;
+  var rows = uniqueItems.map(function(it) {
+    var match  = _mekFuzzyMatchStd(it.desc, stdCache);
+    var sku    = match ? match.sku  : '';
+    var nama   = match ? match.nama : it.desc;
+    var qtyStr = String(it.qty || '') + (it.unit ? ' ' + it.unit : '');
+    return {
+      week:    week,
+      tanggal: tgl,
+      sku:     sku,
+      nama:    nama,
+      jumlah:  String(jumlahCont),
+      tujuan:  finalTujuan,
+      ket:     noSo ? 'SO:' + noSo + (dest ? ' | ' + dest : '') : dest,
+      _qtyKar: qtyStr,
+      _noSo:   noSo,
+      _desc:   it.desc,
+      source:  'SI'
+    };
+  });
 
-      // Kirim dest sebagai arg kedua untuk auto-fill field tujuan
-      callback(rows, dest);
-    } catch(e) {
-      callback([]);
+  callback(rows, dest);
+}
+
+// ── Regex parser untuk teks SI (format PT. Mayora Indah) ─────
+function _mekRegexParseSi(text, weekOverride) {
+  if (!text) return null;
+
+  // Normalisasi whitespace
+  var t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // 1. Tanggal stuffing: "STUFFING : ..." kemudian tanggal dd.MM.yyyy (bisa di baris yang sama atau berikutnya)
+  var tanggal = '';
+  var stuffM = t.match(/STUFFING\s*[:：]\s*[^\n]*?(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
+  if (!stuffM) {
+    // Coba tanggal di baris berikutnya setelah STUFFING
+    stuffM = t.match(/STUFFING\s*[:：][^\n]*[\n\s]+(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
+  }
+  if (stuffM) {
+    tanggal = stuffM[3] + '-' + ('0'+stuffM[2]).slice(-2) + '-' + ('0'+stuffM[1]).slice(-2);
+  }
+  // Fallback: cari tanggal standalone dd.MM.yyyy setelah kata STUFFING
+  if (!tanggal) {
+    var tglM = t.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+    if (tglM) tanggal = tglM[3]+'-'+('0'+tglM[2]).slice(-2)+'-'+('0'+tglM[1]).slice(-2);
+  }
+
+  // 2. NO SO: "SO : 102167499" atau "SO:102167499"
+  var noSo = '';
+  var soM = t.match(/\bSO\s*[:：]\s*(\d+)/i);
+  if (soM) noSo = soM[1].trim();
+
+  // 3. NO. CONT: "2X40HC CONTAINER" atau "2 X 40HC" atau "2X40'"
+  var jumlahCont = 0;
+  var contM = t.match(/NO\.?\s*CONT\s*[:：]\s*(\d+)\s*[xX×]/i);
+  if (contM) jumlahCont = parseInt(contM[1]) || 0;
+  // Fallback: "CONTAINER" baris
+  if (!jumlahCont) {
+    var contM2 = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF)?\s*CONTAINER/i);
+    if (contM2) jumlahCont = parseInt(contM2[1]) || 0;
+  }
+
+  // 4. DESTINATION: setelah "DESTINATION :"
+  var dest = '';
+  var destMatches = t.match(/DESTINATION\s*[:：]\s*([^\n]+)/gi);
+  if (destMatches) {
+    // Ambil destination terakhir yang bukan kosong (kadang ada 2 kali)
+    for (var d = destMatches.length - 1; d >= 0; d--) {
+      var dv = destMatches[d].replace(/^DESTINATION\s*[:：]\s*/i, '').trim();
+      if (dv.length > 2) { dest = dv; break; }
     }
-  })
-  .catch(function() { callback([]); });
+  }
+
+  // 5. Items dari tabel: pola "NO  QTY  UNIT  DESCRIPTION"
+  // Baris item: angka, diikuti angka (qty), diikuti unit (CAR/CTN/PCS/dll), diikuti deskripsi
+  var items = [];
+  var itemRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(CAR|CTN|PCS|BOX|SET|UNIT|KG|PC)\s+([^\n]+)/gi;
+  var im;
+  while ((im = itemRegex.exec(t)) !== null) {
+    var qty  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
+    var unit = im[2].toUpperCase();
+    var desc = im[3].trim().replace(/\s+/g, ' ');
+    // Bersihkan trailing angka/simbol aneh
+    desc = desc.replace(/\s*\d+[.,]\d+\s*$/, '').trim();
+    if (desc.length > 3) {
+      items.push({ qty: qty, unit: unit, desc: desc });
+    }
+  }
+
+  // Fallback: kalau item tidak ditemukan, coba pola lebih longgar
+  if (!items.length) {
+    var looseRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(\w{2,5})\s+([A-Z][A-Z\s\d().\/]+)/gm;
+    while ((im = looseRegex.exec(t)) !== null) {
+      var qty2  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
+      var unit2 = im[2].toUpperCase();
+      var desc2 = im[3].trim().replace(/\s+/g, ' ');
+      if (desc2.length > 5 && qty2 > 0) {
+        items.push({ qty: qty2, unit: unit2, desc: desc2 });
+      }
+    }
+  }
+
+  if (!tanggal && !noSo && !items.length) return null;
+
+  return {
+    tanggal:     tanggal,
+    noSo:        noSo,
+    jumlahCont:  jumlahCont,
+    destination: dest,
+    items:       items
+  };
+}
+
+// ── OCR gambar via Tesseract.js ──────────────────────────────
+function _mekOcrImage(image, callback) {
+  // Load Tesseract.js dari CDN
+  if (!window.Tesseract) {
+    showToast('Memuat OCR engine...', 'info');
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.5/tesseract.min.js';
+    s.onload = function() { _mekRunOcr(image, callback); };
+    s.onerror = function() {
+      showToast('Gagal memuat Tesseract.js', 'error');
+      callback(null);
+    };
+    document.head.appendChild(s);
+  } else {
+    _mekRunOcr(image, callback);
+  }
+}
+
+function _mekRunOcr(image, callback) {
+  var imgSrc = 'data:' + image.mime + ';base64,' + image.b64;
+  Tesseract.recognize(imgSrc, 'eng', {
+    logger: function(m) {
+      if (m.status === 'recognizing text' && m.progress) {
+        var pct = Math.round(m.progress * 100);
+        // Update status di file log jika ada
+        var logs = document.querySelectorAll('[id^="mekSiLogMsg_"]');
+        if (logs.length) {
+          var last = logs[logs.length - 1];
+          last.textContent = 'OCR ' + pct + '%...';
+        }
+      }
+    }
+  }).then(function(result) {
+    callback(result && result.data ? result.data.text : null);
+  }).catch(function() {
+    callback(null);
+  });
 }
 
 // ── Finalize: render tabel SI ────────────────────────────────
