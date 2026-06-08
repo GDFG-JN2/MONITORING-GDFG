@@ -1611,21 +1611,45 @@ function _mekRegexParseSi(text, weekOverride) {
 function _mekOcrImage(image, callback) {
   if (!image || !image.b64) { callback(null); return; }
 
-  // Tampilkan progress
   var logs = document.querySelectorAll('[id^="mekEmailLogMsg_"],[id^="mekSiLogMsg_"]');
-  if (logs.length) logs[logs.length-1].textContent = 'OCR via Google Drive...';
+  function setLog(msg) { if (logs.length) logs[logs.length-1].textContent = msg; }
+  setLog('OCR via Google Drive...');
 
-  API.run('ocrImageEmail', { b64: image.b64, mimeType: image.mime }, function(res) {
-    if (res && res.success && res.text) {
-      console.log('[MEK-DRIVE-OCR]\n' + res.text.slice(0, 800));
-      callback(res.text);
-    } else {
-      console.warn('[MEK-DRIVE-OCR FAIL]', res && res.message);
-      callback(null);
-    }
-  }, function() {
-    callback(null);
+  // Resize dulu jika gambar terlalu besar (maks 2400px)
+  _mekResizeImgB64(image.b64, image.mime, 2400, function(b64r, mimer) {
+    API.run('ocrImageEmail', { b64: b64r, mimeType: mimer }, function(res) {
+      if (res && res.success && res.text && res.text.trim().length > 5) {
+        console.log('[MEK-DRIVE-OCR OK]\n' + res.text.slice(0, 800));
+        setLog('OCR selesai \u2713');
+        callback(res.text);
+      } else {
+        var msg = (res && res.message) ? res.message : (res ? JSON.stringify(res).slice(0,100) : 'no response');
+        console.warn('[MEK-DRIVE-OCR FAIL]', msg);
+        setLog('OCR gagal: ' + msg);
+        showToast('OCR gagal: ' + msg, 'error');
+        callback(null);
+      }
+    });
   });
+}
+
+// Resize gambar via Canvas sebelum kirim ke GAS
+function _mekResizeImgB64(b64, mime, maxPx, cb) {
+  try {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      if (w <= maxPx && h <= maxPx) { cb(b64, mime); return; }
+      var s = maxPx / Math.max(w, h);
+      var cv = document.createElement('canvas');
+      cv.width = Math.round(w*s); cv.height = Math.round(h*s);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      var out = cv.toDataURL('image/jpeg', 0.92);
+      cb(out.split(',')[1], 'image/jpeg');
+    };
+    img.onerror = function() { cb(b64, mime); };
+    img.src = 'data:' + mime + ';base64,' + b64;
+  } catch(e) { cb(b64, mime); }
 }
 
 // ── Finalize: render tabel SI ────────────────────────────────
