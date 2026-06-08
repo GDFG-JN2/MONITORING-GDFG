@@ -875,6 +875,210 @@ function mekHandleEmailFiles(files) {
   });
 }
 
+// ── Handler Excel / CSV ─────────────────────────────────────
+function mekHandleEmailXls(files) {
+  if (!files || !files.length) return;
+  var fileArr = Array.from(files).filter(function(f) {
+    return /\.(xlsx|xls|csv)$/i.test(f.name);
+  });
+  if (!fileArr.length) { showToast('Pilih file Excel (.xlsx/.xls) atau CSV.', 'error'); return; }
+
+  var dz = document.getElementById('mekEmailDropZone');
+  var rw = document.getElementById('mekEmailResultWrap');
+  if (dz) dz.style.display = 'none';
+  if (rw) rw.style.display = 'block';
+
+  var log = document.getElementById('mekEmailFileLog');
+  if (log) log.innerHTML = '';
+  _mekEmailRows = [];
+
+  _mekLoadStd(function(stdCache) {
+    var done = 0;
+    fileArr.forEach(function(file) {
+      _mekAddEmailLog(file.name, 'loading');
+
+      var isCsv = /\.csv$/i.test(file.name);
+      var reader = new FileReader();
+
+      if (isCsv) {
+        // CSV: baca sebagai teks langsung
+        reader.onload = function(e) {
+          var text = e.target.result;
+          _mekUpdateEmailLog(file.name, 'parsing', 'Parsing CSV...');
+          var rows = _mekParseEmailXlsData(text, stdCache, true);
+          _mekEmailRows = _mekEmailRows.concat(rows);
+          _mekUpdateEmailLog(file.name, rows.length?'ok':'warn', rows.length?rows.length+' baris':'Tidak ada data');
+          done++; if (done === fileArr.length) _mekFinalizeEmail();
+        };
+        reader.onerror = function() {
+          _mekUpdateEmailLog(file.name, 'error', 'Gagal baca CSV');
+          done++; if (done === fileArr.length) _mekFinalizeEmail();
+        };
+        reader.readAsText(file);
+      } else {
+        // Excel: pakai SheetJS — load dulu kalau belum ada
+        reader.onload = function(e) {
+          _mekEnsureXLSX(function() {
+          try {
+            _mekUpdateEmailLog(file.name, 'parsing', 'Parsing Excel...');
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, { type: 'array', cellDates: false });
+            // Ambil sheet pertama
+            var sheetName = workbook.SheetNames[0];
+            var sheet = workbook.Sheets[sheetName];
+            // Convert ke CSV text untuk pakai parser yang sama
+            var csv = XLSX.utils.sheet_to_csv(sheet);
+            var rows = _mekParseEmailXlsData(csv, stdCache, true);
+            _mekEmailRows = _mekEmailRows.concat(rows);
+            _mekUpdateEmailLog(file.name, rows.length?'ok':'warn', rows.length?rows.length+' baris':'Tidak ada data');
+          } catch(err) {
+            _mekUpdateEmailLog(file.name, 'error', 'Gagal baca Excel: ' + err.message);
+          }
+          done++; if (done === fileArr.length) _mekFinalizeEmail();
+          }); // end _mekEnsureXLSX
+        };
+        reader.onerror = function() {
+          _mekUpdateEmailLog(file.name, 'error', 'Gagal baca file');
+          done++; if (done === fileArr.length) _mekFinalizeEmail();
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    });
+  });
+}
+
+// ── Load SheetJS jika belum ada ──────────────────────────────
+function _mekEnsureXLSX(cb) {
+  if (window.XLSX) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload = cb;
+  s.onerror = function() { showToast('Gagal load SheetJS', 'error'); };
+  document.head.appendChild(s);
+}
+
+// ── Parser Excel/CSV — pisah kolom by comma/tab ──────────────
+function _mekParseEmailXlsData(text, stdCache, isCsv) {
+  if (!text) return [];
+  var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+
+  function parseTgl(s) {
+    if (!s) return '';
+    s = String(s).trim();
+    var m = s.match(/^(\d{1,2})[\/\-.]([A-Za-z]{3})[\/\-.](\d{2,4})$/);
+    if (m) {
+      var mon = MONTHS[(m[2]||'').toLowerCase()] || 0;
+      if (!mon) return '';
+      var yr = m[3].length === 2 ? '20'+m[3] : m[3];
+      return yr+'-'+('0'+mon).slice(-2)+'-'+('0'+m[1]).slice(-2);
+    }
+    var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m2) return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
+    // Excel serial date
+    if (/^\d{5}$/.test(s)) {
+      var d = new Date(Math.round((parseInt(s)-25569)*86400*1000));
+      return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);
+    }
+    return '';
+  }
+
+  function weekFromTgl(ymd) {
+    if (!ymd) return '';
+    var d = new Date(ymd+'T00:00:00Z');
+    var day = d.getUTCDay()||7;
+    d.setUTCDate(d.getUTCDate()+4-day);
+    var y0 = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return String(Math.ceil(((d-y0)/86400000+1)/7));
+  }
+
+  var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  var weekOverride = parseInt((document.getElementById('mekEmailWeek')||{}).value||'')||0;
+  var yearOverride = parseInt((document.getElementById('mekEmailYear')||{}).value||'')||new Date().getFullYear();
+
+  // Deteksi separator: tab atau comma
+  var sep = '	';
+  if (lines[0] && lines[0].indexOf('	') < 0) sep = ',';
+
+  // Cari baris header
+  var headerIdx = -1;
+  var colMap = {keterangan:-1,so:-1,qt:-1,negara:-1,kode:-1,material:-1,stuffing_date:-1,qty:-1,plant:-1,note:-1};
+
+  for (var h = 0; h < Math.min(lines.length, 5); h++) {
+    var up = lines[h].toUpperCase();
+    if (up.indexOf('SO') >= 0 && (up.indexOf('KODE') >= 0 || up.indexOf('MATERIAL') >= 0 || up.indexOf('STUFFING') >= 0)) {
+      headerIdx = h;
+      var cols = lines[h].split(sep).map(function(s){return s.replace(/^"|"$/g,'').trim().toLowerCase();});
+      cols.forEach(function(h2, i) {
+        if (/keterangan|remark/i.test(h2))         colMap.keterangan  = i;
+        else if (/^so$/.test(h2))                   colMap.so          = i;
+        else if (/^qt$|^qti$/.test(h2))             colMap.qt          = i;
+        else if (/negara|country|nation/i.test(h2)) colMap.negara       = i;
+        else if (/^kode$|^sku$|^code$/.test(h2))   colMap.kode         = i;
+        else if (/material|deskripsi|desc/i.test(h2)) colMap.material   = i;
+        else if (/stuffing.*date|tgl.*stuff/i.test(h2)) colMap.stuffing_date = i;
+        else if (/^qty$|^jumlah$/.test(h2))         colMap.qty          = i;
+        else if (/plant|stuffing.*plant/i.test(h2)) colMap.plant        = i;
+        else if (/note|catatan/i.test(h2))          colMap.note         = i;
+      });
+      break;
+    }
+  }
+
+  var rows = [];
+  var start = headerIdx >= 0 ? headerIdx + 1 : 0;
+
+  for (var i = start; i < lines.length; i++) {
+    var line = lines[i];
+    if (!line || line.trim().length < 3) continue;
+    var cols2 = line.split(sep).map(function(s){ return s.replace(/^"|"$/g,'').trim(); });
+
+    // Ambil nilai per kolom
+    function col(k) { var idx=colMap[k]; return idx>=0 ? (cols2[idx]||'') : ''; }
+
+    var so   = col('so').replace(/\D/g,'');
+    var qt   = col('qt').replace(/\D/g,'');
+    var kode = col('kode').replace(/\D/g,'');
+    var tglRaw = col('stuffing_date');
+    var qty  = parseInt((col('qty')||'0').replace(/\D/g,'')) || 0;
+
+    // Kalau tidak ada kolom map, coba regex
+    if (!so && !kode) {
+      var soM = line.match(/(1\d{8,11})/g);
+      if (soM) { so = soM[0]; qt = soM[1]||''; }
+      var kodeM = line.match(/([34]\d{5})/);
+      if (kodeM) kode = kodeM[1];
+      var tglM = line.match(/(\d{1,2})[\/\-]([A-Za-z]{3})[\/\-](\d{2,4})/);
+      if (tglM) tglRaw = tglM[0];
+      var qtyM = line.match(/(\d{3,4})/g);
+      if (qtyM) qty = parseInt(qtyM[qtyM.length-1])||0;
+    }
+
+    if (!so && !kode) continue; // skip baris kosong
+    if (so && so.length < 8) continue;
+
+    var tgl   = parseTgl(tglRaw);
+    var week  = weekOverride || (tgl ? weekFromTgl(tgl) : '');
+    var negara = (col('negara')||'').toUpperCase();
+    var matRaw = col('material') || line.split(sep).find(function(s){ return s.length > 15 && /[A-Z]{3}/.test(s); }) || '';
+    var plant  = col('plant') || '';
+    var ket    = col('keterangan') || '';
+    var note   = col('note') || '';
+
+    // Fuzzy match SKU dari kode atau material
+    var sku = kode || '';
+    var nama = matRaw;
+
+    rows.push({
+      week: week, tanggal: tgl, sku: sku, noSo: so, noQt: qt,
+      nama: nama, negara: negara, qty: qty, plant: plant,
+      ket: ket, note: note, source: 'EMAIL',
+      _isFirst: true, _groupSize: 1
+    });
+  }
+
+  return rows;
+}
+
 // ── Parser tabel Email ───────────────────────────────────────
 // Header kolom: KETERANGAN|SO|QT|NEGARA|KODE|MATERIAL|STUFFING DATE|QTY|STUFFING PLANT|NOTE
 // Deteksi header dulu, lalu parse baris per baris
@@ -1608,109 +1812,24 @@ function _mekRegexParseSi(text, weekOverride) {
 // ── OCR gambar via Google Drive (GAS) ───────────────────────
 // Lebih akurat dari Tesseract untuk tabel & angka kecil
 // Alur: base64 → GAS → Drive upload → convert Google Doc → baca teks → hapus
-// GAS URL langsung (bypass Worker) khusus untuk OCR yang butuh waktu lama
-// Ganti dengan deployment URL GAS yang aktif
-var _MEK_GAS_DIRECT_URL = '';  // diisi otomatis dari API jika tersedia
-
 function _mekOcrImage(image, callback) {
   if (!image || !image.b64) { callback(null); return; }
 
+  // Tampilkan progress
   var logs = document.querySelectorAll('[id^="mekEmailLogMsg_"],[id^="mekSiLogMsg_"]');
-  function setLog(msg) { if (logs.length) logs[logs.length-1].textContent = msg; }
-  setLog('OCR via Google Drive...');
+  if (logs.length) logs[logs.length-1].textContent = 'OCR via Google Drive...';
 
-  _mekResizeImgB64(image.b64, image.mime, 1200, function(b64r, mimer) {
-    console.log('[MEK-OCR] b64 size:', Math.round(b64r.length/1024), 'KB, mime:', mimer);
-
-    // Coba ambil GAS direct URL dari window config jika ada
-    var gasUrl = _MEK_GAS_DIRECT_URL || (window.APP_CONFIG && window.APP_CONFIG.gasUrl) || '';
-
-    if (gasUrl) {
-      // Kirim langsung ke GAS tanpa Worker (tidak ada timeout 10ms)
-      setLog('OCR langsung ke GAS...');
-      fetch(gasUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'ocrImageEmail', payload: { b64: b64r, mimeType: mimer } }),
-        redirect: 'follow'
-      })
-      .then(function(r) {
-        return r.text().then(function(txt) {
-          console.log('[MEK-OCR-DIRECT RAW]', txt.slice(0, 300));
-          try { return JSON.parse(txt); }
-          catch(e) {
-            // GAS kadang return HTML redirect — fallback ke Worker
-            console.warn('[MEK-OCR-DIRECT] response bukan JSON, fallback ke Worker. Raw:', txt.slice(0,200));
-            return null;
-          }
-        });
-      })
-      .then(function(res) {
-        if (!res) { _mekOcrViaWorker(b64r, mimer, setLog, callback); return; }
-        _mekOcrHandleRes(res, setLog, callback);
-      })
-      .catch(function(err) {
-        console.warn('[MEK-OCR-DIRECT FAIL]', err.message);
-        _mekOcrViaWorker(b64r, mimer, setLog, callback);
-      });
+  API.run('ocrImageEmail', { b64: image.b64, mimeType: image.mime }, function(res) {
+    if (res && res.success && res.text) {
+      console.log('[MEK-DRIVE-OCR]\n' + res.text.slice(0, 800));
+      callback(res.text);
     } else {
-      _mekOcrViaWorker(b64r, mimer, setLog, callback);
+      console.warn('[MEK-DRIVE-OCR FAIL]', res && res.message);
+      callback(null);
     }
-  });
-}
-
-function _mekOcrViaWorker(b64r, mimer, setLog, callback) {
-  setLog('OCR via Worker...');
-  API.run('ocrImageEmail', { b64: b64r, mimeType: mimer }, function(res) {
-    _mekOcrHandleRes(res, setLog, callback);
-  });
-}
-
-function _mekOcrHandleRes(res, setLog, callback) {
-  if (res && res.success && res.text && res.text.trim().length > 5) {
-    console.log('[MEK-DRIVE-OCR OK]\n' + res.text.slice(0, 800));
-    setLog('OCR selesai \u2713');
-    callback(res.text);
-  } else {
-    var msg = (res && res.message) ? res.message
-            : (res ? JSON.stringify(res).slice(0, 150) : 'no response');
-    console.warn('[MEK-DRIVE-OCR FAIL]', msg);
-    setLog('OCR gagal: ' + msg);
-    showToast('OCR gagal: ' + msg, 'error');
+  }, function() {
     callback(null);
-  }
-}
-
-// Resize gambar via Canvas — agresif untuk pastikan payload < 500KB
-function _mekResizeImgB64(b64, mime, maxPx, cb) {
-  try {
-    var img = new Image();
-    img.onload = function() {
-      var w = img.width, h = img.height;
-      // Selalu resize ke maxPx untuk pastikan ukuran kecil
-      var s = Math.min(1, maxPx / Math.max(w, h));
-      var cv = document.createElement('canvas');
-      cv.width  = Math.round(w * s);
-      cv.height = Math.round(h * s);
-      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      // Quality 0.75 — cukup untuk OCR dokumen
-      var out = cv.toDataURL('image/jpeg', 0.75);
-      var outB64 = out.split(',')[1];
-      // Kalau masih > 400KB base64 (~300KB binary), resize lagi
-      if (outB64.length > 400000) {
-        var cv2 = document.createElement('canvas');
-        cv2.width = Math.round(cv.width * 0.7);
-        cv2.height = Math.round(cv.height * 0.7);
-        cv2.getContext('2d').drawImage(cv, 0, 0, cv2.width, cv2.height);
-        outB64 = cv2.toDataURL('image/jpeg', 0.7).split(',')[1];
-      }
-      console.log('[MEK-RESIZE] ' + w + 'x' + h + ' → ' + cv.width + 'x' + cv.height + 
-        ' | b64 size: ' + Math.round(outB64.length/1024) + 'KB');
-      cb(outB64, 'image/jpeg');
-    };
-    img.onerror = function() { cb(b64, mime); };
-    img.src = 'data:' + mime + ';base64,' + b64;
-  } catch(e) { cb(b64, mime); }
+  });
 }
 
 // ── Finalize: render tabel SI ────────────────────────────────
