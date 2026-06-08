@@ -1605,41 +1605,25 @@ function _mekRegexParseSi(text, weekOverride) {
   };
 }
 
-// ── OCR gambar via Tesseract.js ──────────────────────────────
+// ── OCR gambar via Google Drive (GAS) ───────────────────────
+// Lebih akurat dari Tesseract untuk tabel & angka kecil
+// Alur: base64 → GAS → Drive upload → convert Google Doc → baca teks → hapus
 function _mekOcrImage(image, callback) {
-  // Load Tesseract.js dari CDN
-  if (!window.Tesseract) {
-    showToast('Memuat OCR engine...', 'info');
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.5/tesseract.min.js';
-    s.onload = function() { _mekRunOcr(image, callback); };
-    s.onerror = function() {
-      showToast('Gagal memuat Tesseract.js', 'error');
-      callback(null);
-    };
-    document.head.appendChild(s);
-  } else {
-    _mekRunOcr(image, callback);
-  }
-}
+  if (!image || !image.b64) { callback(null); return; }
 
-function _mekRunOcr(image, callback) {
-  var imgSrc = 'data:' + image.mime + ';base64,' + image.b64;
-  Tesseract.recognize(imgSrc, 'eng', {
-    logger: function(m) {
-      if (m.status === 'recognizing text' && m.progress) {
-        var pct = Math.round(m.progress * 100);
-        // Update status di file log jika ada
-        var logs = document.querySelectorAll('[id^="mekSiLogMsg_"]');
-        if (logs.length) {
-          var last = logs[logs.length - 1];
-          last.textContent = 'OCR ' + pct + '%...';
-        }
-      }
+  // Tampilkan progress
+  var logs = document.querySelectorAll('[id^="mekEmailLogMsg_"],[id^="mekSiLogMsg_"]');
+  if (logs.length) logs[logs.length-1].textContent = 'OCR via Google Drive...';
+
+  API.run('ocrImageEmail', { b64: image.b64, mimeType: image.mime }, function(res) {
+    if (res && res.success && res.text) {
+      console.log('[MEK-DRIVE-OCR]\n' + res.text.slice(0, 800));
+      callback(res.text);
+    } else {
+      console.warn('[MEK-DRIVE-OCR FAIL]', res && res.message);
+      callback(null);
     }
-  }).then(function(result) {
-    callback(result && result.data ? result.data.text : null);
-  }).catch(function() {
+  }, function() {
     callback(null);
   });
 }
