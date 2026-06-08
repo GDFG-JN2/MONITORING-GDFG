@@ -866,7 +866,33 @@ function _mekExtractPdfText(file, callback) {
     .then(function(pages) {
       return Promise.all(pages.map(function(page) {
         return page.getTextContent().then(function(tc) {
-          return tc.items.map(function(i){ return i.str; }).join(' ');
+          // Sort item berdasarkan posisi Y (baris) lalu X (kolom kiri ke kanan)
+          // PDF.js koordinat Y: makin besar = makin ke atas, jadi kita balik (negatif)
+          var items = tc.items.slice().sort(function(a, b) {
+            var ay = Math.round(a.transform[5] / 5) * 5; // snap ke grid 5pt
+            var by = Math.round(b.transform[5] / 5) * 5;
+            if (ay !== by) return by - ay; // Y besar = atas = duluan
+            return a.transform[4] - b.transform[4]; // X kecil = kiri = duluan
+          });
+          // Gabungkan dengan newline kalau Y berubah signifikan (beda baris)
+          var lines = [];
+          var curY = null;
+          var curLine = [];
+          items.forEach(function(it) {
+            if (!it.str.trim()) return; // skip spasi kosong
+            var y = Math.round(it.transform[5] / 3) * 3;
+            if (curY === null) curY = y;
+            if (Math.abs(y - curY) > 3) {
+              // Baris baru
+              if (curLine.length) lines.push(curLine.join(' '));
+              curLine = [it.str];
+              curY = y;
+            } else {
+              curLine.push(it.str);
+            }
+          });
+          if (curLine.length) lines.push(curLine.join(' '));
+          return lines.join('\n');
         });
       }));
     })
@@ -903,12 +929,8 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
   var dest       = result.destination;
   var week       = weekOverride || '';
 
-  // Deduplikasi items
-  var seen = {}, uniqueItems = [];
-  result.items.forEach(function(it) {
-    var key = String(it.qty) + '|' + it.desc;
-    if (!seen[key]) { seen[key] = true; uniqueItems.push(it); }
-  });
+  // Deduplikasi sudah dilakukan di _mekRegexParseSi
+  var uniqueItems = result.items;
 
   var finalTujuan = tujuan || dest;
   var rows = uniqueItems.map(function(it) {
@@ -938,20 +960,20 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
 function _mekRegexParseSi(text, weekOverride) {
   if (!text) return null;
 
-  // Normalisasi whitespace
-  var t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Normalisasi whitespace, hapus karakter zero-width
+  var t = text.replace(/[\u200B-\u200D\uFEFF]/g, '')
+              .replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // 1. Tanggal stuffing: "STUFFING : ..." kemudian tanggal dd.MM.yyyy (bisa di baris yang sama atau berikutnya)
+  // 1. Tanggal stuffing: "STUFFING : ..." kemudian tanggal dd.MM.yyyy
   var tanggal = '';
   var stuffM = t.match(/STUFFING\s*[:：]\s*[^\n]*?(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
   if (!stuffM) {
-    // Coba tanggal di baris berikutnya setelah STUFFING
     stuffM = t.match(/STUFFING\s*[:：][^\n]*[\n\s]+(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
   }
   if (stuffM) {
     tanggal = stuffM[3] + '-' + ('0'+stuffM[2]).slice(-2) + '-' + ('0'+stuffM[1]).slice(-2);
   }
-  // Fallback: cari tanggal standalone dd.MM.yyyy setelah kata STUFFING
+  // Fallback: cari tanggal standalone dd.MM.yyyy
   if (!tanggal) {
     var tglM = t.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
     if (tglM) tanggal = tglM[3]+'-'+('0'+tglM[2]).slice(-2)+'-'+('0'+tglM[1]).slice(-2);
@@ -962,21 +984,40 @@ function _mekRegexParseSi(text, weekOverride) {
   var soM = t.match(/\bSO\s*[:：]\s*(\d+)/i);
   if (soM) noSo = soM[1].trim();
 
-  // 3. NO. CONT: "2X40HC CONTAINER" atau "2 X 40HC" atau "2X40'"
+  // 3. NO. CONT — berbagai pola:
+  //    "NO. CONT : 2X40HC CONTAINER"
+  //    "2X40HC CONTAINER"
+  //    "2 X 40HC CONTAINER"
+  //    "2X40' CONTAINER"
+  //    "NO CONT : 2 X 40HC"
   var jumlahCont = 0;
-  var contM = t.match(/NO\.?\s*CONT\s*[:：]\s*(\d+)\s*[xX×]/i);
-  if (contM) jumlahCont = parseInt(contM[1]) || 0;
-  // Fallback: "CONTAINER" baris
+
+  // Pola 1: ada label "NO. CONT" atau "NO CONT"
+  var contLabel = t.match(/NO\.?\s*CONT\s*[:：]\s*(\d+)\s*[xX×]/i);
+  if (contLabel) jumlahCont = parseInt(contLabel[1]) || 0;
+
+  // Pola 2: NXhhHC/GP/OT CONTAINER — paling umum di SI Mayora
   if (!jumlahCont) {
-    var contM2 = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF)?\s*CONTAINER/i);
-    if (contM2) jumlahCont = parseInt(contM2[1]) || 0;
+    var contHc = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF)\s*CONTAINER/i);
+    if (contHc) jumlahCont = parseInt(contHc[1]) || 0;
   }
 
-  // 4. DESTINATION: setelah "DESTINATION :"
+  // Pola 3: NXhhHC tanpa kata CONTAINER (misal OCR terpotong)
+  if (!jumlahCont) {
+    var contHc2 = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF)/i);
+    if (contHc2) jumlahCont = parseInt(contHc2[1]) || 0;
+  }
+
+  // Pola 4: N CONTAINER saja (terakhir, paling umum kalau OCR)
+  if (!jumlahCont) {
+    var contSimple = t.match(/(\d+)\s*(?:UNIT\s*)?CONTAINER/i);
+    if (contSimple) jumlahCont = parseInt(contSimple[1]) || 0;
+  }
+
+  // 4. DESTINATION
   var dest = '';
   var destMatches = t.match(/DESTINATION\s*[:：]\s*([^\n]+)/gi);
   if (destMatches) {
-    // Ambil destination terakhir yang bukan kosong (kadang ada 2 kali)
     for (var d = destMatches.length - 1; d >= 0; d--) {
       var dv = destMatches[d].replace(/^DESTINATION\s*[:：]\s*/i, '').trim();
       if (dv.length > 2) { dest = dv; break; }
@@ -984,31 +1025,42 @@ function _mekRegexParseSi(text, weekOverride) {
   }
 
   // 5. Items dari tabel: pola "NO  QTY  UNIT  DESCRIPTION"
-  // Baris item: angka, diikuti angka (qty), diikuti unit (CAR/CTN/PCS/dll), diikuti deskripsi
+  // Baris item: angka, diikuti angka (qty), diikuti unit, diikuti deskripsi
   var items = [];
+  var seen = {};
+
+  function _addItem(qty, unit, desc) {
+    // Normalisasi desc untuk deduplikasi (lowercase, hapus spasi extra, hapus angka trailing)
+    var normDesc = desc.toLowerCase().replace(/\s+/g, ' ').replace(/[\d,.()\[\]]+$/, '').trim();
+    // Juga normalisasi qty-nya (OCR bisa beda dikit)
+    var qtyNorm = Math.round(qty / 10) * 10; // snap ke puluhan terdekat untuk toleransi OCR
+    var key = qtyNorm + '|' + normDesc.slice(0, 30);
+    if (seen[key]) return;
+    seen[key] = true;
+    if (desc.length > 3) items.push({ qty: qty, unit: unit, desc: desc });
+  }
+
+  // Pola utama: angka baris + qty + unit + desc
   var itemRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(CAR|CTN|PCS|BOX|SET|UNIT|KG|PC)\s+([^\n]+)/gi;
   var im;
   while ((im = itemRegex.exec(t)) !== null) {
     var qty  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
     var unit = im[2].toUpperCase();
-    var desc = im[3].trim().replace(/\s+/g, ' ');
-    // Bersihkan trailing angka/simbol aneh
-    desc = desc.replace(/\s*\d+[.,]\d+\s*$/, '').trim();
-    if (desc.length > 3) {
-      items.push({ qty: qty, unit: unit, desc: desc });
-    }
+    var desc = im[3].trim().replace(/\s+/g, ' ')
+                    .replace(/\s+[\d.,]+\s+[\d.,]+\s*$/, '')  // hapus "UNIT_PRICE AMOUNT" di akhir
+                    .replace(/\s*\d+[.,]\d+\s*$/, '')          // hapus angka desimal trailing
+                    .trim();
+    _addItem(qty, unit, desc);
   }
 
-  // Fallback: kalau item tidak ditemukan, coba pola lebih longgar
+  // Fallback pola longgar jika tidak ada item ketemu
   if (!items.length) {
     var looseRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(\w{2,5})\s+([A-Z][A-Z\s\d().\/]+)/gm;
     while ((im = looseRegex.exec(t)) !== null) {
       var qty2  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
       var unit2 = im[2].toUpperCase();
       var desc2 = im[3].trim().replace(/\s+/g, ' ');
-      if (desc2.length > 5 && qty2 > 0) {
-        items.push({ qty: qty2, unit: unit2, desc: desc2 });
-      }
+      if (desc2.length > 5 && qty2 > 0) _addItem(qty2, unit2, desc2);
     }
   }
 
