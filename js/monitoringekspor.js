@@ -1044,8 +1044,14 @@ function mekCapEmailSwitchView(view) {
   var btnA = document.getElementById('mekCapEmailByAktual');
   if (btnP) btnP.classList.toggle('active', view === 'plan');
   if (btnA) btnA.classList.toggle('active', view === 'aktual');
-  // Reload dari GAS karena filter antrian berbeda per mode
-  mekLoadCapaian();
+  if (view === 'aktual') {
+    _mekRenderCapaianEmailAktual(_mekCapEmailData);
+  } else {
+    var sku = ((document.getElementById('mekCapSku')||{}).value||'').toLowerCase();
+    var doc = ((document.getElementById('mekCapDoc')||{}).value||'').trim();
+    var tuj = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase();
+    _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tuj);
+  }
 }
 
 function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
@@ -2099,7 +2105,7 @@ function mekLoadCapaian() {
   if (emailToggle) emailToggle.style.display = _mekCapMode === 'email' ? '' : 'none';
 
   if (_mekCapMode === 'email') {
-    API.run('getMekCapaianEmail', { from: from, to: to, viewMode: _mekCapEmailView }, function(res) {
+    API.run('getMekCapaianEmail', { from: from, to: to }, function(res) {
       if (!res || !res.success) {
         tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
         return;
