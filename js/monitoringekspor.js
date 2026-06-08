@@ -1608,6 +1608,10 @@ function _mekRegexParseSi(text, weekOverride) {
 // ── OCR gambar via Google Drive (GAS) ───────────────────────
 // Lebih akurat dari Tesseract untuk tabel & angka kecil
 // Alur: base64 → GAS → Drive upload → convert Google Doc → baca teks → hapus
+// GAS URL langsung (bypass Worker) khusus untuk OCR yang butuh waktu lama
+// Ganti dengan deployment URL GAS yang aktif
+var _MEK_GAS_DIRECT_URL = 'https://script.google.com/macros/s/AKfycbxgC5QYg1PWSJ1WSgFHKNvQcXQ52Y7MWgOlhHfDx_1KfM3t0Vc8LrnWFHNVAjIfCfnG/exec';  // diisi otomatis dari API jika tersedia
+
 function _mekOcrImage(image, callback) {
   if (!image || !image.b64) { callback(null); return; }
 
@@ -1615,37 +1619,81 @@ function _mekOcrImage(image, callback) {
   function setLog(msg) { if (logs.length) logs[logs.length-1].textContent = msg; }
   setLog('OCR via Google Drive...');
 
-  // Resize dulu jika gambar terlalu besar (maks 2400px)
-  _mekResizeImgB64(image.b64, image.mime, 2400, function(b64r, mimer) {
-    API.run('ocrImageEmail', { b64: b64r, mimeType: mimer }, function(res) {
-      if (res && res.success && res.text && res.text.trim().length > 5) {
-        console.log('[MEK-DRIVE-OCR OK]\n' + res.text.slice(0, 800));
-        setLog('OCR selesai \u2713');
-        callback(res.text);
-      } else {
-        var msg = (res && res.message) ? res.message : (res ? JSON.stringify(res).slice(0,100) : 'no response');
-        console.warn('[MEK-DRIVE-OCR FAIL]', msg);
-        setLog('OCR gagal: ' + msg);
-        showToast('OCR gagal: ' + msg, 'error');
-        callback(null);
-      }
-    });
+  _mekResizeImgB64(image.b64, image.mime, 1200, function(b64r, mimer) {
+    console.log('[MEK-OCR] b64 size:', Math.round(b64r.length/1024), 'KB, mime:', mimer);
+
+    // Coba ambil GAS direct URL dari window config jika ada
+    var gasUrl = _MEK_GAS_DIRECT_URL || (window.APP_CONFIG && window.APP_CONFIG.gasUrl) || '';
+
+    if (gasUrl) {
+      // Kirim langsung ke GAS tanpa Worker (tidak ada timeout 10ms)
+      setLog('OCR langsung ke GAS...');
+      fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ocrImageEmail', payload: { b64: b64r, mimeType: mimer } })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) { _mekOcrHandleRes(res, setLog, callback); })
+      .catch(function(err) {
+        console.warn('[MEK-OCR-DIRECT FAIL]', err);
+        // Fallback ke Worker
+        _mekOcrViaWorker(b64r, mimer, setLog, callback);
+      });
+    } else {
+      _mekOcrViaWorker(b64r, mimer, setLog, callback);
+    }
   });
 }
 
-// Resize gambar via Canvas sebelum kirim ke GAS
+function _mekOcrViaWorker(b64r, mimer, setLog, callback) {
+  setLog('OCR via Worker...');
+  API.run('ocrImageEmail', { b64: b64r, mimeType: mimer }, function(res) {
+    _mekOcrHandleRes(res, setLog, callback);
+  });
+}
+
+function _mekOcrHandleRes(res, setLog, callback) {
+  if (res && res.success && res.text && res.text.trim().length > 5) {
+    console.log('[MEK-DRIVE-OCR OK]\n' + res.text.slice(0, 800));
+    setLog('OCR selesai \u2713');
+    callback(res.text);
+  } else {
+    var msg = (res && res.message) ? res.message
+            : (res ? JSON.stringify(res).slice(0, 150) : 'no response');
+    console.warn('[MEK-DRIVE-OCR FAIL]', msg);
+    setLog('OCR gagal: ' + msg);
+    showToast('OCR gagal: ' + msg, 'error');
+    callback(null);
+  }
+}
+
+// Resize gambar via Canvas — agresif untuk pastikan payload < 500KB
 function _mekResizeImgB64(b64, mime, maxPx, cb) {
   try {
     var img = new Image();
     img.onload = function() {
       var w = img.width, h = img.height;
-      if (w <= maxPx && h <= maxPx) { cb(b64, mime); return; }
-      var s = maxPx / Math.max(w, h);
+      // Selalu resize ke maxPx untuk pastikan ukuran kecil
+      var s = Math.min(1, maxPx / Math.max(w, h));
       var cv = document.createElement('canvas');
-      cv.width = Math.round(w*s); cv.height = Math.round(h*s);
+      cv.width  = Math.round(w * s);
+      cv.height = Math.round(h * s);
       cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      var out = cv.toDataURL('image/jpeg', 0.92);
-      cb(out.split(',')[1], 'image/jpeg');
+      // Quality 0.75 — cukup untuk OCR dokumen
+      var out = cv.toDataURL('image/jpeg', 0.75);
+      var outB64 = out.split(',')[1];
+      // Kalau masih > 400KB base64 (~300KB binary), resize lagi
+      if (outB64.length > 400000) {
+        var cv2 = document.createElement('canvas');
+        cv2.width = Math.round(cv.width * 0.7);
+        cv2.height = Math.round(cv.height * 0.7);
+        cv2.getContext('2d').drawImage(cv, 0, 0, cv2.width, cv2.height);
+        outB64 = cv2.toDataURL('image/jpeg', 0.7).split(',')[1];
+      }
+      console.log('[MEK-RESIZE] ' + w + 'x' + h + ' → ' + cv.width + 'x' + cv.height + 
+        ' | b64 size: ' + Math.round(outB64.length/1024) + 'KB');
+      cb(outB64, 'image/jpeg');
     };
     img.onerror = function() { cb(b64, mime); };
     img.src = 'data:' + mime + ';base64,' + b64;
