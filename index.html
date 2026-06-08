@@ -5030,6 +5030,12 @@
             <i class="fas fa-upload"></i> Pilih PDF / Gambar
           </label>
           <input type="file" id="mekEmailFileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple style="display:none;" onchange="mekHandleEmailFiles(this.files)">
+          <label for="mekEmailXlsInput"
+            style="padding:6px 16px;border-radius:8px;border:2px dashed #9ae6b4;background:#f0fff4;font-size:12px;font-weight:700;cursor:pointer;color:#276749;display:flex;align-items:center;gap:6px;transition:border-color .2s;"
+            onmouseover="this.style.borderColor='#38a169'" onmouseout="this.style.borderColor='#9ae6b4'">
+            <i class="fas fa-file-excel" style="color:#38a169;"></i> Pilih Excel / CSV
+          </label>
+          <input type="file" id="mekEmailXlsInput" accept=".xlsx,.xls,.csv" multiple style="display:none;" onchange="mekHandleEmailXls(this.files)">
           <span id="mekEmailParseCount" style="background:#e2e8f0;border-radius:20px;padding:1px 10px;font-size:11px;font-weight:700;color:#4a5568;display:none;">0 baris</span>
           <button id="mekEmailBtnClear" onclick="mekClearEmail()" style="display:none;padding:5px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#718096;">
             <i class="fas fa-times"></i> Clear
@@ -5048,7 +5054,7 @@
             ondrop="event.preventDefault();this.style.borderColor='#f6d860';this.style.background='';mekHandleEmailFiles(event.dataTransfer.files);">
             <i class="fas fa-envelope-open-text" style="font-size:40px;display:block;margin-bottom:12px;color:#d69e2e;opacity:.5;"></i>
             <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Klik, drag & drop, atau Ctrl+V paste screenshot</div>
-            <div style="font-size:12px;color:#a0aec0;margin-top:4px;">PDF, PNG, JPG, WEBP — bisa beberapa file</div>
+            <div style="font-size:12px;color:#a0aec0;margin-top:4px;">PDF, PNG, JPG, WEBP — atau <span style="color:#38a169;font-weight:700;">Excel / CSV</span></div>
           </div>
 
           <!-- Log + tabel preview -->
