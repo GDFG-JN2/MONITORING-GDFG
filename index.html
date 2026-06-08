@@ -4933,6 +4933,7 @@
           </label>
           <input type="file" id="mekSiFileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple style="display:none;" onchange="mekHandleSiFiles(this.files)">
           <span id="mekSiParseCount" style="background:#e2e8f0;border-radius:20px;padding:1px 10px;font-size:11px;font-weight:700;color:#4a5568;display:none;">0 baris</span>
+          <button id="mekSiClearBtn" onclick="mekSiClear()" style="display:none;padding:5px 12px;border-radius:8px;border:none;background:#fed7d7;color:#c53030;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-times"></i> Clear</button>
         </div>
 
         <!-- Status parsing PDF + hasil tabel -->
@@ -4962,7 +4963,6 @@
                   <th>Week</th>
                   <th>Tanggal</th>
                   <th>No. SO</th>
-                  <th>SKU</th>
                   <th>Nama (ITEM)</th>
                   <th style="text-align:right;">Cont</th>
                   <th>Tujuan</th>
