@@ -4676,42 +4676,94 @@
       <!-- ════ PANE CAPAIAN PLANNING ════ -->
       <div id="mekPaneCapaian" style="display:none;">
 
-        <!-- Filter Capaian -->
-        <div class="real-filter-bar" style="padding:10px 14px;flex-wrap:wrap;">
-          <label>Dari</label>
-          <input type="date" id="mekCapFrom">
-          <label>Sampai</label>
-          <input type="date" id="mekCapTo">
-          <label>SKU / Nama</label>
-          <input type="text" id="mekCapSku" placeholder="kode atau nama..."
-            style="width:150px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
-          <label>No. SO/DOC</label>
-          <input type="text" id="mekCapDoc" placeholder="no. SO..."
-            style="width:120px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
-          <label>Tujuan</label>
-          <input type="text" id="mekCapTujuan" placeholder="tujuan..."
-            style="width:110px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
-          <button class="btn-filter" onclick="mekLoadCapaian()"><i class="fas fa-search"></i> Tampilkan</button>
-          <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
+        <!-- Toggle mode filter Capaian: Tanggal / Week -->
+        <div style="padding:8px 14px 0;">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button id="mekCapBtnDate" class="sum-view-btn active" onclick="mekCapSwitchFilterMode('date')">
+              <i class="fas fa-calendar-day"></i> Tanggal
+            </button>
+            <button id="mekCapBtnWeek" class="sum-view-btn" onclick="mekCapSwitchFilterMode('week')">
+              <i class="fas fa-calendar-week"></i> Week
+            </button>
+          </div>
+
+          <!-- Filter by Tanggal -->
+          <div id="mekCapFilterDate" class="real-filter-bar">
+            <label>Dari</label>
+            <input type="date" id="mekCapFrom">
+            <label>Sampai</label>
+            <input type="date" id="mekCapTo">
+            <label>SKU / Nama</label>
+            <input type="text" id="mekCapSku" placeholder="kode atau nama..."
+              style="width:140px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>No. SO/DOC</label>
+            <input type="text" id="mekCapDoc" placeholder="no. SO..."
+              style="width:110px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>Tujuan</label>
+            <input type="text" id="mekCapTujuan" placeholder="tujuan..."
+              style="width:100px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <button class="btn-filter" onclick="mekLoadCapaian()"><i class="fas fa-search"></i> Tampilkan</button>
+            <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
+          </div>
+
+          <!-- Filter by Week -->
+          <div id="mekCapFilterWeek" class="real-filter-bar" style="display:none;">
+            <label>Week</label>
+            <input type="number" id="mekCapWeekFrom" min="1" max="53" placeholder=""
+              style="width:60px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>—</label>
+            <input type="number" id="mekCapWeekTo" min="1" max="53" placeholder=""
+              style="width:60px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <input type="number" id="mekCapWeekYear" min="2020" max="2099" placeholder=""
+              style="width:72px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label style="font-size:10px;opacity:.7;">tahun</label>
+            <label>SKU / Nama</label>
+            <input type="text" id="mekCapSkuW" placeholder="kode atau nama..."
+              style="width:130px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>No. SO/DOC</label>
+            <input type="text" id="mekCapDocW" placeholder="no. SO..."
+              style="width:100px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>Tujuan</label>
+            <input type="text" id="mekCapTujuanW" placeholder="tujuan..."
+              style="width:90px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <button class="btn-filter" onclick="mekCapApplyWeek()"><i class="fas fa-search"></i> Tampilkan</button>
+            <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
+          </div>
+
+          <!-- Info hasil konversi week -->
+          <div id="mekCapWeekInfo" style="display:none;font-size:11px;color:#718096;margin-top:6px;padding:0 2px;">
+            <i class="fas fa-info-circle"></i> <span id="mekCapWeekInfoText"></span>
+          </div>
+        </div>
+
+        <!-- Filter status: All / Sudah Datang / Belum -->
+        <div style="display:flex;gap:6px;padding:8px 14px 0;flex-wrap:wrap;">
+          <button id="mekCapFAll"    class="sum-view-btn active" onclick="mekCapSetFilter('all')">Semua</button>
+          <button id="mekCapFDatang" class="sum-view-btn"        onclick="mekCapSetFilter('datang')"><i class="fas fa-check"></i> Sudah Ada</button>
+          <button id="mekCapFBelum"  class="sum-view-btn"        onclick="mekCapSetFilter('belum')"><i class="fas fa-clock"></i> Belum Datang</button>
         </div>
 
         <!-- Summary cards capaian -->
-        <div class="mek-card-grid" style="padding:10px 14px 6px;">
+        <div class="mek-card-grid" style="padding:8px 14px 6px;">
+          <div class="mek-card">
+            <div class="mek-card-ico" style="background:#e2e8f0;color:#4a5568;"><i class="fas fa-boxes"></i></div>
+            <div><div class="mek-card-val" id="mekCapCardTotal">—</div><div class="mek-card-lbl">Total Cont</div></div>
+          </div>
           <div class="mek-card">
             <div class="mek-card-ico" style="background:#c6f6d5;color:#276749;"><i class="fas fa-check-circle"></i></div>
             <div><div class="mek-card-val" id="mekCapCardKeluar">—</div><div class="mek-card-lbl">Sudah Keluar</div></div>
           </div>
           <div class="mek-card">
             <div class="mek-card-ico" style="background:#bee3f8;color:#2b6cb0;"><i class="fas fa-truck-loading"></i></div>
-            <div><div class="mek-card-val" id="mekCapCardDaftar">—</div><div class="mek-card-lbl">Sedang Proses</div></div>
+            <div><div class="mek-card-val" id="mekCapCardDaftar">—</div><div class="mek-card-lbl">Proses/Daftar</div></div>
           </div>
           <div class="mek-card">
             <div class="mek-card-ico" style="background:#fed7d7;color:#9b2c2c;"><i class="fas fa-clock"></i></div>
-            <div><div class="mek-card-val" id="mekCapCardBelum">—</div><div class="mek-card-lbl">Belum Daftar</div></div>
+            <div><div class="mek-card-val" id="mekCapCardBelum">—</div><div class="mek-card-lbl">Belum Datang</div></div>
           </div>
           <div class="mek-card">
             <div class="mek-card-ico" style="background:#fefcbf;color:#744210;"><i class="fas fa-percentage"></i></div>
-            <div><div class="mek-card-val" id="mekCapCardPct">—</div><div class="mek-card-lbl">% Terealisasi</div></div>
+            <div><div class="mek-card-val" id="mekCapCardPct">—</div><div class="mek-card-lbl">% Keluar</div></div>
           </div>
         </div>
 
@@ -4731,16 +4783,17 @@
                   <th>Nama</th>
                   <th style="text-align:right;">Plan Cont</th>
                   <th>Tujuan</th>
-                  <th>No. SO</th>
+                  <th>No. DOC</th>
                   <th>No. Pol</th>
                   <th>Waktu Daftar</th>
+                  <th>Proses Loading</th>
                   <th>Waktu Keluar</th>
                   <th style="text-align:center;">Status</th>
                   <th>Source</th>
                 </tr>
               </thead>
               <tbody id="mekCapTbody">
-                <tr><td colspan="12" style="text-align:center;padding:50px;color:#a0aec0;font-size:13px;">
+                <tr><td colspan="13" style="text-align:center;padding:50px;color:#a0aec0;font-size:13px;">
                   <i class="fas fa-chart-pie" style="font-size:30px;display:block;margin-bottom:10px;opacity:.2;"></i>
                   Pilih rentang tanggal lalu klik <b>Tampilkan</b>
                 </td></tr>
