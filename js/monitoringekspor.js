@@ -61,6 +61,16 @@ function _mekGetISOWeekRange(week, year) {
   return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
 }
 
+// Hitung ISO week number dari string "YYYY-MM-DD"
+function _mekDateToISOWeek(ymd) {
+  if (!ymd) return 0;
+  var d = new Date(ymd + 'T00:00:00Z');
+  var day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
 function _mekFmtTglDisplay(ymd) {
   if (!ymd) return '';
   var p = ymd.split('-');
@@ -821,16 +831,9 @@ function _mekAutoFillTujuan(dest) {
   if (!el || el.value.trim()) return; // sudah diisi manual, jangan overwrite
   if (!dest) return;
 
-  // Ekstrak: "TG. PRIOK, JKT - KATTUPALLI, INDIA" → "INDIA"
-  // Ambil kata/frasa setelah tanda koma atau dash terakhir
-  var clean = dest.trim();
-  // Coba ambil setelah koma+spasi terakhir
-  var parts = clean.split(/,\s*/);
-  var last  = parts[parts.length - 1].trim();
-  // Kalau hasil masih ada " - ", ambil sesudahnya
-  var dashParts = last.split(/\s*[-–]\s*/);
-  last = dashParts[dashParts.length - 1].trim();
-  // Kapitalisasi title case sederhana
+  // Ekstrak: "TG. PRIOK, JKT - KATTUPALLI, INDIA" → "India"
+  var dParts = dest.trim().split(/[,\-]\s*/);
+  var last   = dParts[dParts.length - 1].trim();
   last = last.charAt(0).toUpperCase() + last.slice(1).toLowerCase();
 
   el.value = last;
@@ -927,12 +930,27 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
   var noSo       = result.noSo;
   var jumlahCont = result.jumlahCont;
   var dest       = result.destination;
-  var week       = weekOverride || '';
+
+  // Week: dari override input, atau hitung otomatis dari tanggal stuffing
+  var week = weekOverride || '';
+  if (!week && tgl) {
+    var w = _mekDateToISOWeek(tgl);
+    if (w) week = String(w);
+  }
+
+  // Tujuan pendek: ambil kata terakhir setelah koma/dash terakhir
+  // "TG. PRIOK, JKT - KATTUPALLI, INDIA" → "India"
+  var destShort = dest;
+  if (dest) {
+    var dParts = dest.split(/[,\-]\s*/);
+    destShort = dParts[dParts.length - 1].trim();
+    destShort = destShort.charAt(0).toUpperCase() + destShort.slice(1).toLowerCase();
+  }
 
   // Deduplikasi sudah dilakukan di _mekRegexParseSi
   var uniqueItems = result.items;
 
-  var finalTujuan = tujuan || dest;
+  var finalTujuan = tujuan || destShort;
   var rows = uniqueItems.map(function(it) {
     var match  = _mekFuzzyMatchStd(it.desc, stdCache);
     var sku    = match ? match.sku  : '';
@@ -942,6 +960,7 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
       week:    week,
       tanggal: tgl,
       sku:     sku,
+      noSo:    noSo,
       nama:    nama,
       jumlah:  String(jumlahCont),
       tujuan:  finalTujuan,
@@ -953,7 +972,7 @@ function _mekParseSiText(text, image, tujuan, stdCache, callback) {
     };
   });
 
-  callback(rows, dest);
+  callback(rows, destShort);
 }
 
 // ── Regex parser untuk teks SI (format PT. Mayora Indah) ─────
@@ -1127,7 +1146,7 @@ function _mekRenderSiPreview(rows) {
   var tbody = document.getElementById('mekSiPreviewTbody');
   if (!tbody) return;
   if (!rows || !rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(function(r, i) {
@@ -1136,6 +1155,7 @@ function _mekRenderSiPreview(rows) {
       '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">' + (i+1) + '</td>' +
       '<td style="text-align:center;">' + (r.week ? '<span style="background:#ebf8ff;color:#2b6cb0;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">W'+r.week+'</span>' : '<span style="color:#cbd5e0;">—</span>') + '</td>' +
       '<td style="white-space:nowrap;font-size:12px;">' + _mekEsc(_mekFmtTglDisplay(r.tanggal)||r.tanggal) + '</td>' +
+      '<td style="font-size:12px;font-weight:600;color:#2d3748;">' + _mekEsc(r.noSo||'—') + '</td>' +
       '<td>' +
         (skuOk
           ? '<b style="font-size:12px;">' + _mekEsc(r.sku) + '</b>'
