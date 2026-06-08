@@ -910,7 +910,7 @@ function mekEmailSwitchMode(mode) {
 }
 
 // Kolom tabel manual: stuffing_date, so, qt, negara, kode, material, qty, plant, keterangan
-var _MEK_MAN_COLS = ['stuffing_date','so','qt','negara','kode','material','qty','plant','keterangan'];
+var _MEK_MAN_COLS = ['keterangan','so','qt','negara','kode','material','stuffing_date','qty','plant','ready','email','rsv_crt','po_sto','do_sto','note'];
 
 function mekEmailManualAddRow(vals) {
   var tbody = document.getElementById('mekEmailManualTbody');
@@ -931,7 +931,7 @@ function mekEmailManualAddRow(vals) {
     td.contentEditable = 'true';
     td.dataset.col = col;
     td.style.cssText = 'outline:none;padding:5px 6px;font-size:12px;min-width:60px;white-space:nowrap;cursor:text;';
-    td.style.textAlign = col === 'qty' ? 'right' : 'left';
+    td.style.textAlign = (col === 'qty' || col === 'rsv_crt') ? 'right' : 'left';
     if (vals && vals[col] !== undefined) td.textContent = vals[col];
 
     // Highlight saat fokus
@@ -1058,19 +1058,26 @@ function _mekCollectManualRows() {
       var el = tr.querySelector('[data-col="'+col+'"]');
       return el ? el.textContent.trim() : '';
     }
-    var so  = g('so').replace(/\D/g,'');
+    var so   = g('so').replace(/\D/g,'');
     var kode = g('kode').replace(/\D/g,'');
     if (!so && !kode) return;
-    var tgl  = parseTgl(g('stuffing_date'));
-    var wk   = weekOverride ? String(weekOverride) : weekFromTgl(tgl);
-    var qty  = parseInt(g('qty').replace(/\D/g,''))||0;
+    var tgl = parseTgl(g('stuffing_date'));
+    var wk  = weekOverride ? String(weekOverride) : weekFromTgl(tgl);
+    var qty = parseInt(g('qty').replace(/\D/g,''))||0;
+    // Gabung field tambahan ke kolom KET untuk disimpan ke sheet
+    var extra = [g('ready'),g('email'),g('rsv_crt'),g('po_sto'),g('do_sto')]
+      .map(function(v,i){
+        var labels = ['READY','EMAIL','RSV','PO','DO'];
+        return v ? labels[i]+':'+v : '';
+      }).filter(Boolean).join(' | ');
+    var ket = [g('keterangan'), extra].filter(Boolean).join(' | ');
     rows.push({
       week: wk, tanggal: tgl,
       sku: kode, noSo: so, noQt: g('qt').replace(/\D/g,''),
       nama: g('material'),
       negara: g('negara').toUpperCase(),
       qty: qty, plant: g('plant'),
-      ket: g('keterangan'), note: '',
+      ket: ket, note: g('note'),
       source: 'EMAIL', _isFirst: true, _groupSize: 1
     });
   });
