@@ -1610,7 +1610,7 @@ function _mekRegexParseSi(text, weekOverride) {
 // Alur: base64 → GAS → Drive upload → convert Google Doc → baca teks → hapus
 // GAS URL langsung (bypass Worker) khusus untuk OCR yang butuh waktu lama
 // Ganti dengan deployment URL GAS yang aktif
-var _MEK_GAS_DIRECT_URL = 'https://script.google.com/macros/s/AKfycbxgC5QYg1PWSJ1WSgFHKNvQcXQ52Y7MWgOlhHfDx_1KfM3t0Vc8LrnWFHNVAjIfCfnG/exec';  // diisi otomatis dari API jika tersedia
+var _MEK_GAS_DIRECT_URL = '';  // diisi otomatis dari API jika tersedia
 
 function _mekOcrImage(image, callback) {
   if (!image || !image.b64) { callback(null); return; }
@@ -1631,13 +1631,26 @@ function _mekOcrImage(image, callback) {
       fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'ocrImageEmail', payload: { b64: b64r, mimeType: mimer } })
+        body: JSON.stringify({ action: 'ocrImageEmail', payload: { b64: b64r, mimeType: mimer } }),
+        redirect: 'follow'
       })
-      .then(function(r) { return r.json(); })
-      .then(function(res) { _mekOcrHandleRes(res, setLog, callback); })
+      .then(function(r) {
+        return r.text().then(function(txt) {
+          console.log('[MEK-OCR-DIRECT RAW]', txt.slice(0, 300));
+          try { return JSON.parse(txt); }
+          catch(e) {
+            // GAS kadang return HTML redirect — fallback ke Worker
+            console.warn('[MEK-OCR-DIRECT] response bukan JSON, fallback ke Worker. Raw:', txt.slice(0,200));
+            return null;
+          }
+        });
+      })
+      .then(function(res) {
+        if (!res) { _mekOcrViaWorker(b64r, mimer, setLog, callback); return; }
+        _mekOcrHandleRes(res, setLog, callback);
+      })
       .catch(function(err) {
-        console.warn('[MEK-OCR-DIRECT FAIL]', err);
-        // Fallback ke Worker
+        console.warn('[MEK-OCR-DIRECT FAIL]', err.message);
         _mekOcrViaWorker(b64r, mimer, setLog, callback);
       });
     } else {
