@@ -7,10 +7,6 @@
 // ── State ────────────────────────────────────────────────────
 var _mekFilterMode  = 'date';   // 'date' | 'week'
 var _mekSummaryData = [];
-// FIX: deklarasi dipindah ke atas agar tidak dipakai sebelum var
-var _mekCapMode     = 'all';    // 'all' | 'wa' | 'si' | 'email'
-var _mekCapData     = [];
-var _mekCapFilter   = 'all';    // 'all' | 'datang' | 'belum'
 
 // ── Inisialisasi halaman ─────────────────────────────────────
 function mekInitPage() {
@@ -142,18 +138,10 @@ function mekSwitchTab(tab) {
   var hideEl = tab === 'summary' ? ipEl : spEl;
   if (!showEl || !hideEl) return;
 
-  // FIX: tambah pointer-events:none agar elemen yang sedang fade-out
-  // tidak menghalangi klik pada elemen di bawahnya
-  hideEl.style.opacity      = '0';
-  hideEl.style.pointerEvents = 'none';
-  hideEl.style.transition   = 'opacity .18s ease';
+  hideEl.style.opacity = '0'; hideEl.style.transition = 'opacity .18s ease';
   setTimeout(function () {
-    hideEl.style.display      = 'none';
-    hideEl.style.pointerEvents = '';   // reset untuk saat ditampilkan lagi
-    showEl.style.opacity      = '0';
-    showEl.style.display      = 'block';
-    showEl.style.pointerEvents = '';   // pastikan elemen baru bisa diklik
-    showEl.style.transition   = 'opacity .2s ease';
+    hideEl.style.display = 'none';
+    showEl.style.opacity = '0'; showEl.style.display = 'block'; showEl.style.transition = 'opacity .2s ease';
     requestAnimationFrame(function () { requestAnimationFrame(function () { showEl.style.opacity = '1'; }); });
   }, 180);
 
@@ -779,11 +767,6 @@ function mekSwitchPlanMode(mode) {
     btn.style.borderBottomColor = isActive ? ac : 'transparent';
   });
 
-  // FIX: selalu hapus dulu listener lama sebelum pasang yang baru,
-  // agar tidak ada duplikasi listener yang bisa mengganggu event lain
-  document.removeEventListener('paste', _mekGlobalSiPaste);
-  document.removeEventListener('paste', _mekGlobalEmailPaste);
-
   if (mode === 'si') {
     _mekLoadStd(function(){});
     document.addEventListener('paste', _mekGlobalSiPaste);
@@ -791,6 +774,8 @@ function mekSwitchPlanMode(mode) {
       var dz = document.getElementById('mekSiDropZone');
       if (dz && dz.style.display !== 'none') { dz.setAttribute('tabindex','0'); dz.focus(); }
     }, 100);
+  } else {
+    document.removeEventListener('paste', _mekGlobalSiPaste);
   }
 
   if (mode === 'email') {
@@ -802,6 +787,8 @@ function mekSwitchPlanMode(mode) {
       var dz = document.getElementById('mekEmailDropZone');
       if (dz && dz.style.display !== 'none') { dz.setAttribute('tabindex','0'); dz.focus(); }
     }, 100);
+  } else {
+    document.removeEventListener('paste', _mekGlobalEmailPaste);
   }
 }
 
@@ -1257,17 +1244,17 @@ function _mekParseEmailTable(text, stdCache) {
     if (/^(keterangan|so|qt|negara|kode|material|stuffing|note)/i.test(line.trim())) continue;
 
     // 1. Cari SO (angka 9-12 digit, biasanya mulai 10/11/12)
-    var soMatch = line.match(/(1\d{8,11})/g);
+    var soMatch = line.match(/\b(1\d{8,11})\b/g);
     if (!soMatch || soMatch.length < 1) continue;
     var so = soMatch[0];
     var qt = soMatch.length >= 2 ? soMatch[1] : '';
 
     // 2. Cari KODE (angka 6 digit, biasanya 4xxxxx)
-    var kodeMatch = line.match(/([34]\d{5})/);
+    var kodeMatch = line.match(/\b([34]\d{5})\b/);
     var kode = kodeMatch ? kodeMatch[1] : '';
 
     // 3. Cari STUFFING DATE (dd-Mon-yy/yyyy)
-    var tglMatch = line.match(/(\d{1,2})[\/\-]([A-Za-z]{3})[\/\-](\d{2,4})/);
+    var tglMatch = line.match(/\b(\d{1,2})[\/\-]([A-Za-z]{3})[\/\-](\d{2,4})\b/);
     var tglRaw   = tglMatch ? tglMatch[0] : '';
     var tgl      = parseTgl(tglRaw);
 
@@ -1275,7 +1262,7 @@ function _mekParseEmailTable(text, stdCache) {
     var qty = '';
     if (tglRaw) {
       var afterDate = line.slice(line.indexOf(tglRaw) + tglRaw.length);
-      var qtyM = afterDate.match(/(\d{3,5})/);
+      var qtyM = afterDate.match(/\b(\d{3,5})\b/);
       if (qtyM) qty = qtyM[1];
     }
 
@@ -1286,11 +1273,11 @@ function _mekParseEmailTable(text, stdCache) {
     }
 
     // 6. Cari PLANT (JAYANTI 1/2/3 atau nama plant lain)
-    var plantMatch = line.match(/(JAYANTI\s*\d|TANGERANG|KEJAYAN|CIBITUNG|BEKASI)/i);
+    var plantMatch = line.match(/\b(JAYANTI\s*\d|TANGERANG|KEJAYAN|CIBITUNG|BEKASI)\b/i);
     var plant = plantMatch ? plantMatch[0].trim() : '';
 
     // 7. Deteksi CANCEL
-    var isCancel = /CANCEL/i.test(line);
+    var isCancel = /\bCANCEL\b/i.test(line);
 
     // 8. Ambil MATERIAL — panjang, uppercase, setelah KODE
     var material = '';
@@ -2158,7 +2145,9 @@ function mekLoadCapaian() {
   });
 }
 
-// _mekCapData, _mekCapFilter, _mekCapMode sudah dideklarasikan di atas file
+var _mekCapData   = [];
+var _mekCapFilter = 'all';  // 'all' | 'datang' | 'belum'
+var _mekCapMode   = 'all';  // 'all' | 'wa' | 'si'
 
 function mekCapSwitchMode(mode) {
   _mekCapMode = mode;
