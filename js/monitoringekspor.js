@@ -983,13 +983,22 @@ function _mekRegexParseSi(text, weekOverride) {
   var t = text.replace(/[\u200B-\u200D\uFEFF]/g, '')
               .replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // 1. Tanggal stuffing: "STUFFING : ..." kemudian tanggal dd.MM.yyyy
+  // 1. Tanggal stuffing — berbagai format
   var tanggal = '';
-  var stuffM = t.match(/STUFFING\s*[:：]\s*[^\n]*?(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
+  var _MONTHS = {january:1,february:2,march:3,april:4,may:5,june:6,
+                 july:7,august:8,september:9,october:10,november:11,december:12};
+
+  // Format: "STUFFING : JAYANTI 2/KITE 05.06.2026" atau "Stuffing Date : 06 June 2026"
+  var stuffM = t.match(/(?:STUFFING|Stuffing\s*Date)\s*[:：]\s*[^\n]*?(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
   if (!stuffM) {
-    stuffM = t.match(/STUFFING\s*[:：][^\n]*[\n\s]+(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
+    // "Stuffing Date : 06 June 2026" (bulan nama)
+    var stuffText = t.match(/(?:STUFFING|Stuffing\s*Date)\s*[:：]\s*[^\n]*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (stuffText) {
+      var mNum = _MONTHS[(stuffText[2]||'').toLowerCase()] || 0;
+      if (mNum) tanggal = stuffText[3]+'-'+('0'+mNum).slice(-2)+'-'+('0'+stuffText[1]).slice(-2);
+    }
   }
-  if (stuffM) {
+  if (!tanggal && stuffM) {
     tanggal = stuffM[3] + '-' + ('0'+stuffM[2]).slice(-2) + '-' + ('0'+stuffM[1]).slice(-2);
   }
   // Fallback: cari tanggal standalone dd.MM.yyyy
@@ -1011,23 +1020,23 @@ function _mekRegexParseSi(text, weekOverride) {
   //    "NO CONT : 2 X 40HC"
   var jumlahCont = 0;
 
-  // Pola 1: ada label "NO. CONT" atau "NO CONT"
+  // Pola 1: label "NO. CONT : 2X40HC" atau "NO CONT : 2X40HC"
   var contLabel = t.match(/NO\.?\s*CONT\s*[:：]\s*(\d+)\s*[xX×]/i);
   if (contLabel) jumlahCont = parseInt(contLabel[1]) || 0;
 
-  // Pola 2: NXhhHC/GP/OT CONTAINER — paling umum di SI Mayora
+  // Pola 2: "Jumlah Container : 1XCONTAINER 40 HC FT" atau "Jumlah Container : 2"
   if (!jumlahCont) {
-    var contHc = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF)\s*CONTAINER/i);
+    var contJml = t.match(/Jumlah\s*Container\s*[:：]\s*(\d+)/i);
+    if (contJml) jumlahCont = parseInt(contJml[1]) || 0;
+  }
+
+  // Pola 3: "NXhh HC CONTAINER" atau "N X 40HC CONTAINER"
+  if (!jumlahCont) {
+    var contHc = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF|FT)\s*(?:CONTAINER)?/i);
     if (contHc) jumlahCont = parseInt(contHc[1]) || 0;
   }
 
-  // Pola 3: NXhhHC tanpa kata CONTAINER (misal OCR terpotong)
-  if (!jumlahCont) {
-    var contHc2 = t.match(/(\d+)\s*[xX×]\s*\d+['"]?\s*(?:HC|GP|OT|FR|RF)/i);
-    if (contHc2) jumlahCont = parseInt(contHc2[1]) || 0;
-  }
-
-  // Pola 4: N CONTAINER saja (terakhir, paling umum kalau OCR)
+  // Pola 4: "N CONTAINER" saja
   if (!jumlahCont) {
     var contSimple = t.match(/(\d+)\s*(?:UNIT\s*)?CONTAINER/i);
     if (contSimple) jumlahCont = parseInt(contSimple[1]) || 0;
@@ -1044,43 +1053,66 @@ function _mekRegexParseSi(text, weekOverride) {
   }
 
   // 5. Items dari tabel: pola "NO  QTY  UNIT  DESCRIPTION"
-  // Baris item: angka, diikuti angka (qty), diikuti unit, diikuti deskripsi
-  var items = [];
-  var seen = {};
+  // Kumpulkan RAW dulu, lalu deduplikasi berdasarkan desc
+  var rawItems = [];
 
-  function _addItem(qty, unit, desc) {
-    // Normalisasi desc untuk deduplikasi (lowercase, hapus spasi extra, hapus angka trailing)
-    var normDesc = desc.toLowerCase().replace(/\s+/g, ' ').replace(/[\d,.()\[\]]+$/, '').trim();
-    // Juga normalisasi qty-nya (OCR bisa beda dikit)
-    var qtyNorm = Math.round(qty / 10) * 10; // snap ke puluhan terdekat untuk toleransi OCR
-    var key = qtyNorm + '|' + normDesc.slice(0, 30);
-    if (seen[key]) return;
-    seen[key] = true;
-    if (desc.length > 3) items.push({ qty: qty, unit: unit, desc: desc });
+  function _cleanDesc(raw) {
+    return raw.trim().replace(/\s+/g, ' ')
+              .replace(/\s+[\d.,]+\s+[\d.,]+\s*$/, '')
+              .replace(/\s*\d+[.,]\d+\s*$/, '')
+              .trim();
+  }
+  function _normKey(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 25);
   }
 
-  // Pola utama: angka baris + qty + unit + desc
-  var itemRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(CAR|CTN|PCS|BOX|SET|UNIT|KG|PC)\s+([^\n]+)/gi;
+  var itemRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(CAR|KAR|CTN|PCS|BOX|SET|UNIT|KG|PC)\s+([^\n]+)/gi;
   var im;
   while ((im = itemRegex.exec(t)) !== null) {
     var qty  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
     var unit = im[2].toUpperCase();
-    var desc = im[3].trim().replace(/\s+/g, ' ')
-                    .replace(/\s+[\d.,]+\s+[\d.,]+\s*$/, '')  // hapus "UNIT_PRICE AMOUNT" di akhir
-                    .replace(/\s*\d+[.,]\d+\s*$/, '')          // hapus angka desimal trailing
-                    .trim();
-    _addItem(qty, unit, desc);
+    var desc = _cleanDesc(im[3]);
+    if (desc.length > 3) rawItems.push({ qty: qty, unit: unit, desc: desc });
   }
 
-  // Fallback pola longgar jika tidak ada item ketemu
-  if (!items.length) {
+  if (!rawItems.length) {
     var looseRegex = /(?:^|\n)\s*\d+\s+([\d.,]+)\s+(\w{2,5})\s+([A-Z][A-Z\s\d().\/]+)/gm;
     while ((im = looseRegex.exec(t)) !== null) {
       var qty2  = parseFloat(im[1].replace(/\./g,'').replace(',','.')) || 0;
       var unit2 = im[2].toUpperCase();
-      var desc2 = im[3].trim().replace(/\s+/g, ' ');
-      if (desc2.length > 5 && qty2 > 0) _addItem(qty2, unit2, desc2);
+      var desc2 = _cleanDesc(im[3]);
+      if (desc2.length > 5 && qty2 > 0) rawItems.push({ qty: qty2, unit: unit2, desc: desc2 });
     }
+  }
+
+  // Cek apakah semua baris item identik (format SI lama: 1 item repeat N kali = N cont)
+  var freqMap = {}, firstItem = {};
+  rawItems.forEach(function(it) {
+    var k = _normKey(it.desc);
+    if (!freqMap[k]) { freqMap[k] = 0; firstItem[k] = it; }
+    freqMap[k]++;
+  });
+  var uniqueDescCount = Object.keys(freqMap).length;
+
+  var items;
+  if (uniqueDescCount === 1 && rawItems.length > 1 && jumlahCont === 0) {
+    // Semua baris identik DAN tidak ada NO.CONT di header → count baris = jumlah cont
+    var k0 = Object.keys(freqMap)[0];
+    jumlahCont = freqMap[k0];
+    items = [{ qty: firstItem[k0].qty, unit: firstItem[k0].unit, desc: firstItem[k0].desc }];
+  } else if (uniqueDescCount === 1 && rawItems.length > 1 && rawItems.length === jumlahCont) {
+    // Semua baris identik DAN count baris = NO.CONT dari header → konfirmasi, deduplikasi
+    var k0 = Object.keys(freqMap)[0];
+    items = [{ qty: firstItem[k0].qty, unit: firstItem[k0].unit, desc: firstItem[k0].desc }];
+  } else {
+    // Format multi-item: tiap baris = item berbeda, jumlah cont dari header
+    // Hanya deduplikasi kalau desc IDENTIK persis (bukan fuzzy), untuk handle OCR repeat
+    var seenExact = {};
+    items = [];
+    rawItems.forEach(function(it) {
+      var k = it.desc; // key exact, bukan normKey
+      if (!seenExact[k]) { seenExact[k] = true; items.push({ qty: it.qty, unit: it.unit, desc: it.desc }); }
+    });
   }
 
   if (!tanggal && !noSo && !items.length) return null;
