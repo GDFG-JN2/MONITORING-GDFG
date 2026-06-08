@@ -5042,8 +5042,20 @@
           </button>
         </div>
 
-        <!-- Scrollable area: drop zone + log + tabel -->
-        <div style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
+        <!-- Toggle Upload / Input Manual -->
+        <div style="display:flex;gap:0;background:#f7fafc;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
+          <button id="mekEmailModeUpload" onclick="mekEmailSwitchMode('upload')"
+            style="padding:7px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#1a3a5c;border-bottom:3px solid #1a3a5c;margin-bottom:-1px;">
+            <i class="fas fa-upload"></i> Upload File
+          </button>
+          <button id="mekEmailModeManual" onclick="mekEmailSwitchMode('manual')"
+            style="padding:7px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-1px;">
+            <i class="fas fa-keyboard"></i> Input Manual
+          </button>
+        </div>
+
+        <!-- ── PANEL UPLOAD ── -->
+        <div id="mekEmailUploadPanel" style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
 
           <!-- Drop zone -->
           <div id="mekEmailDropZone"
@@ -5082,7 +5094,49 @@
             </table>
           </div>
 
+        </div><!-- /mekEmailUploadPanel -->
+
+        <!-- ── PANEL INPUT MANUAL ── -->
+        <div id="mekEmailManualPanel" style="display:none;overflow:auto;flex:1;-webkit-overflow-scrolling:touch;padding:12px 14px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+            <span style="font-size:12px;color:#718096;">
+              <i class="fas fa-info-circle"></i> Ketik langsung atau <b>Ctrl+V</b> paste dari Excel
+            </span>
+            <button onclick="mekEmailManualAddRow()"
+              style="padding:4px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-size:12px;cursor:pointer;color:#1a3a5c;font-weight:700;">
+              <i class="fas fa-plus"></i> Tambah Baris
+            </button>
+            <button onclick="mekEmailManualClear()"
+              style="padding:4px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-size:12px;cursor:pointer;color:#e53e3e;">
+              <i class="fas fa-trash"></i> Clear
+            </button>
+          </div>
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+            <table id="mekEmailManualTbl" class="mek-plan-tbl" style="min-width:900px;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+              <thead>
+                <tr>
+                  <th style="width:28px;text-align:center;">#</th>
+                  <th style="min-width:90px;">Tgl Stuffing</th>
+                  <th style="min-width:120px;">SO</th>
+                  <th style="min-width:120px;">QT</th>
+                  <th style="min-width:70px;">Negara</th>
+                  <th style="min-width:70px;">Kode</th>
+                  <th style="min-width:200px;">Material</th>
+                  <th style="min-width:60px;text-align:right;">QTY</th>
+                  <th style="min-width:90px;">Plant</th>
+                  <th style="min-width:130px;">Keterangan</th>
+                  <th style="width:28px;"></th>
+                </tr>
+              </thead>
+              <tbody id="mekEmailManualTbody"></tbody>
+            </table>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:#a0aec0;">
+            <i class="fas fa-lightbulb" style="color:#d69e2e;"></i>
+            Tips: Copy sel dari Excel → klik sel pertama di tabel → Ctrl+V untuk paste banyak baris sekaligus
+          </div>
         </div>
+
       </div><!-- /mekEmailPanel -->
 
     </div><!-- /mekInputPane -->
