@@ -823,6 +823,11 @@ function _mekGlobalEmailPaste(e) {
 }
 
 function mekHandleEmailPaste(e) {
+  // Kalau mode manual atau target adalah cell editable di tabel → biarkan browser handle sendiri
+  if (_mekEmailInputMode === 'manual') return;
+  var tag = (e.target && e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || e.target.contentEditable === 'true') return;
+
   var items = (e.clipboardData || e.originalEvent && e.originalEvent.clipboardData || {}).items;
   if (!items) return;
   for (var i = 0; i < items.length; i++) {
@@ -1071,14 +1076,21 @@ function _mekCollectManualRows() {
         return v ? labels[i]+':'+v : '';
       }).filter(Boolean).join(' | ');
     var ket = [g('keterangan'), extra].filter(Boolean).join(' | ');
+    var negara = g('negara').toUpperCase();
+    // KET = SO + QT + extra fields + keterangan user
+    var noQt  = g('qt').replace(/\D/g,'');
+    var soQtStr = [so ? 'SO:'+so : '', noQt ? 'QT:'+noQt : ''].filter(Boolean).join(' | ');
+    var ketFull = [soQtStr, ket].filter(Boolean).join(' | ');
     rows.push({
-      week: wk, tanggal: tgl,
-      sku: kode, noSo: so, noQt: g('qt').replace(/\D/g,''),
-      nama: g('material'),
-      negara: g('negara').toUpperCase(),
-      qty: qty, plant: g('plant'),
-      ket: ket, note: g('note'),
-      source: 'EMAIL', _isFirst: true, _groupSize: 1
+      week:    wk,
+      tanggal: tgl,
+      sku:     kode,
+      nama:    g('material'),
+      jumlah:  '1',          // default 1 cont per baris; bisa diisi dari kolom lain kalau ada
+      tujuan:  negara,       // NEGARA → TUJUAN (field yang disimpan ke sheet)
+      ket:     ketFull,
+      source:  'EMAIL',
+      _isFirst: true, _groupSize: 1
     });
   });
   return rows;
@@ -1882,69 +1894,30 @@ function _mekRegexParseSi(text, weekOverride) {
   };
 }
 
-// ── OCR via Claude API Vision ───────────────────────────────
-// Kirim gambar langsung ke Claude — baca tabel dan return JSON
+// ── OCR via GAS (Gemini/Drive) ───────────────────────────────
 function _mekOcrImage(image, callback) {
   if (!image || !image.b64) { callback(null); return; }
 
   var logs = document.querySelectorAll('[id^="mekEmailLogMsg_"],[id^="mekSiLogMsg_"]');
   function setLog(msg) { if (logs.length) logs[logs.length-1].textContent = msg; }
-  setLog('Membaca tabel dengan AI...');
+  setLog('OCR via GAS...');
 
-  _mekResizeImgB64(image.b64, image.mime, 1600, function(b64r, mimer) {
+  _mekResizeImgB64(image.b64, image.mime, 1200, function(b64r, mimer) {
     console.log('[MEK-OCR] size:', Math.round(b64r.length/1024), 'KB');
-
-    var prompt = 'Ini adalah tabel planning ekspor. Ekstrak SEMUA baris data (bukan baris header) sebagai JSON array. ' +
-      'Tiap baris adalah object dengan field berikut: ' +
-      'keterangan (kolom pertama, bisa kosong), ' +
-      'so (angka ~12 digit kolom SO), ' +
-      'qt (angka ~12 digit kolom QT/QTI), ' +
-      'negara (kolom NEGARA), ' +
-      'kode (angka 6 digit kolom KODE), ' +
-      'material (teks kolom MATERIAL/DESKRIPSI), ' +
-      'stuffing_date (teks tanggal kolom STUFFING DATE, format asli dari tabel misalnya 08-Jun-26), ' +
-      'qty (angka kolom QTY), ' +
-      'plant (kolom STUFFING PLANT), ' +
-      'note (kolom NOTE, bisa kosong). ' +
-      'Return HANYA JSON array tanpa teks lain dan tanpa markdown.';
-
-    fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: mimer, data: b64r } },
-          { type: 'text', text: prompt }
-        ]}]
-      })
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      if (!res || res.error) {
-        var msg = res && res.error ? res.error.message : 'API error';
-        setLog('Gagal: ' + msg); showToast('Gagal baca gambar: ' + msg, 'error');
-        callback(null); return;
+    API.run('ocrImageEmail', { b64: b64r, mimeType: mimer }, function(res) {
+      if (res && res.success && res.text && res.text.trim().length > 5) {
+        setLog('OCR selesai ✓');
+        callback(res.text);
+      } else {
+        var msg = (res && res.message) ? res.message : 'OCR gagal';
+        setLog('⚠ ' + msg);
+        showToast('OCR gagal: ' + msg, 'error');
+        callback(null);
       }
-      var text = (res.content||[]).map(function(b){ return b.text||''; }).join('');
-      console.log('[MEK-OCR-AI]', text.slice(0,300));
-      setLog('Selesai ✓');
-      callback(text);
-    })
-    .catch(function(err){
-      setLog('Error: ' + err.message);
-      showToast('Error: ' + err.message, 'error');
-      callback(null);
     });
   });
 }
 
-// Resize gambar via Canvas sebelum kirim ke API
 function _mekResizeImgB64(b64, mime, maxPx, cb) {
   try {
     var img = new Image();
