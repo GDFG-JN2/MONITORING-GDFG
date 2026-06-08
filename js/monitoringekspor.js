@@ -588,16 +588,10 @@ function mekSavePlanning() {
   if (_mekPlanMode === 'si') {
     rows = _mekSiRows;
   } else if (_mekPlanMode === 'email') {
-    // Kalau mode manual, collect dari tabel
-    if (_mekEmailInputMode === 'manual') {
-      rows = _mekCollectManualRows();
-    } else {
-      rows = _mekEmailRows;
-    }
+    rows = _mekEmailInputMode === 'manual' ? _mekCollectManualRows() : _mekEmailRows;
   } else {
     rows = _mekParsedRows;
   }
-
   if (!rows || !rows.length) {
     var msg = _mekPlanMode === 'si'    ? 'Belum ada data SI. Upload PDF dulu.'
             : _mekPlanMode === 'email' ? (_mekEmailInputMode === 'manual' ? 'Isi tabel dulu.' : 'Belum ada data Email. Upload file dulu.')
@@ -631,27 +625,16 @@ function mekSavePlanning() {
     weekOverride = ((document.getElementById('mekEmailWeek')||{}).value||'').trim();
   }
 
-  // Sanitize: hapus karakter yang bisa merusak JSON (newline, tab, quotes aneh dari Excel)
   var cleanRows = filledRows.map(function(r) {
     function san(v) {
       if (!v && v !== 0) return '';
       return String(v).replace(/[\r\n\t]/g,' ').replace(/[\x00-\x1f\x7f]/g,'').trim();
     }
-    return {
-      week:    san(r.week),
-      tanggal: san(r.tanggal),
-      sku:     san(r.sku),
-      nama:    san(r.nama),
-      jumlah:  san(r.jumlah) || '1',
-      tujuan:  san(r.tujuan),
-      ket:     san(r.ket),
-      noSo:    san(r.noSo),
-      source:  san(r.source) || 'EMAIL',
-      _isFirst:   r._isFirst,
-      _groupSize: r._groupSize
-    };
+    return { week:san(r.week), tanggal:san(r.tanggal), sku:san(r.sku), nama:san(r.nama),
+      jumlah:san(r.jumlah)||'1', tujuan:san(r.tujuan), ket:san(r.ket),
+      noSo:san(r.noSo), source:san(r.source)||'EMAIL',
+      _isFirst:r._isFirst, _groupSize:r._groupSize };
   });
-
   API.run('saveMekPlanningData', { rows: cleanRows, weekOverride: weekOverride }, function (res) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Simpan'; }
     if (res && res.success) {
@@ -844,11 +827,9 @@ function _mekGlobalEmailPaste(e) {
 }
 
 function mekHandleEmailPaste(e) {
-  // Kalau mode manual atau target adalah cell editable di tabel → biarkan browser handle sendiri
   if (_mekEmailInputMode === 'manual') return;
   var tag = (e.target && e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea' || e.target.contentEditable === 'true') return;
-
   var items = (e.clipboardData || e.originalEvent && e.originalEvent.clipboardData || {}).items;
   if (!items) return;
   for (var i = 0; i < items.length; i++) {
@@ -911,7 +892,9 @@ function mekHandleEmailFiles(files) {
   });
 }
 
-// ── Switch mode Upload / Manual ─────────────────────────────
+// ======================================================
+// MANUAL INPUT TABLE
+// ======================================================
 var _mekEmailInputMode = 'upload';
 
 function mekEmailSwitchMode(mode) {
@@ -922,20 +905,18 @@ function mekEmailSwitchMode(mode) {
   var btnM = document.getElementById('mekEmailModeManual');
   if (!up || !man) return;
   if (mode === 'upload') {
-    up.style.display  = ''; man.style.display = 'none';
-    btnU.style.color  = '#1a3a5c'; btnU.style.borderBottomColor = '#1a3a5c';
-    btnM.style.color  = '#718096'; btnM.style.borderBottomColor = 'transparent';
+    up.style.display=''; man.style.display='none';
+    if(btnU){btnU.style.color='#1a3a5c';btnU.style.borderBottomColor='#1a3a5c';}
+    if(btnM){btnM.style.color='#718096';btnM.style.borderBottomColor='transparent';}
   } else {
-    up.style.display  = 'none'; man.style.display = '';
-    btnM.style.color  = '#1a3a5c'; btnM.style.borderBottomColor = '#1a3a5c';
-    btnU.style.color  = '#718096'; btnU.style.borderBottomColor = 'transparent';
-    // Init tabel kalau kosong
+    up.style.display='none'; man.style.display='';
+    if(btnM){btnM.style.color='#1a3a5c';btnM.style.borderBottomColor='#1a3a5c';}
+    if(btnU){btnU.style.color='#718096';btnU.style.borderBottomColor='transparent';}
     var tbody = document.getElementById('mekEmailManualTbody');
     if (tbody && !tbody.rows.length) mekEmailManualAddRow();
   }
 }
 
-// Kolom tabel manual: stuffing_date, so, qt, negara, kode, material, qty, plant, keterangan
 var _MEK_MAN_COLS = ['keterangan','so','qt','negara','kode','material','stuffing_date','qty','plant','ready','email','rsv_crt','po_sto','do_sto','note'];
 
 function mekEmailManualAddRow(vals) {
@@ -944,101 +925,61 @@ function mekEmailManualAddRow(vals) {
   var idx = tbody.rows.length;
   var tr = document.createElement('tr');
   tr.dataset.idx = idx;
-
-  // Nomor baris
   var tdNum = document.createElement('td');
-  tdNum.style.cssText = 'text-align:center;color:#a0aec0;font-size:11px;background:#f8fafc;';
+  tdNum.style.cssText = 'text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;';
   tdNum.textContent = idx + 1;
   tr.appendChild(tdNum);
-
-  // Cell per kolom
   _MEK_MAN_COLS.forEach(function(col, ci) {
     var td = document.createElement('td');
     td.contentEditable = 'true';
     td.dataset.col = col;
     td.style.cssText = 'outline:none;padding:5px 6px;font-size:12px;min-width:60px;white-space:nowrap;cursor:text;';
-    td.style.textAlign = (col === 'qty' || col === 'rsv_crt') ? 'right' : 'left';
+    td.style.textAlign = (col==='qty'||col==='rsv_crt') ? 'right' : 'left';
     if (vals && vals[col] !== undefined) td.textContent = vals[col];
-
-    // Highlight saat fokus
-    td.addEventListener('focus', function() { td.style.background = '#fffde7'; });
-    td.addEventListener('blur',  function() { td.style.background = ''; });
-
-    // Tab ke cell berikutnya
+    td.addEventListener('focus', function(){ td.style.background='#fffde7'; });
+    td.addEventListener('blur',  function(){ td.style.background=''; });
     td.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
         var cells = tr.querySelectorAll('[contenteditable]');
         var pos = Array.from(cells).indexOf(td);
-        if (pos < cells.length - 1) {
-          cells[pos + 1].focus();
-        } else {
-          // Tab di kolom terakhir → tambah baris baru
-          mekEmailManualAddRow();
-          setTimeout(function() {
-            var rows = tbody.rows;
-            if (rows.length > 1) rows[rows.length-1].cells[1].focus();
-          }, 50);
-        }
+        if (pos < cells.length-1) { cells[pos+1].focus(); }
+        else { mekEmailManualAddRow(); setTimeout(function(){ var rows=tbody.rows; if(rows.length>1)rows[rows.length-1].cells[1].focus(); },50); }
       } else if (e.key === 'Enter') {
         e.preventDefault();
         mekEmailManualAddRow();
-        setTimeout(function() {
-          var rows = tbody.rows;
-          if (rows.length > 1) rows[rows.length-1].cells[1].focus();
-        }, 50);
+        setTimeout(function(){ var rows=tbody.rows; if(rows.length>1)rows[rows.length-1].cells[1].focus(); },50);
       }
     });
-
-    // Paste dari Excel (tab-separated)
     td.addEventListener('paste', function(e) {
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData('text');
       if (!text) return;
       var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(Boolean);
-      if (lines.length === 1 && lines[0].indexOf('	') < 0) {
-        // Single cell paste
-        document.execCommand('insertText', false, lines[0]);
-        return;
-      }
-      // Multi-cell paste: fill dari posisi ini ke bawah
-      var colStart = ci;
+      if (lines.length===1 && lines[0].indexOf('\t')<0) { document.execCommand('insertText',false,lines[0]); return; }
       lines.forEach(function(line, li) {
-        var cellVals = line.split('	');
+        var cellVals = line.split('\t');
         var targetRow;
-        if (li === 0) {
-          targetRow = tr;
-        } else {
-          // Tambah baris kalau perlu
-          while (tbody.rows.length <= idx + li) mekEmailManualAddRow();
-          targetRow = tbody.rows[idx + li];
-        }
-        cellVals.forEach(function(val, vi) {
-          var colIdx = colStart + vi;
-          if (colIdx >= _MEK_MAN_COLS.length) return;
-          var cell = targetRow.querySelector('[data-col="' + _MEK_MAN_COLS[colIdx] + '"]');
-          if (cell) cell.textContent = val.trim();
+        if (li===0) { targetRow=tr; }
+        else { while(tbody.rows.length<=idx+li) mekEmailManualAddRow(); targetRow=tbody.rows[idx+li]; }
+        cellVals.forEach(function(val,vi){
+          var colIdx=ci+vi;
+          if(colIdx>=_MEK_MAN_COLS.length) return;
+          var cell=targetRow.querySelector('[data-col="'+_MEK_MAN_COLS[colIdx]+'"]');
+          if(cell) cell.textContent=val.trim();
         });
       });
     });
-
     tr.appendChild(td);
   });
-
-  // Tombol hapus baris
   var tdDel = document.createElement('td');
   tdDel.style.cssText = 'text-align:center;padding:2px;';
   var btn = document.createElement('button');
   btn.innerHTML = '<i class="fas fa-times"></i>';
   btn.style.cssText = 'background:none;border:none;color:#fc8181;cursor:pointer;font-size:11px;padding:3px 5px;';
-  btn.onclick = function() {
-    tr.parentNode.removeChild(tr);
-    // Re-number
-    Array.from(tbody.rows).forEach(function(r, i) { r.cells[0].textContent = i+1; });
-  };
+  btn.onclick = function(){ tr.parentNode.removeChild(tr); Array.from(tbody.rows).forEach(function(r,i){r.cells[0].textContent=i+1;}); };
   tdDel.appendChild(btn);
   tr.appendChild(tdDel);
-
   tbody.appendChild(tr);
 }
 
@@ -1048,150 +989,155 @@ function mekEmailManualClear() {
   mekEmailManualAddRow();
 }
 
-// Kumpulkan rows dari tabel manual → format internal email
 function _mekCollectManualRows() {
   var tbody = document.getElementById('mekEmailManualTbody');
   if (!tbody) return [];
   var weekOverride = parseInt((document.getElementById('mekEmailWeek')||{}).value||'')||0;
   var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-
   function parseTgl(s) {
     if (!s) return '';
     s = String(s).trim();
-    var m = s.match(/^(\d{1,2})[\/\-.]([A-Za-z]{3})[\/\-.](\d{2,4})$/);
-    if (m) {
-      var mon = MONTHS[(m[2]||'').toLowerCase()]||0;
-      if (!mon) return '';
-      var yr = m[3].length===2?'20'+m[3]:m[3];
-      return yr+'-'+('0'+mon).slice(-2)+'-'+('0'+m[1]).slice(-2);
-    }
+    var m = s.match(/^(\d{1,2})[\/.\-]([A-Za-z]{3})[\/.\-](\d{2,4})$/);
+    if (m) { var mon=MONTHS[(m[2]||'').toLowerCase()]||0; if(!mon)return ''; var yr=m[3].length===2?'20'+m[3]:m[3]; return yr+'-'+('0'+mon).slice(-2)+'-'+('0'+m[1]).slice(-2); }
     var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if (m2) return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
     return '';
   }
   function weekFromTgl(ymd) {
     if (!ymd) return '';
-    var d = new Date(ymd+'T00:00:00Z');
-    var day = d.getUTCDay()||7;
+    var d=new Date(ymd+'T00:00:00Z'); var day=d.getUTCDay()||7;
     d.setUTCDate(d.getUTCDate()+4-day);
-    var y0 = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    var y0=new Date(Date.UTC(d.getUTCFullYear(),0,1));
     return String(Math.ceil(((d-y0)/86400000+1)/7));
   }
-
   var rows = [];
   Array.from(tbody.rows).forEach(function(tr) {
-    function g(col) {
-      var el = tr.querySelector('[data-col="'+col+'"]');
-      return el ? el.textContent.trim() : '';
-    }
-    var so   = g('so').replace(/\D/g,'');
-    var kode = g('kode').replace(/\D/g,'');
+    function g(col){ var el=tr.querySelector('[data-col="'+col+'"]'); return el?el.textContent.trim():''; }
+    var so=g('so').replace(/\D/g,''), kode=g('kode').replace(/\D/g,'');
     if (!so && !kode) return;
-    var tgl = parseTgl(g('stuffing_date'));
-    var wk  = weekOverride ? String(weekOverride) : weekFromTgl(tgl);
-    var qty = parseInt(g('qty').replace(/\D/g,''))||0;
-    // Gabung field tambahan ke kolom KET untuk disimpan ke sheet
-    var extra = [g('ready'),g('email'),g('rsv_crt'),g('po_sto'),g('do_sto')]
-      .map(function(v,i){
-        var labels = ['READY','EMAIL','RSV','PO','DO'];
-        return v ? labels[i]+':'+v : '';
-      }).filter(Boolean).join(' | ');
-    var ket = [g('keterangan'), extra].filter(Boolean).join(' | ');
-    var negara = g('negara').toUpperCase();
-    // KET = SO + QT + extra fields + keterangan user
-    var noQt  = g('qt').replace(/\D/g,'');
-    var soQtStr = [so ? 'SO:'+so : '', noQt ? 'QT:'+noQt : ''].filter(Boolean).join(' | ');
-    var ketFull = [soQtStr, ket].filter(Boolean).join(' | ');
-    rows.push({
-      week:    wk,
-      tanggal: tgl,
-      sku:     kode,
-      nama:    g('material'),
-      jumlah:  '1',          // default 1 cont per baris; bisa diisi dari kolom lain kalau ada
-      tujuan:  negara,       // NEGARA → TUJUAN (field yang disimpan ke sheet)
-      ket:     ketFull,
-      source:  'EMAIL',
-      _isFirst: true, _groupSize: 1
-    });
+    var tgl=parseTgl(g('stuffing_date'));
+    var wk=weekOverride?String(weekOverride):weekFromTgl(tgl);
+    var qty=parseInt(g('qty').replace(/\D/g,''))||0;
+    var extra=[g('ready'),g('email'),g('rsv_crt'),g('po_sto'),g('do_sto')]
+      .map(function(v,i){var L=['READY','EMAIL','RSV','PO','DO'];return v?L[i]+':'+v:'';}).filter(Boolean).join(' | ');
+    var negara=g('negara').toUpperCase();
+    var noQt=g('qt').replace(/\D/g,'');
+    var soQtStr=[so?'SO:'+so:'',noQt?'QT:'+noQt:''].filter(Boolean).join(' | ');
+    var ket=[soQtStr,g('keterangan'),extra].filter(Boolean).join(' | ');
+    rows.push({ week:wk, tanggal:tgl, sku:kode, nama:g('material'),
+      jumlah:'1', tujuan:negara, ket:ket, noSo:so,
+      source:'EMAIL', _isFirst:true, _groupSize:1 });
   });
   return rows;
 }
 
+// ======================================================
+// CAPAIAN EMAIL - load dan render
+// ======================================================
+var _mekCapEmailData    = [];
+var _mekCapEmailSummary = {};
+
+function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
+  var tbody = document.getElementById('mekCapTbody');
+  if (!tbody) return;
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data.</td></tr>';
+    return;
+  }
+  skuFilter = (skuFilter||'').toLowerCase();
+  docFilter = _mekStripLeadingZero(docFilter||'');
+  tujFilter = (tujFilter||'').toLowerCase();
+
+  var filtered = data;
+  if (skuFilter || docFilter || tujFilter) {
+    var validKey = {};
+    data.forEach(function(r) {
+      var k = r.noSo+'|'+r.planTgl;
+      var skuOk = !skuFilter||(r.sku||'').toLowerCase().indexOf(skuFilter)>=0||(r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
+      var docOk = !docFilter||_mekStripLeadingZero(r.noSo||'').indexOf(docFilter)>=0;
+      var tujOk = !tujFilter||(r.tujuan||'').toLowerCase().indexOf(tujFilter)>=0;
+      if (skuOk&&docOk&&tujOk) validKey[k]=true;
+    });
+    filtered = data.filter(function(r){ return validKey[r.noSo+'|'+r.planTgl]; });
+  }
+
+  var byDate={}, dateOrder=[];
+  filtered.forEach(function(r){
+    if (!byDate[r.planTgl]){byDate[r.planTgl]=[];dateOrder.push(r.planTgl);}
+    byDate[r.planTgl].push(r);
+  });
+  dateOrder=dateOrder.filter(function(d,i){return dateOrder.indexOf(d)===i;});
+
+  var CS='border-bottom:1px solid #e2e8f0;padding:6px 8px;font-size:12px;';
+  var html='';
+
+  dateOrder.forEach(function(planTgl){
+    var rows=byDate[planTgl];
+    var sum=_mekCapEmailSummary[planTgl]||{total:0,keluar:0,loading:0,daftar:0,belum:0,pendingan:0};
+    var pct=sum.total?Math.round(sum.keluar/sum.total*100):0;
+
+    html+='<tr style="background:#1a3a5c;"><td colspan="14" style="padding:8px 12px;color:#fff;font-size:12px;font-weight:700;">' +
+      '<span style="margin-right:12px;">' + _mekFmtTglDisplay(planTgl) + '</span>' +
+      '<span style="background:rgba(255,255,255,.15);border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">Total: '+sum.total+' truk</span>' +
+      '<span style="background:#48bb78;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">' + sum.keluar + ' keluar</span>' +
+      ((sum.loading+sum.daftar)?'<span style="background:#ed8936;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">'+(sum.loading+sum.daftar)+' proses</span>':'') +
+      (sum.belum?'<span style="background:#fc8181;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">'+sum.belum+' belum</span>':'') +
+      (sum.pendingan?'<span style="background:#f6d860;color:#744210;border-radius:10px;padding:2px 10px;font-size:11px;">'+sum.pendingan+' pendingan</span>':'') +
+      '<span style="float:right;font-size:11px;opacity:.8;">'+pct+'% keluar</span>' +
+      '</td></tr>';
+
+    html+='<tr style="background:#2d4a6a;color:#bee3f8;font-size:11px;font-weight:700;">' +
+      '<th style="padding:5px 8px;width:30px;">#</th><th style="padding:5px 8px;">NO SO</th>' +
+      '<th style="padding:5px 8px;">SKU</th><th style="padding:5px 8px;">Nama Item</th>' +
+      '<th style="padding:5px 8px;text-align:right;">Plan</th><th style="padding:5px 8px;">Tujuan</th>' +
+      '<th style="padding:5px 8px;">No Pol</th><th style="padding:5px 8px;">Ekspedisi</th>' +
+      '<th style="padding:5px 8px;">Waktu Daftar</th><th style="padding:5px 8px;">Proses Loading</th>' +
+      '<th style="padding:5px 8px;">Waktu Keluar</th><th style="padding:5px 8px;">Status</th>' +
+      '<th style="padding:5px 8px;">Tgl Aktual</th><th style="padding:5px 8px;">Keterangan</th></tr>';
+
+    var rowNum=0;
+    rows.forEach(function(r){
+      if(r.isFirstRow) rowNum++;
+      var isPend=r.isPendingan;
+      var bg=isPend?'background:#fffff0;':(r.status==='belum'?'background:#fff5f5;':'');
+      var badge=r.status==='keluar'
+        ?'<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Keluar</span>'
+        :r.status==='loading'
+        ?'<span style="background:#feebc8;color:#744210;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Loading</span>'
+        :r.status==='daftar'
+        ?'<span style="background:#bee3f8;color:#2b6cb0;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Daftar</span>'
+        :'<span style="background:#fed7d7;color:#c53030;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Belum</span>';
+      var ket=isPend?'<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>':'';
+      html+='<tr style="'+bg+'">' +
+        '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'')+'</td>' +
+        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+_mekEsc(r.noSo||'—')+'</td>' +
+        '<td style="'+CS+'font-weight:700;">'+(r.isFirstRow?_mekEsc(r.sku||''):'')+'</td>' +
+        '<td style="'+CS+'">'+(r.isFirstRow?_mekEsc(r.nama||''):'')+'</td>' +
+        '<td style="'+CS+'text-align:right;font-weight:700;">'+(r.isFirstRow&&r.planCont?r.planCont:'')+'</td>' +
+        '<td style="'+CS+'color:#276749;font-weight:600;">'+(r.isFirstRow?_mekEsc(r.tujuan||''):'')+'</td>' +
+        '<td style="'+CS+'font-weight:600;">'+_mekEsc(r.nopol||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.waktuKeluar||'—')+'</td>' +
+        '<td style="'+CS+'">'+badge+'</td>' +
+        '<td style="'+CS+'font-size:11px;color:#718096;">'+_mekEsc(r.tglDaftar?_mekFmtTglDisplay(r.tglDaftar):'—')+'</td>' +
+        '<td style="'+CS+'">'+ket+'</td>' +
+        '</tr>';
+    });
+  });
+
+  tbody.innerHTML = html;
+}
+
+// ======================================================
 // ── Parser tabel Email ───────────────────────────────────────
 // Header kolom: KETERANGAN|SO|QT|NEGARA|KODE|MATERIAL|STUFFING DATE|QTY|STUFFING PLANT|NOTE
 // Deteksi header dulu, lalu parse baris per baris
 var _MEK_EMAIL_COLS = ['keterangan','so','qt','negara','kode','material','stuffing_date','qty','plant','note'];
 
-// Map JSON rows dari Claude Vision ke format internal email
-function _mekMapAiRowsToEmail(aiRows, stdCache) {
-  var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-  var weekOverride = parseInt((document.getElementById('mekEmailWeek')||{}).value||'')||0;
-
-  function parseTgl(s) {
-    if (!s) return '';
-    s = String(s).trim();
-    var m = s.match(/^(\d{1,2})[\/\-.]([A-Za-z]{3})[\/\-.](\d{2,4})$/);
-    if (m) {
-      var mon = MONTHS[(m[2]||'').toLowerCase()]||0;
-      if (!mon) return '';
-      var yr = m[3].length===2 ? '20'+m[3] : m[3];
-      return yr+'-'+('0'+mon).slice(-2)+'-'+('0'+m[1]).slice(-2);
-    }
-    var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if (m2) return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
-    return '';
-  }
-  function weekFromTgl(ymd) {
-    if (!ymd) return '';
-    var d = new Date(ymd+'T00:00:00Z');
-    var day = d.getUTCDay()||7;
-    d.setUTCDate(d.getUTCDate()+4-day);
-    var y0 = new Date(Date.UTC(d.getUTCFullYear(),0,1));
-    return String(Math.ceil(((d-y0)/86400000+1)/7));
-  }
-
-  var rows = [];
-  aiRows.forEach(function(r) {
-    var so  = String(r.so||'').replace(/\D/g,'');
-    var qt  = String(r.qt||'').replace(/\D/g,'');
-    var tgl = parseTgl(r.stuffing_date);
-    var wk  = weekOverride ? String(weekOverride) : weekFromTgl(tgl);
-    var sku = String(r.kode||'').replace(/\D/g,'');
-    var qty = parseInt(String(r.qty||'0').replace(/\D/g,''))||0;
-    if (!so && !sku) return; // skip baris kosong
-    rows.push({
-      week: wk, tanggal: tgl,
-      sku: sku, noSo: so, noQt: qt,
-      nama: String(r.material||'').trim(),
-      negara: String(r.negara||'').trim().toUpperCase(),
-      qty: qty, plant: String(r.plant||'').trim(),
-      ket: String(r.keterangan||'').trim(),
-      note: String(r.note||'').trim(),
-      source: 'EMAIL', _isFirst: true, _groupSize: 1
-    });
-  });
-  return rows;
-}
-
 function _mekParseEmailTable(text, stdCache) {
   if (!text) return [];
-
-  // ── Cek apakah response adalah JSON dari Claude Vision ───
-  var trimmed = text.trim();
-  if (trimmed.startsWith('[') || trimmed.startsWith('```')) {
-    // Claude return JSON array — parse langsung
-    try {
-      var jsonStr = trimmed.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
-      var aiRows = JSON.parse(jsonStr);
-      if (Array.isArray(aiRows) && aiRows.length > 0) {
-        console.log('[MEK-EMAIL AI-JSON] parsed', aiRows.length, 'rows');
-        return _mekMapAiRowsToEmail(aiRows, stdCache);
-      }
-    } catch(e) {
-      console.warn('[MEK-EMAIL AI-JSON parse fail]', e.message);
-      // fallback ke parser teks biasa
-    }
-  }
 
   // ── Debug: tampilkan teks mentah OCR di file log ─────────
   console.log('[MEK-EMAIL RAW TEXT]\n' + text.slice(0, 1000));
@@ -1915,23 +1861,21 @@ function _mekRegexParseSi(text, weekOverride) {
   };
 }
 
-// ── OCR via GAS (Gemini/Drive) ───────────────────────────────
+// ── OCR gambar via GAS (Gemini/Drive) ─────────────────────
 function _mekOcrImage(image, callback) {
   if (!image || !image.b64) { callback(null); return; }
-
   var logs = document.querySelectorAll('[id^="mekEmailLogMsg_"],[id^="mekSiLogMsg_"]');
   function setLog(msg) { if (logs.length) logs[logs.length-1].textContent = msg; }
   setLog('OCR via GAS...');
-
   _mekResizeImgB64(image.b64, image.mime, 1200, function(b64r, mimer) {
     console.log('[MEK-OCR] size:', Math.round(b64r.length/1024), 'KB');
     API.run('ocrImageEmail', { b64: b64r, mimeType: mimer }, function(res) {
       if (res && res.success && res.text && res.text.trim().length > 5) {
-        setLog('OCR selesai ✓');
+        setLog('OCR selesai');
         callback(res.text);
       } else {
         var msg = (res && res.message) ? res.message : 'OCR gagal';
-        setLog('⚠ ' + msg);
+        setLog(msg);
         showToast('OCR gagal: ' + msg, 'error');
         callback(null);
       }
@@ -1939,6 +1883,7 @@ function _mekOcrImage(image, callback) {
   });
 }
 
+// Resize gambar via Canvas sebelum kirim ke GAS
 function _mekResizeImgB64(b64, mime, maxPx, cb) {
   try {
     var img = new Image();
@@ -1955,7 +1900,6 @@ function _mekResizeImgB64(b64, mime, maxPx, cb) {
     img.src = 'data:' + mime + ';base64,' + b64;
   } catch(e) { cb(b64, mime); }
 }
-
 
 // ── Finalize: render tabel SI ────────────────────────────────
 function _mekFinalizeSiRows() {
@@ -2136,6 +2080,19 @@ function mekLoadCapaian() {
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#a0aec0;">' +
     '<i class="fas fa-spinner fa-spin" style="font-size:22px;"></i></td></tr>';
+
+  if (_mekCapMode === 'email') {
+    API.run('getMekCapaianEmail', { from: from, to: to }, function(res) {
+      if (!res || !res.success) {
+        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
+        return;
+      }
+      _mekCapEmailData = res.data || [];
+      _mekCapEmailSummary = res.summaryByDate || {};
+      _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tujuan);
+    });
+    return;
+  }
 
   API.run('getMekCapaianPlanning', { from: from, to: to, mode: _mekCapMode }, function(res) {
     if (!res || !res.success) {
