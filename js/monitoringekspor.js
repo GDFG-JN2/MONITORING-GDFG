@@ -1036,6 +1036,23 @@ function _mekCollectManualRows() {
 // ======================================================
 var _mekCapEmailData    = [];
 var _mekCapEmailSummary = {};
+var _mekCapEmailView    = 'plan';  // 'plan' | 'aktual'
+
+function mekCapEmailSwitchView(view) {
+  _mekCapEmailView = view;
+  var btnP = document.getElementById('mekCapEmailByPlan');
+  var btnA = document.getElementById('mekCapEmailByAktual');
+  if (btnP) btnP.classList.toggle('active', view === 'plan');
+  if (btnA) btnA.classList.toggle('active', view === 'aktual');
+  if (view === 'aktual') {
+    _mekRenderCapaianEmailAktual(_mekCapEmailData);
+  } else {
+    var sku = ((document.getElementById('mekCapSku')||{}).value||'').toLowerCase();
+    var doc = ((document.getElementById('mekCapDoc')||{}).value||'').trim();
+    var tuj = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase();
+    _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tuj);
+  }
+}
 
 function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   var tbody = document.getElementById('mekCapTbody');
@@ -2081,6 +2098,12 @@ function mekLoadCapaian() {
   tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#a0aec0;">' +
     '<i class="fas fa-spinner fa-spin" style="font-size:22px;"></i></td></tr>';
 
+  // Sembunyikan/tampilkan thead dan toggle email
+  var thead = document.getElementById('mekCapThead');
+  if (thead) thead.style.display = _mekCapMode === 'email' ? 'none' : '';
+  var emailToggle = document.getElementById('mekCapEmailViewToggle');
+  if (emailToggle) emailToggle.style.display = _mekCapMode === 'email' ? '' : 'none';
+
   if (_mekCapMode === 'email') {
     API.run('getMekCapaianEmail', { from: from, to: to }, function(res) {
       if (!res || !res.success) {
@@ -2089,7 +2112,11 @@ function mekLoadCapaian() {
       }
       _mekCapEmailData = res.data || [];
       _mekCapEmailSummary = res.summaryByDate || {};
-      _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tujuan);
+      if (_mekCapEmailView === 'aktual') {
+        _mekRenderCapaianEmailAktual(_mekCapEmailData);
+      } else {
+        _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tujuan);
+      }
     });
     return;
   }
@@ -2139,6 +2166,104 @@ function mekCapSwitchMode(mode) {
       (mode==='email' && id==='mekCapModeEmail'));
   });
   mekLoadCapaian();
+}
+
+// ── Render By Aktual — grup per tanggal aktual masuk ─────────
+function _mekRenderCapaianEmailAktual(data) {
+  var tbody = document.getElementById('mekCapTbody');
+  if (!tbody) return;
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data.</td></tr>';
+    return;
+  }
+
+  // Group per tanggal aktual (tglDaftar), skip baris belum
+  var byAktual = {}, aktualOrder = [];
+  data.forEach(function(r) {
+    if (r.status === 'belum' || !r.tglDaftar) return;
+    if (!byAktual[r.tglDaftar]) { byAktual[r.tglDaftar] = []; aktualOrder.push(r.tglDaftar); }
+    byAktual[r.tglDaftar].push(r);
+  });
+  aktualOrder = aktualOrder.filter(function(d,i){ return aktualOrder.indexOf(d)===i; }).sort();
+
+  var CS = 'border-bottom:1px solid #e2e8f0;padding:6px 8px;font-size:12px;';
+  var html = '';
+
+  aktualOrder.forEach(function(aktualTgl) {
+    var rows = byAktual[aktualTgl];
+    var keluar  = rows.filter(function(r){ return r.status==='keluar'; }).length;
+    var loading = rows.filter(function(r){ return r.status==='loading'; }).length;
+    var daftar  = rows.filter(function(r){ return r.status==='daftar'; }).length;
+    var pend    = rows.filter(function(r){ return r.isPendingan; }).length;
+
+    // Header tanggal aktual
+    html += '<tr style="background:#276749;">' +
+      '<td colspan="14" style="padding:8px 12px;color:#fff;font-size:12px;font-weight:700;">' +
+        '<span style="margin-right:12px;">' + _mekFmtTglDisplay(aktualTgl) + '</span>' +
+        '<span style="background:rgba(255,255,255,.15);border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">Total: '+rows.length+' truk</span>' +
+        (keluar  ? '<span style="background:#48bb78;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">'+keluar+' keluar</span>' : '') +
+        (loading+daftar ? '<span style="background:#ed8936;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">'+(loading+daftar)+' proses</span>' : '') +
+        (pend ? '<span style="background:#f6d860;color:#744210;border-radius:10px;padding:2px 10px;font-size:11px;">'+pend+' pendingan</span>' : '') +
+      '</td></tr>';
+
+    // Header kolom
+    html += '<tr style="background:#2d6a4f;color:#d8f3dc;font-size:11px;font-weight:700;">' +
+      '<th style="padding:5px 8px;width:30px;">#</th>' +
+      '<th style="padding:5px 8px;">NO SO</th>' +
+      '<th style="padding:5px 8px;">SKU</th>' +
+      '<th style="padding:5px 8px;">Nama Item</th>' +
+      '<th style="padding:5px 8px;text-align:right;">Plan</th>' +
+      '<th style="padding:5px 8px;">Tgl Plan</th>' +
+      '<th style="padding:5px 8px;">No Pol</th>' +
+      '<th style="padding:5px 8px;">Ekspedisi</th>' +
+      '<th style="padding:5px 8px;">Waktu Daftar</th>' +
+      '<th style="padding:5px 8px;">Proses Loading</th>' +
+      '<th style="padding:5px 8px;">Waktu Keluar</th>' +
+      '<th style="padding:5px 8px;">Status</th>' +
+      '<th style="padding:5px 8px;">Tujuan</th>' +
+      '<th style="padding:5px 8px;">Keterangan</th>' +
+      '</tr>';
+
+    // Group per SO — SO sama hanya tampil info di baris pertama
+    var seenSo = {}, rowNum = 0;
+    rows.forEach(function(r) {
+      var isFirstSo = !seenSo[r.noSo];
+      if (isFirstSo) { seenSo[r.noSo] = 0; rowNum++; }
+      seenSo[r.noSo]++;
+
+      var isPend = r.isPendingan;
+      var bg = isPend ? 'background:#fffff0;' : '';
+
+      var badge = r.status==='keluar'
+        ? '<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Keluar</span>'
+        : r.status==='loading'
+        ? '<span style="background:#feebc8;color:#744210;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Loading</span>'
+        : '<span style="background:#bee3f8;color:#2b6cb0;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Daftar</span>';
+
+      var ket = isPend
+        ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>'
+        : '';
+
+      html += '<tr style="'+bg+'">' +
+        '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(isFirstSo ? rowNum : '')+'</td>' +
+        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(isFirstSo ? _mekEsc(r.noSo||'—') : '')+'</td>' +
+        '<td style="'+CS+'font-weight:700;">'+(isFirstSo ? _mekEsc(r.sku||'') : '')+'</td>' +
+        '<td style="'+CS+'">'+(isFirstSo ? _mekEsc(r.nama||'') : '')+'</td>' +
+        '<td style="'+CS+'text-align:right;font-weight:700;">'+(isFirstSo && r.planCont ? r.planCont : '')+'</td>' +
+        '<td style="'+CS+'font-size:11px;color:#718096;">'+(isFirstSo ? _mekFmtTglDisplay(r.planTgl) : '')+'</td>' +
+        '<td style="'+CS+'font-weight:600;">'+_mekEsc(r.nopol||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'—')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.waktuKeluar||'—')+'</td>' +
+        '<td style="'+CS+'">'+badge+'</td>' +
+        '<td style="'+CS+'color:#276749;font-weight:600;">'+(isFirstSo ? _mekEsc(r.tujuan||'') : '')+'</td>' +
+        '<td style="'+CS+'">'+ket+'</td>' +
+        '</tr>';
+    });
+  });
+
+  tbody.innerHTML = html;
 }
 
 function mekCapSetFilter(f) {
