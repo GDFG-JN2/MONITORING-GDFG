@@ -2257,7 +2257,7 @@ function _mekRenderCapaianEmailAktual(data) {
         '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'—')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.waktuKeluar||'—')+'</td>' +
         '<td style="'+CS+'">'+badge+'</td>' +
-        '<td style="'+CS+'color:#276749;font-weight:600;">'+(isFirstSo ? _mekEsc(r.tujuan||'') : '')+'</td>' +
+        '<td style="'+CS+'color:#276749;font-weight:600;">'+_mekEsc(r.tujuan||'')+'</td>' +
         '<td style="'+CS+'">'+ket+'</td>' +
         '</tr>';
     });
