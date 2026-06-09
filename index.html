@@ -4696,6 +4696,18 @@
           </button>
         </div>
 
+        <!-- Sub-toggle Email: By Planning / By Aktual -->
+        <div id="mekCapEmailViewToggle" style="display:none;padding:6px 14px 4px;border-bottom:1px solid #e2e8f0;">
+          <div style="display:flex;gap:6px;">
+            <button id="mekCapEmailByPlan" class="sum-view-btn active" onclick="mekCapEmailSwitchView('plan')">
+              <i class="fas fa-calendar-alt"></i> By Planning
+            </button>
+            <button id="mekCapEmailByAktual" class="sum-view-btn" onclick="mekCapEmailSwitchView('aktual')">
+              <i class="fas fa-truck"></i> By Aktual
+            </button>
+          </div>
+        </div>
+
         <!-- Toggle mode filter Capaian: Tanggal / Week -->
         <div style="padding:8px 14px 0;">
           <div style="display:flex;gap:6px;margin-bottom:8px;">
@@ -4804,7 +4816,7 @@
           </div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
             <table class="mek-sum-tbl" id="mekCapTbl">
-              <thead>
+              <thead id="mekCapThead">
                 <tr>
                   <th style="width:32px;text-align:center;">#</th>
                   <th>Tgl Planning</th>
