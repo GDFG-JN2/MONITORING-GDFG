@@ -5471,31 +5471,17 @@
   </script>
 
 <script>
-// ── Global zoom untuk semua halaman ─────────────────────────
+// ── Global zoom — pakai CSS zoom property (aman, tidak merusak layout) ──
 var _appZoomLevel = 100;
 var _appZoomStep  = 10;
 var _appZoomMin   = 50;
 var _appZoomMax   = 150;
-var _appZoomTarget = null;  // element yang di-scale
-
-function _zoomGetTarget() {
-  // Scale #dashboard atau #monitoringEksporPage atau element utama
-  return document.getElementById('dashboard') ||
-         document.getElementById('main-content') ||
-         document.body;
-}
 
 function _zoomApply() {
-  var el = _zoomGetTarget();
-  if (!el) return;
-  var s = _appZoomLevel / 100;
-  el.style.transformOrigin = 'top left';
-  el.style.transform = s === 1 ? '' : 'scale(' + s + ')';
-  el.style.width     = s === 1 ? '' : (100 / s) + '%';
-  // Update label
+  var pct = _appZoomLevel / 100;
+  document.body.style.zoom = pct;
   var lbl = document.getElementById('zoomLevelLabel');
   if (lbl) lbl.textContent = _appZoomLevel + '%';
-  // Simpan ke localStorage
   try { localStorage.setItem('appZoom', _appZoomLevel); } catch(e) {}
 }
 
@@ -5509,8 +5495,7 @@ function _zoomReset() { _appZoomLevel = 100; _zoomApply(); }
     var saved = parseInt(localStorage.getItem('appZoom'));
     if (saved && saved >= 50 && saved <= 150) _appZoomLevel = saved;
   } catch(e) {}
-  // Apply setelah halaman siap
-  window.addEventListener('load', function() { if (_appZoomLevel !== 100) _zoomApply(); });
+  window.addEventListener('load', function() { _zoomApply(); });
 })();
 </script>
 </body>
