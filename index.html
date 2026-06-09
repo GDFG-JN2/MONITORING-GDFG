@@ -2318,101 +2318,53 @@
       #mekSiPanel{ height:calc(100vh - 195px) !important; }
     }
 
-    /* ── MOBILE PORTRAIT ≤ 480px ────────────────────────────────
-       Semua elemen dikecilkan, layout tetap fungsional          */
-    @media(max-width:480px){
-      /* Cards: 3 kolom compact di portrait */
-      #monitoringEksporPage .mek-card-grid{
-        grid-template-columns:repeat(3,1fr);
-        gap:5px; padding:6px 8px;
-      }
-      #monitoringEksporPage .mek-card{
-        padding:7px 8px; gap:6px; border-radius:8px;
-      }
-      #monitoringEksporPage .mek-card-ico{
-        width:24px; height:24px; font-size:11px; display:none;
-      }
-      #monitoringEksporPage .mek-card-val{ font-size:14px; }
-      #monitoringEksporPage .mek-card-lbl{ font-size:9px; letter-spacing:0; }
-
-      /* Tab bar: scroll horizontal */
+    /* ── MOBILE PORTRAIT ≤ 768px ─────────────────────────────── */
+    @media(max-width:768px){
+      /* Tab bar scroll horizontal */
       #monitoringEksporPage .mek-tab-bar{
         overflow-x:auto; -webkit-overflow-scrolling:touch;
         scrollbar-width:none; flex-wrap:nowrap;
       }
       #monitoringEksporPage .mek-tab-bar::-webkit-scrollbar{ display:none; }
       #monitoringEksporPage .mek-tab-btn{
-        padding:8px 12px; font-size:10px; white-space:nowrap;
-        flex-shrink:0; letter-spacing:0;
+        padding:8px 14px; font-size:11px; white-space:nowrap; flex-shrink:0; letter-spacing:0;
       }
-
-      /* Header toolbar monitoring ekspor */
-      #monitoringEksporPage .mek-hdr-title{ font-size:11px; }
-      #monitoringEksporPage [style*="padding:10px 14px"]{
-        padding:6px 10px !important;
+      /* Cards 3 kolom */
+      #monitoringEksporPage .mek-card-grid{
+        grid-template-columns:repeat(3,1fr); gap:6px; padding:8px 10px;
       }
-
-      /* Filter bar: wrap, font lebih kecil */
-      #monitoringEksporPage .mek-filter-bar{
-        padding:6px 8px; gap:5px;
-      }
-      #monitoringEksporPage .mek-filter-bar input,
-      #monitoringEksporPage .mek-filter-bar select{
-        font-size:11px; padding:4px 6px; min-width:80px;
-      }
-
-      /* Toggle capaian/detail */
-      #mekSumViewToggle{ padding:4px 8px 0; gap:4px; }
-      .sum-view-btn{ padding:5px 10px; font-size:10px; }
-
-      /* Tabel summary: font lebih kecil */
-      #monitoringEksporPage .mek-sum-tbl{ font-size:10px; }
-      #monitoringEksporPage .mek-sum-tbl thead th{
-        font-size:9px; padding:5px 6px;
-      }
-      #monitoringEksporPage .mek-sum-tbl tbody td{
-        padding:5px 6px;
-      }
-
-      /* Capaian planning toolbar */
-      #mekPaneCapaian [style*="padding:8px 14px"]{
-        padding:5px 8px !important; gap:5px !important;
-      }
-
-      /* Input planning toolbar */
-      #mekInputPane [style*="padding:10px 14px"]{
-        padding:6px 8px !important;
-      }
-      #mekInputPane [style*="padding:8px 14px"]{
-        padding:5px 8px !important;
-      }
-
-      /* Sembunyikan label teks pada toolbar, sisakan icon */
-      #monitoringEksporPage .mek-btn-label{ display:none; }
-
-      /* Toggle WA/SI/Email di input planning */
-      #mekWaPanel .mek-plan-mode-bar{
-        overflow-x:auto; -webkit-overflow-scrolling:touch;
-        scrollbar-width:none; flex-wrap:nowrap;
-      }
+      #monitoringEksporPage .mek-card{ padding:9px 10px; gap:7px; }
+      #monitoringEksporPage .mek-card-ico{ width:26px; height:26px; font-size:12px; }
+      #monitoringEksporPage .mek-card-val{ font-size:16px; }
+      #monitoringEksporPage .mek-card-lbl{ font-size:9px; letter-spacing:0; }
+      /* Toggle */
+      #mekSumViewToggle{ gap:4px; }
+      .sum-view-btn{ padding:6px 11px; font-size:11px; }
+      /* Tabel */
+      #monitoringEksporPage .mek-sum-tbl{ font-size:11px; }
+      #monitoringEksporPage .mek-sum-tbl thead th{ font-size:9px; padding:6px 7px; }
+      #monitoringEksporPage .mek-sum-tbl tbody td{ padding:5px 7px; }
     }
 
-    /* Portrait medium 481-768px */
-    @media(min-width:481px) and (max-width:768px){
-      #monitoringEksporPage .mek-card-grid{
-        grid-template-columns:repeat(3,1fr); gap:7px; padding:8px 10px;
-      }
-      #monitoringEksporPage .mek-card{
-        padding:10px 10px; gap:8px;
-      }
-      #monitoringEksporPage .mek-card-ico{
-        width:28px; height:28px; font-size:13px;
-      }
-      #monitoringEksporPage .mek-card-val{ font-size:17px; }
+    /* ── MOBILE PORTRAIT KECIL ≤ 430px ──────────────────────── */
+    @media(max-width:430px){
       #monitoringEksporPage .mek-tab-btn{
-        padding:9px 14px; font-size:11px;
+        padding:7px 10px; font-size:10px;
       }
-      #monitoringEksporPage .mek-sum-tbl{ font-size:11px; }
+      /* Cards: sembunyikan icon, 3 kolom sangat compact */
+      #monitoringEksporPage .mek-card-grid{
+        grid-template-columns:repeat(3,1fr); gap:4px; padding:5px 8px;
+      }
+      #monitoringEksporPage .mek-card{ padding:6px 7px; gap:4px; border-radius:7px; }
+      #monitoringEksporPage .mek-card-ico{ display:none; }
+      #monitoringEksporPage .mek-card-val{ font-size:14px; }
+      #monitoringEksporPage .mek-card-lbl{ font-size:9px; }
+      /* Toggle */
+      .sum-view-btn{ padding:5px 9px; font-size:10px; }
+      /* Tabel */
+      #monitoringEksporPage .mek-sum-tbl{ font-size:10px; }
+      #monitoringEksporPage .mek-sum-tbl thead th{ font-size:9px; padding:5px 5px; }
+      #monitoringEksporPage .mek-sum-tbl tbody td{ padding:4px 5px; }
     }
 </style>
 </head>
