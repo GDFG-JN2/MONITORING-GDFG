@@ -1467,19 +1467,19 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   tbody.innerHTML = html;
 
   // Update summary cards (By Planning email)
-  var _tc=0,_kc=0,_lc=0,_dc=0,_bc=0,_ss={};
+  var _tc=0,_kc=0,_lc=0,_dc=0,_ss={};
   data.forEach(function(r){
     var k=r.noSo+'|'+r.planTgl;
-    // Hanya hitung planCont di baris pertama (isFirstRow) supaya tidak double
     if(!_ss[k] && r.isFirstRow && r.planCont){_ss[k]=true;_tc+=r.planCont;}
     else if(!_ss[k] && r.isFirstRow){_ss[k]=true;}
     if(r.status==='keluar') _kc++;
     else if(r.status==='loading') _lc++;
     else if(r.status==='daftar') _dc++;
-    else _bc++;
   });
+  var _dtg = _kc+_lc+_dc;
+  var _bc  = Math.max(0, _tc - _dtg);  // belum = planning - datang
   _mekSetCard('mekCapCardTotal',_tc);
-  _mekSetCard('mekCapCardDatang',_kc+_lc+_dc);
+  _mekSetCard('mekCapCardDatang',_dtg);
   _mekSetCard('mekCapCardKeluar',_kc);
   _mekSetCard('mekCapCardDaftar',_lc+_dc);
   _mekSetCard('mekCapCardBelum',_bc);
@@ -2621,23 +2621,27 @@ function _mekRenderCapaianEmailAktual(data) {
 
   tbody.innerHTML = html;
 
-  // Update summary cards
+  // Update summary cards — pakai _mekCapEmailData (semua, termasuk belum)
+  // supaya totalCont sama dengan By Planning
   var totalC=0, keluarC=0, loadingC=0, daftarC=0, belumC=0;
   var seenSo3={};
-  data.forEach(function(r){
-    if(!seenSo3[r.noSo+'|'+r.planTgl] && r.planCont){ seenSo3[r.noSo+'|'+r.planTgl]=true; totalC+=r.planCont; }
-    else if(!seenSo3[r.noSo+'|'+r.planTgl]){ seenSo3[r.noSo+'|'+r.planTgl]=true; }
+  _mekCapEmailData.forEach(function(r){
+    if(!seenSo3[r.noSo+'|'+r.planTgl] && r.isFirstRow && r.planCont){
+      seenSo3[r.noSo+'|'+r.planTgl]=true; totalC+=r.planCont;
+    } else if(!seenSo3[r.noSo+'|'+r.planTgl]){
+      seenSo3[r.noSo+'|'+r.planTgl]=true;
+    }
     if(r.status==='keluar') keluarC++;
     else if(r.status==='loading') loadingC++;
     else if(r.status==='daftar') daftarC++;
-    else belumC++;
   });
-  var datangC=keluarC+loadingC+daftarC;
+  var datangC  = keluarC+loadingC+daftarC;
+  var belumReal = Math.max(0, totalC - datangC);
   _mekSetCard('mekCapCardTotal',  totalC);
   _mekSetCard('mekCapCardDatang', datangC);
   _mekSetCard('mekCapCardKeluar', keluarC);
   _mekSetCard('mekCapCardDaftar', loadingC+daftarC);
-  _mekSetCard('mekCapCardBelum',  belumC);
+  _mekSetCard('mekCapCardBelum',  belumReal);
   var pctEl3=document.getElementById('mekCapCardPct');
   if(pctEl3) pctEl3.textContent = totalC ? Math.round(keluarC/totalC*100)+'%' : '—';
 }
@@ -2716,14 +2720,15 @@ function _mekRenderCapaian(data, statusFilter) {
     else if (r.status === 'daftar')  daftarCont++;
     else                             belumCont++;
   });
+  var datangCont = keluarCont + loadingCont + daftarCont;
+  var belumReal  = Math.max(0, totalCont - datangCont);  // belum = planning - datang
   var pct = totalCont > 0 ? Math.round((keluarCont/totalCont)*100) : 0;
 
-  var datangCont = keluarCont + loadingCont + daftarCont;  // total yang sudah datang
   _mekSetCard('mekCapCardTotal',   totalCont);
   _mekSetCard('mekCapCardDatang',  datangCont);
   _mekSetCard('mekCapCardKeluar',  keluarCont);
   _mekSetCard('mekCapCardDaftar',  loadingCont + daftarCont);
-  _mekSetCard('mekCapCardBelum',   belumCont);
+  _mekSetCard('mekCapCardBelum',   belumReal);
   var pctEl = document.getElementById('mekCapCardPct');
   if (pctEl) pctEl.textContent = totalCont ? (Math.round(keluarCont/totalCont*100) + '%') : '—';
   if (ctEl)  ctEl.textContent  = data.length + ' data';
