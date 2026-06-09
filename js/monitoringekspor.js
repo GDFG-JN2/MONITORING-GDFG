@@ -1470,7 +1470,9 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   var _tc=0,_kc=0,_lc=0,_dc=0,_bc=0,_ss={};
   data.forEach(function(r){
     var k=r.noSo+'|'+r.planTgl;
-    if(!_ss[k]){_ss[k]=true;_tc+=(r.planCont||1);}
+    // Hanya hitung planCont di baris pertama (isFirstRow) supaya tidak double
+    if(!_ss[k] && r.isFirstRow && r.planCont){_ss[k]=true;_tc+=r.planCont;}
+    else if(!_ss[k] && r.isFirstRow){_ss[k]=true;}
     if(r.status==='keluar') _kc++;
     else if(r.status==='loading') _lc++;
     else if(r.status==='daftar') _dc++;
@@ -2623,7 +2625,8 @@ function _mekRenderCapaianEmailAktual(data) {
   var totalC=0, keluarC=0, loadingC=0, daftarC=0, belumC=0;
   var seenSo3={};
   data.forEach(function(r){
-    if(!seenSo3[r.noSo+'|'+r.planTgl]){ seenSo3[r.noSo+'|'+r.planTgl]=true; totalC+=(r.planCont||1); }
+    if(!seenSo3[r.noSo+'|'+r.planTgl] && r.planCont){ seenSo3[r.noSo+'|'+r.planTgl]=true; totalC+=r.planCont; }
+    else if(!seenSo3[r.noSo+'|'+r.planTgl]){ seenSo3[r.noSo+'|'+r.planTgl]=true; }
     if(r.status==='keluar') keluarC++;
     else if(r.status==='loading') loadingC++;
     else if(r.status==='daftar') daftarC++;
