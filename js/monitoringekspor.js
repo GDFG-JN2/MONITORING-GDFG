@@ -259,6 +259,12 @@ function _mekRenderPlanningTab(data) {
            'min-width:60px;display:block;border-radius:4px;transition:background .15s;';
 
   tbody.innerHTML = data.map(function(r, i) {
+    // Warna baris berdasarkan status antrian
+    var rowBg = r._status === 'done'    ? 'background:#f0fff4;' :   // hijau muda — semua keluar
+                r._status === 'partial' ? 'background:#fff5f5;' :   // merah muda — sebagian
+                r._status === 'pending' ? 'background:#fff5f5;' :   // merah muda — belum ada
+                (i%2===0 ? '' : 'background:#f8fafc;');             // default stripe
+
     var cells = _MEK_PLAN_COLS.map(function(col) {
       var val = r[col.key] !== undefined ? String(r[col.key]) : '';
       var td;
@@ -275,7 +281,7 @@ function _mekRenderPlanningTab(data) {
       return td;
     }).join('');
 
-    return '<tr style="'+(i%2===0?'':'background:#f8fafc;')+'">' +
+    return '<tr style="'+rowBg+'">' +
       '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">' + (i+1) + '</td>' +
       cells +
       '<td style="text-align:center;">' +
