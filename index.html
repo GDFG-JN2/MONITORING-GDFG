@@ -2309,6 +2309,15 @@
       #monitoringEksporPage .mek-card-val{ font-size:16px; }
       #monitoringEksporPage .mek-card-lbl{ font-size:9px; }
     }
+    /* Freeze header tabel Planning */
+    #mekPlanningTbl thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #1a3a5c;
+      color: #fff;
+    }
+
     /* Mobile: layout input planning jadi satu kolom vertikal dengan tab toggle */
     @media(max-width:700px){
       #mekMobilePaneToggle{ display:flex !important; position:relative !important; }
@@ -5095,8 +5104,8 @@
       <!-- Tabel -->
       <div style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;padding:12px 14px;">
         <div style="overflow-x:auto;">
-          <table id="mekPlanningTbl" class="mek-plan-tbl" style="min-width:1400px;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-            <thead style="position:sticky;top:0;z-index:2;">
+          <table id="mekPlanningTbl" class="mek-plan-tbl" style="min-width:1400px;border-collapse:collapse;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+            <thead>
               <tr>
                 <th style="width:28px;text-align:center;">#</th>
                 <th style="min-width:50px;">WEEK</th>
