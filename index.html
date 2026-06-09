@@ -2490,7 +2490,7 @@
         <button class="btn-hdr" onclick="refreshData()"><i class="fas fa-sync-alt"></i> <span class="btn-hdr-text">Refresh</span></button>
         <div id="zoomControl">
           <button onclick="_zoomOut()" title="Zoom out">−</button>
-          <span id="zoomLabel">100%</span>
+          <span id="zoomLabel"><span id="zoomLevelLabel">100%</span></span>
           <button onclick="_zoomIn()" title="Zoom in">+</button>
         </div>
         <button class="btn-hdr" onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span class="btn-hdr-text">Logout</span></button>
@@ -5470,5 +5470,48 @@
   });
   </script>
 
+<script>
+// ── Global zoom untuk semua halaman ─────────────────────────
+var _appZoomLevel = 100;
+var _appZoomStep  = 10;
+var _appZoomMin   = 50;
+var _appZoomMax   = 150;
+var _appZoomTarget = null;  // element yang di-scale
+
+function _zoomGetTarget() {
+  // Scale #dashboard atau #monitoringEksporPage atau element utama
+  return document.getElementById('dashboard') ||
+         document.getElementById('main-content') ||
+         document.body;
+}
+
+function _zoomApply() {
+  var el = _zoomGetTarget();
+  if (!el) return;
+  var s = _appZoomLevel / 100;
+  el.style.transformOrigin = 'top left';
+  el.style.transform = s === 1 ? '' : 'scale(' + s + ')';
+  el.style.width     = s === 1 ? '' : (100 / s) + '%';
+  // Update label
+  var lbl = document.getElementById('zoomLevelLabel');
+  if (lbl) lbl.textContent = _appZoomLevel + '%';
+  // Simpan ke localStorage
+  try { localStorage.setItem('appZoom', _appZoomLevel); } catch(e) {}
+}
+
+function _zoomIn()    { if (_appZoomLevel < _appZoomMax) { _appZoomLevel += _appZoomStep; _zoomApply(); } }
+function _zoomOut()   { if (_appZoomLevel > _appZoomMin) { _appZoomLevel -= _appZoomStep; _zoomApply(); } }
+function _zoomReset() { _appZoomLevel = 100; _zoomApply(); }
+
+// Restore zoom dari localStorage saat load
+(function() {
+  try {
+    var saved = parseInt(localStorage.getItem('appZoom'));
+    if (saved && saved >= 50 && saved <= 150) _appZoomLevel = saved;
+  } catch(e) {}
+  // Apply setelah halaman siap
+  window.addEventListener('load', function() { if (_appZoomLevel !== 100) _zoomApply(); });
+})();
+</script>
 </body>
 </html>
