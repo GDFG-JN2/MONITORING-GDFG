@@ -1181,8 +1181,12 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       '<th style="padding:5px 8px;">Waktu Keluar</th><th style="padding:5px 8px;">Status</th>' +
       '<th style="padding:5px 8px;">Tgl Aktual</th><th style="padding:5px 8px;">Keterangan</th></tr>';
 
+
     var rowNum=0;
     rows.forEach(function(r){
+      // Skip baris belum yang kosong (tidak ada SO dan nopol)
+      if (r.status === 'belum' && !r.noSo && !r.nopol) return;
+
       if(r.isFirstRow) rowNum++;
       var isPend=r.isPendingan;
       var bg=isPend?'background:#fffff0;':(r.status==='belum'?'background:#fff5f5;':'');
@@ -1196,12 +1200,12 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var ket=isPend?'<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>':'';
       html+='<tr style="'+bg+'">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'')+'</td>' +
-        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+_mekEsc(r.noSo||'—')+'</td>' +
-        '<td style="'+CS+'font-weight:700;">'+(r.isFirstRow?_mekEsc(r.sku||''):'')+'</td>' +
-        '<td style="'+CS+'">'+(r.isFirstRow?_mekEsc(r.nama||''):'')+'</td>' +
+        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'—'):'')+'</td>' +
+        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'—'):'')+  '</td>' +
+        '<td style="'+CS+'font-weight:700;">'+_mekEsc(r.sku||'')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.nama||'')+'</td>' +
         '<td style="'+CS+'text-align:right;font-weight:700;">'+(r.isFirstRow&&r.planCont?r.planCont:'')+'</td>' +
         '<td style="'+CS+'color:#276749;font-weight:600;">'+(r.isFirstRow?_mekEsc(r.tujuan||''):'')+'</td>' +
-        '<td style="'+CS+'font-weight:600;">'+_mekEsc(r.nopol||'—')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'—')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'—')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'—')+'</td>' +
@@ -2418,12 +2422,14 @@ function _mekRenderCapaian(data, statusFilter) {
   });
   var pct = totalCont > 0 ? Math.round((keluarCont/totalCont)*100) : 0;
 
+  var datangCont = keluarCont + loadingCont + daftarCont;  // total yang sudah datang
+  _mekSetCard('mekCapCardTotal',   totalCont);
+  _mekSetCard('mekCapCardDatang',  datangCont);
   _mekSetCard('mekCapCardKeluar',  keluarCont);
   _mekSetCard('mekCapCardDaftar',  loadingCont + daftarCont);
   _mekSetCard('mekCapCardBelum',   belumCont);
-  _mekSetCard('mekCapCardTotal',   totalCont);
   var pctEl = document.getElementById('mekCapCardPct');
-  if (pctEl) pctEl.textContent = (totalCont ? pct : '—') + (totalCont ? '%' : '');
+  if (pctEl) pctEl.textContent = totalCont ? (Math.round(keluarCont/totalCont*100) + '%') : '—';
   if (ctEl)  ctEl.textContent  = data.length + ' data';
 
   // Filter tampilan
