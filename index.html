@@ -4782,6 +4782,12 @@
             <label>Tujuan</label>
             <input type="text" id="mekCapTujuan" placeholder="tujuan..."
               style="width:100px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>Plant</label>
+            <select id="mekCapPlant" onchange="mekLoadCapaian()"
+              style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;">
+              <option value="">All</option>
+              <option value="JAYANTI 2">JAYANTI 2</option>
+            </select>
             <button class="btn-filter" onclick="mekLoadCapaian()"><i class="fas fa-search"></i> Tampilkan</button>
             <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
           </div>
@@ -4809,6 +4815,12 @@
             <label>Tujuan</label>
             <input type="text" id="mekCapTujuanW" placeholder="tujuan..."
               style="width:90px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>Plant</label>
+            <select id="mekCapPlantW" onchange="mekCapApplyWeek()"
+              style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;">
+              <option value="">All</option>
+              <option value="JAYANTI 2">JAYANTI 2</option>
+            </select>
             <button class="btn-filter" onclick="mekCapApplyWeek()"><i class="fas fa-search"></i> Tampilkan</button>
             <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
           </div>
