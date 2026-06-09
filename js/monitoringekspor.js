@@ -165,20 +165,21 @@ function mekSwitchTab(tab) {
 var _mekPlanningData = [];
 
 var _MEK_PLAN_COLS = [
-  {key:'keterangan', label:'KETERANGAN'},
-  {key:'so',         label:'SO'},
-  {key:'qt',         label:'QT'},
-  {key:'negara',     label:'NEGARA'},
-  {key:'sku',        label:'KODE'},
-  {key:'nama',       label:'MATERIAL'},
-  {key:'stuffingDate', label:'STUFFING DATE'},
-  {key:'jumlahCont', label:'QTY CONT', right:true},
-  {key:'ready',      label:'READY/NOT'},
-  {key:'email',      label:'EMAIL'},
-  {key:'rsvCrt',     label:'RSV CRT', right:true},
-  {key:'poSto',      label:'PO STO/PO INT'},
-  {key:'doSto',      label:'DO STO/DO INT'},
-  {key:'note',       label:'NOTE'}
+  {key:'week',        label:'WEEK',           ro:true},  // read-only, dihitung otomatis
+  {key:'keterangan',  label:'KETERANGAN'},
+  {key:'so',          label:'SO'},
+  {key:'qt',          label:'QT'},
+  {key:'negara',      label:'NEGARA'},
+  {key:'sku',         label:'KODE'},
+  {key:'nama',        label:'MATERIAL'},
+  {key:'stuffingDate',label:'STUFFING DATE'},
+  {key:'jumlahCont',  label:'QTY CONT', right:true},
+  {key:'ready',       label:'READY/NOT'},
+  {key:'email',       label:'EMAIL'},
+  {key:'rsvCrt',      label:'RSV CRT', right:true},
+  {key:'poSto',       label:'PO STO/PO INT'},
+  {key:'doSto',       label:'DO STO/DO INT'},
+  {key:'note',        label:'NOTE'}
 ];
 
 function mekLoadPlanningTab() {
@@ -219,12 +220,17 @@ function _mekRenderPlanningTab(data) {
   tbody.innerHTML = data.map(function(r, i) {
     var cells = _MEK_PLAN_COLS.map(function(col) {
       var val = r[col.key] !== undefined ? String(r[col.key]) : '';
-      var td = '<td><span contenteditable="true"';
-      td += ' data-row="'+i+'" data-col="'+col.key+'"';
-      td += ' style="'+ES+(col.right?'text-align:right;':'')+'color:#2d3748;"';
-      td += ' onblur="_mekPlanCellEdit('+i+',\''+col.key+'\',this.innerText.trim())"';
-      td += ' onkeydown="if(event.key===String.fromCharCode(13)){event.preventDefault();this.blur();}">';
-      td += _mekEsc(val) + '</span></td>';
+      var td;
+      if (col.ro) {
+        td = '<td style="text-align:center;background:#f8fafc;color:#718096;font-size:11px;font-weight:700;padding:5px 8px;">' + _mekEsc(val) + '</td>';
+      } else {
+        td = '<td><span contenteditable="true"';
+        td += ' data-row="'+i+'" data-col="'+col.key+'"';
+        td += ' style="'+ES+(col.right?'text-align:right;':'')+'color:#2d3748;"';
+        td += ' onblur="_mekPlanCellEdit('+i+',\''+col.key+'\',this.innerText.trim())"';
+        td += ' onkeydown="if(event.key===String.fromCharCode(13)){event.preventDefault();this.blur();}">';
+        td += _mekEsc(val) + '</span></td>';
+      }
       return td;
     }).join('');
 
