@@ -1200,19 +1200,20 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var ket=isPend?'<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>':'';
       html+='<tr style="'+bg+'">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'')+'</td>' +
-        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'—'):'')+'</td>' +
-        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'—'):'')+  '</td>' +
+        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'\u2014'):'')+  '</td>' +
         '<td style="'+CS+'font-weight:700;">'+_mekEsc(r.sku||'')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.nama||'')+'</td>' +
         '<td style="'+CS+'text-align:right;font-weight:700;">'+(r.isFirstRow&&r.planCont?r.planCont:'')+'</td>' +
         '<td style="'+CS+'color:#276749;font-weight:600;">'+(r.isFirstRow?_mekEsc(r.tujuan||''):'')+'</td>' +
-        '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'—')+'</td>' +
-        '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'—')+'</td>' +
-        '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'—')+'</td>' +
-        '<td style="'+CS+'">'+_mekEsc(r.waktuKeluar||'—')+'</td>' +
+        '<td style="'+CS+'font-weight:600;">'+_mekEsc(r.nopol||'\u2014')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'\u2014')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'\u2014')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'\u2014')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.waktuKeluar||'\u2014')+'</td>' +
         '<td style="'+CS+'">'+badge+'</td>' +
-        '<td style="'+CS+'font-size:11px;color:#718096;">'+_mekEsc(r.tglDaftar?_mekFmtTglDisplay(r.tglDaftar):'—')+'</td>' +
+        '<td style="'+CS+'font-size:11px;color:#718096;">'+_mekEsc(r.tglDaftar?_mekFmtTglDisplay(r.tglDaftar):'\u2014')+'</td>' +
         '<td style="'+CS+'">'+ket+'</td>' +
+        '</tr>';
         '</tr>';
     });
   });
