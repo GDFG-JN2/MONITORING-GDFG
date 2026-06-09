@@ -5471,17 +5471,27 @@
   </script>
 
 <script>
-// ── Global zoom — pakai CSS zoom property (aman, tidak merusak layout) ──
+// ── Global zoom via viewport initial-scale ───────────────────
 var _appZoomLevel = 100;
 var _appZoomStep  = 10;
 var _appZoomMin   = 50;
 var _appZoomMax   = 150;
 
 function _zoomApply() {
-  var pct = _appZoomLevel / 100;
-  document.body.style.zoom = pct;
+  var scale = _appZoomLevel / 100;
+  // Update viewport meta
+  var vp = document.querySelector('meta[name="viewport"]');
+  if (vp) {
+    vp.setAttribute('content',
+      'width=device-width, initial-scale=' + scale +
+      ', minimum-scale=' + scale +
+      ', maximum-scale=' + scale +
+      ', viewport-fit=cover');
+  }
   var lbl = document.getElementById('zoomLevelLabel');
   if (lbl) lbl.textContent = _appZoomLevel + '%';
+  // Reset zoom CSS kalau sempat diapply sebelumnya
+  document.body.style.zoom = '';
   try { localStorage.setItem('appZoom', _appZoomLevel); } catch(e) {}
 }
 
@@ -5489,7 +5499,6 @@ function _zoomIn()    { if (_appZoomLevel < _appZoomMax) { _appZoomLevel += _app
 function _zoomOut()   { if (_appZoomLevel > _appZoomMin) { _appZoomLevel -= _appZoomStep; _zoomApply(); } }
 function _zoomReset() { _appZoomLevel = 100; _zoomApply(); }
 
-// Restore zoom dari localStorage saat load
 (function() {
   try {
     var saved = parseInt(localStorage.getItem('appZoom'));
