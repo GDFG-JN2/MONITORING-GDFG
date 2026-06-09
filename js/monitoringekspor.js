@@ -1377,15 +1377,18 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   docFilter = _mekStripLeadingZero(docFilter||'');
   tujFilter = (tujFilter||'').toLowerCase();
 
+  var plantFilter = ((document.getElementById('mekCapPlant')||{}).value||'').trim().toUpperCase();
+
   var filtered = data;
-  if (skuFilter || docFilter || tujFilter) {
+  if (skuFilter || docFilter || tujFilter || plantFilter) {
     var validKey = {};
     data.forEach(function(r) {
       var k = r.noSo+'|'+r.planTgl;
-      var skuOk = !skuFilter || (r.sku||'').toLowerCase().indexOf(skuFilter)>=0 || (r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
-      var docOk = !docFilter || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilter.toLowerCase())>=0;
-      var tujOk = !tujFilter || (r.tujuan||'').toLowerCase().indexOf(tujFilter.toLowerCase())>=0;
-      if (skuOk && docOk && tujOk) validKey[k] = true;
+      var skuOk   = !skuFilter   || (r.sku||'').toLowerCase().indexOf(skuFilter)>=0 || (r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
+      var docOk   = !docFilter   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilter.toLowerCase())>=0;
+      var tujOk   = !tujFilter   || (r.tujuan||'').toLowerCase().indexOf(tujFilter.toLowerCase())>=0;
+      var plantOk = !plantFilter || (r.plant||'').toUpperCase().indexOf(plantFilter)>=0;
+      if (skuOk && docOk && tujOk && plantOk) validKey[k] = true;
     });
     filtered = data.filter(function(r){ return validKey[r.noSo+'|'+r.planTgl]; });
   }
@@ -2520,6 +2523,12 @@ function _mekRenderCapaianEmailAktual(data) {
   if (!data || !data.length) {
     tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data.</td></tr>';
     return;
+  }
+
+  // Filter plant
+  var plantFilterA = ((document.getElementById('mekCapPlant')||{}).value||'').trim().toUpperCase();
+  if (plantFilterA) {
+    data = data.filter(function(r){ return (r.plant||'').toUpperCase().indexOf(plantFilterA)>=0; });
   }
 
   // Group per tanggal aktual (tglDaftar), skip baris belum
