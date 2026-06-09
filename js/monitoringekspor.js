@@ -212,7 +212,8 @@ var _MEK_PLAN_COLS = [
   {key:'sku',         label:'KODE'},
   {key:'nama',        label:'MATERIAL'},
   {key:'stuffingDate',label:'STUFFING DATE'},
-  {key:'jumlahCont',  label:'QTY CONT', right:true},
+  {key:'jumlahCont',  label:'QTY CONT', right:true, ro:true},
+  {key:'qty',         label:'QTY KRT',  right:true},
   {key:'ready',       label:'READY/NOT'},
   {key:'email',       label:'EMAIL'},
   {key:'rsvCrt',      label:'RSV CRT', right:true},
@@ -298,7 +299,15 @@ function _mekSavePlanningRow(rowIdx) {
   var status = document.getElementById('mekPlanSaveStatus');
   if (status) status.textContent = 'Menyimpan baris '+(rowIdx+1)+'...';
 
-  API.run('updateMekEmailPlanningRow', { rowIdx: r._rowIdx, fields: r }, function(res) {
+  // Kumpulkan QTY semua container dari baris yang sama (rowIdx di sheet)
+  var qtyKrtAll = _mekPlanningData
+    .filter(function(row){ return row._rowIdx === r._rowIdx; })
+    .sort(function(a,b){ return a._contIdx - b._contIdx; })
+    .map(function(row){ return String(row.qty||''); });
+
+  var fields = Object.assign({}, r, { qtyKrtAll: qtyKrtAll });
+
+  API.run('updateMekEmailPlanningRow', { rowIdx: r._rowIdx, fields: fields }, function(res) {
     if (res && res.success) {
       _mekPlanningData[rowIdx]._dirty = false;
       if (status) status.textContent = 'Baris '+(rowIdx+1)+' tersimpan ✓';
@@ -1322,9 +1331,11 @@ function _mekCollectManualRows() {
     var negara=g('negara').toUpperCase();
     var noQt=g('qt').replace(/\D/g,'');
     var soQtStr=[so?'SO:'+so:'',noQt?'QT:'+noQt:''].filter(Boolean).join(' | ');
-    var ket=[soQtStr,g('keterangan'),extra].filter(Boolean).join(' | ');
+    // Simpan QTY karton di KET — akan digabung comma-separated saat grouping
+    var qtyStr = qty ? 'QTY_KRT:'+qty : '';
+    var ket=[soQtStr,g('keterangan'),extra,qtyStr].filter(Boolean).join(' | ');
     rows.push({ week:wk, tanggal:tgl, sku:kode, nama:g('material'),
-      jumlah:'1', tujuan:negara, ket:ket, noSo:so,
+      jumlah:'1', tujuan:negara, ket:ket, noSo:so, qtyKrt:qty,
       source:'EMAIL', _isFirst:true, _groupSize:1 });
   });
   return rows;
