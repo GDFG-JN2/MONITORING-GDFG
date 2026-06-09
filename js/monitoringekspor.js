@@ -212,6 +212,7 @@ var _MEK_PLAN_COLS = [
   {key:'sku',         label:'KODE'},
   {key:'nama',        label:'MATERIAL'},
   {key:'stuffingDate',label:'STUFFING DATE'},
+  {key:'plant',       label:'STUFFING PLANT'},
   {key:'jumlahCont',  label:'QTY CONT', right:true, ro:true},
   {key:'qty',         label:'QTY KRT',  right:true},
   {key:'ready',       label:'READY/NOT'},
@@ -1332,8 +1333,9 @@ function _mekCollectManualRows() {
     var noQt=g('qt').replace(/\D/g,'');
     var soQtStr=[so?'SO:'+so:'',noQt?'QT:'+noQt:''].filter(Boolean).join(' | ');
     // Simpan QTY karton di KET — akan digabung comma-separated saat grouping
-    var qtyStr = qty ? 'QTY_KRT:'+qty : '';
-    var ket=[soQtStr,g('keterangan'),extra,qtyStr].filter(Boolean).join(' | ');
+    var qtyStr  = qty ? 'QTY_KRT:'+qty : '';
+    var plantStr = g('plant') ? 'PLANT:'+g('plant').trim() : '';
+    var ket=[soQtStr,g('keterangan'),extra,qtyStr,plantStr].filter(Boolean).join(' | ');
     rows.push({ week:wk, tanggal:tgl, sku:kode, nama:g('material'),
       jumlah:'1', tujuan:negara, ket:ket, noSo:so, qtyKrt:qty,
       source:'EMAIL', _isFirst:true, _groupSize:1 });
@@ -2424,6 +2426,7 @@ function mekLoadCapaian() {
   var to     = (document.getElementById('mekCapTo')      || {}).value || '';
   var sku    = ((document.getElementById('mekCapSku')    || {}).value || '').trim().toLowerCase();
   var nopol  = ((document.getElementById('mekCapNopol')  || {}).value || '').trim().toLowerCase();
+  var plant  = ((document.getElementById('mekCapPlant')  || {}).value || '').trim().toUpperCase();
   var doc    = _mekStripLeadingZero(((document.getElementById('mekCapDoc') || {}).value || '').trim());
   var tujuan = ((document.getElementById('mekCapTujuan') || {}).value || '').trim().toLowerCase();
 
@@ -2473,7 +2476,8 @@ function mekLoadCapaian() {
         var docOk  = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
         var tujOk  = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
         var nopolOk= !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
-        if (skuOk && docOk && tujOk && nopolOk) planKeys[r._planKey] = true;
+        var plantOk= !plant  || (r.stuffingPlant||r.plant||'').toUpperCase().indexOf(plant)>=0;
+        if (skuOk && docOk && tujOk && nopolOk && plantOk) planKeys[r._planKey] = true;
         else planKeys[r._planKey] = planKeys[r._planKey] || false;
       });
       data = data.filter(function(r){ return planKeys[r._planKey]; });
@@ -2657,6 +2661,7 @@ function mekCapApplyWeek() {
   var ed  = document.getElementById('mekCapDoc');    if (ed)  ed.value  = (document.getElementById('mekCapDocW')||{}).value||'';
   var enp = document.getElementById('mekCapNopol');  if (enp) enp.value = (document.getElementById('mekCapNopolW')||{}).value||'';
   var etj = document.getElementById('mekCapTujuan'); if (etj) etj.value = (document.getElementById('mekCapTujuanW')||{}).value||'';
+  var epl = document.getElementById('mekCapPlant');  if (epl) epl.value = (document.getElementById('mekCapPlantW')||{}).value||'';
   var infoTxt = document.getElementById('mekCapWeekInfoText');
   if (infoTxt) infoTxt.innerText = 'Week '+wFrom+(wFrom!==wTo?' – Week '+wTo:'')+' '+year+' = '+_mekFmtTglDisplay(rf.from)+' s/d '+_mekFmtTglDisplay(rt.to);
   var info = document.getElementById('mekCapWeekInfo'); if (info) info.style.display='block';
@@ -2664,7 +2669,7 @@ function mekCapApplyWeek() {
 }
 
 function mekResetCapaian() {
-  ['mekCapSku','mekCapDoc','mekCapNopol','mekCapTujuan','mekCapSkuW','mekCapDocW','mekCapNopolW','mekCapTujuanW',
+  ['mekCapSku','mekCapDoc','mekCapNopol','mekCapPlant','mekCapTujuan','mekCapSkuW','mekCapDocW','mekCapNopolW','mekCapPlantW','mekCapTujuanW',
    'mekCapWeekFrom','mekCapWeekTo'].forEach(function(id){ var e=document.getElementById(id); if(e)e.value=''; });
   var today=new Date(), yyyy=today.getFullYear(), mm=String(today.getMonth()+1).padStart(2,'0'), dd=String(today.getDate()).padStart(2,'0');
   var ef=document.getElementById('mekCapFrom'); if(ef) ef.value=yyyy+'-'+mm+'-01';
