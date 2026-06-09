@@ -129,27 +129,141 @@ function mekResetFilter() {
 
 // ── Tab switching ─────────────────────────────────────────────
 function mekSwitchTab(tab) {
-  var spEl = document.getElementById('mekSummaryPane');
-  var ipEl = document.getElementById('mekInputPane');
-  var tsEl = document.getElementById('mekTabSummary');
-  var tiEl = document.getElementById('mekTabInput');
-
-  var showEl = tab === 'summary' ? spEl : ipEl;
-  var hideEl = tab === 'summary' ? ipEl : spEl;
-  if (!showEl || !hideEl) return;
-
-  hideEl.style.opacity = '0'; hideEl.style.transition = 'opacity .18s ease';
-  setTimeout(function () {
-    hideEl.style.display = 'none';
-    showEl.style.opacity = '0'; showEl.style.display = 'block'; showEl.style.transition = 'opacity .2s ease';
-    requestAnimationFrame(function () { requestAnimationFrame(function () { showEl.style.opacity = '1'; }); });
-  }, 180);
-
+  var panes = { summary: 'mekSummaryPane', input: 'mekInputPane', planning: 'mekPlanningPane' };
+  var tabs  = { summary: 'mekTabSummary',  input: 'mekTabInput',  planning: 'mekTabPlanning'  };
   var ac = '#1a3a5c';
-  if (tsEl) { tsEl.style.color = tab==='summary'?ac:'#718096'; tsEl.style.borderBottomColor = tab==='summary'?ac:'transparent'; }
-  if (tiEl) { tiEl.style.color = tab==='input'  ?ac:'#718096'; tiEl.style.borderBottomColor = tab==='input'  ?ac:'transparent'; }
+
+  Object.keys(panes).forEach(function(t) {
+    var pane = document.getElementById(panes[t]);
+    var btn  = document.getElementById(tabs[t]);
+    if (pane) {
+      if (t === tab) {
+        pane.style.opacity = '0'; pane.style.display = 'flex'; pane.style.flexDirection = 'column';
+        pane.style.transition = 'opacity .2s ease';
+        requestAnimationFrame(function(){ requestAnimationFrame(function(){ pane.style.opacity = '1'; }); });
+      } else {
+        pane.style.display = 'none';
+      }
+    }
+    if (btn) {
+      btn.style.color = t===tab ? ac : '#718096';
+      btn.style.borderBottomColor = t===tab ? ac : 'transparent';
+    }
+  });
+
   var bsEl = document.getElementById('btnMekSummary'); if (bsEl) bsEl.style.background = tab==='summary'?'rgba(255,255,255,.35)':'rgba(255,255,255,.2)';
-  var biEl = document.getElementById('btnMekInput');   if (biEl) biEl.style.background = tab==='input'  ?'rgba(255,255,255,.35)':'rgba(255,255,255,.2)';
+  var biEl = document.getElementById('btnMekInput');   if (biEl) biEl.style.background = tab==='input'?'rgba(255,255,255,.35)':'rgba(255,255,255,.2)';
+
+  // Sembunyikan toggle Capaian/Detail saat di tab selain Summary
+  var sumToggle = document.getElementById('mekSumViewToggle');
+  if (sumToggle) sumToggle.style.display = tab === 'summary' ? '' : 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+// TAB PLANNING — baca dan edit PLANNING_EKSPOR (source EMAIL)
+// ════════════════════════════════════════════════════════════
+var _mekPlanningData = [];
+
+var _MEK_PLAN_COLS = [
+  {key:'keterangan', label:'KETERANGAN'},
+  {key:'so',         label:'SO'},
+  {key:'qt',         label:'QT'},
+  {key:'negara',     label:'NEGARA'},
+  {key:'sku',        label:'KODE'},
+  {key:'nama',       label:'MATERIAL'},
+  {key:'stuffingDate', label:'STUFFING DATE'},
+  {key:'jumlahCont', label:'QTY CONT', right:true},
+  {key:'ready',      label:'READY/NOT'},
+  {key:'email',      label:'EMAIL'},
+  {key:'rsvCrt',     label:'RSV CRT', right:true},
+  {key:'poSto',      label:'PO STO/PO INT'},
+  {key:'doSto',      label:'DO STO/DO INT'},
+  {key:'note',       label:'NOTE'}
+];
+
+function mekLoadPlanningTab() {
+  var wFrom = parseInt((document.getElementById('mekPlanWeekFrom')||{}).value||'') || 0;
+  var wTo   = parseInt((document.getElementById('mekPlanWeekTo')  ||{}).value||'') || wFrom;
+  var year  = parseInt((document.getElementById('mekPlanYear')    ||{}).value||'') || new Date().getFullYear();
+  if (!wFrom) { showToast('Isi week terlebih dahulu.', 'warning'); return; }
+
+  var tbody = document.getElementById('mekPlanningTbody');
+  var empty = document.getElementById('mekPlanningEmpty');
+  var cnt   = document.getElementById('mekPlanRowCount');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:30px;color:#a0aec0;">Memuat...</td></tr>';
+  if (empty) empty.style.display = 'none';
+
+  API.run('getMekEmailPlanning', { weekFrom: wFrom, weekTo: wTo, year: year }, function(res) {
+    if (!res || !res.success) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
+      return;
+    }
+    _mekPlanningData = res.data || [];
+    if (cnt) { cnt.textContent = _mekPlanningData.length + ' baris'; cnt.style.display = _mekPlanningData.length ? '' : 'none'; }
+    if (!_mekPlanningData.length) {
+      if (tbody) tbody.innerHTML = '';
+      if (empty) empty.style.display = '';
+      return;
+    }
+    _mekRenderPlanningTab(_mekPlanningData);
+  });
+}
+
+function _mekRenderPlanningTab(data) {
+  var tbody = document.getElementById('mekPlanningTbody');
+  if (!tbody) return;
+
+  var ES = 'outline:none;padding:5px 6px;font-size:12px;white-space:nowrap;cursor:text;' +
+           'min-width:60px;display:block;border-radius:4px;transition:background .15s;';
+
+  tbody.innerHTML = data.map(function(r, i) {
+    var cells = _MEK_PLAN_COLS.map(function(col) {
+      var val = r[col.key] !== undefined ? String(r[col.key]) : '';
+      var td = '<td><span contenteditable="true"';
+      td += ' data-row="'+i+'" data-col="'+col.key+'"';
+      td += ' style="'+ES+(col.right?'text-align:right;':'')+'color:#2d3748;"';
+      td += ' onblur="_mekPlanCellEdit('+i+',\''+col.key+'\',this.innerText.trim())"';
+      td += ' onkeydown="if(event.key===String.fromCharCode(13)){event.preventDefault();this.blur();}">';
+      td += _mekEsc(val) + '</span></td>';
+      return td;
+    }).join('');
+
+    return '<tr style="'+(i%2===0?'':'background:#f8fafc;')+'">' +
+      '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">' + (i+1) + '</td>' +
+      cells +
+      '<td style="text-align:center;">' +
+        '<button onclick="_mekSavePlanningRow('+i+')" ' +
+          'style="padding:3px 10px;border-radius:6px;border:none;background:#1a3a5c;color:#fff;font-size:11px;cursor:pointer;font-weight:700;">' +
+          'Simpan</button>' +
+      '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function _mekPlanCellEdit(rowIdx, colKey, val) {
+  if (_mekPlanningData[rowIdx]) {
+    _mekPlanningData[rowIdx][colKey] = val;
+    _mekPlanningData[rowIdx]._dirty = true;
+  }
+}
+
+function _mekSavePlanningRow(rowIdx) {
+  var r = _mekPlanningData[rowIdx];
+  if (!r) return;
+  var status = document.getElementById('mekPlanSaveStatus');
+  if (status) status.textContent = 'Menyimpan baris '+(rowIdx+1)+'...';
+
+  API.run('updateMekEmailPlanningRow', { rowIdx: r._rowIdx, fields: r }, function(res) {
+    if (res && res.success) {
+      _mekPlanningData[rowIdx]._dirty = false;
+      if (status) status.textContent = 'Baris '+(rowIdx+1)+' tersimpan ✓';
+      setTimeout(function(){ if(status) status.textContent=''; }, 3000);
+    } else {
+      var msg = res && res.message ? res.message : 'error';
+      showToast('Gagal simpan: '+msg, 'error');
+      if (status) status.textContent = '';
+    }
+  });
 }
 
 // ── Helper: hapus angka 0 di depan (untuk No. DOC) ───────────
