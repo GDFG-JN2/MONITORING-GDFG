@@ -4859,9 +4859,20 @@
           <div class="opname-view-header" style="background:linear-gradient(135deg,#0f2027,#1a3a5c);">
             <span style="font-size:13px;font-weight:800;"><i class="fas fa-chart-pie" style="margin-right:6px;"></i>Capaian Planning Ekspor</span>
             <span id="mekCapRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 data</span>
-            <button onclick="mekDownloadCapaianPdf()" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
-              <i class="fas fa-file-pdf"></i> PDF
-            </button>
+            <!-- Download dropdown Capaian -->
+            <div style="position:relative;display:inline-block;margin-left:auto;" id="mekCapDownloadWrap">
+              <button onclick="mekToggleCapDownloadMenu()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <i class="fas fa-download"></i> Download <i class="fas fa-chevron-down" style="font-size:9px;"></i>
+              </button>
+              <div id="mekCapDownloadMenu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);border:1px solid #e2e8f0;overflow:hidden;z-index:99;min-width:140px;">
+                <button onclick="mekDownloadCapaianPdf();mekToggleCapDownloadMenu()" style="width:100%;text-align:left;padding:9px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#2d3748;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='none'">
+                  <i class="fas fa-file-pdf" style="color:#e53e3e;width:14px;"></i> Download PDF
+                </button>
+                <button onclick="mekDownloadCapaianExcel();mekToggleCapDownloadMenu()" style="width:100%;text-align:left;padding:9px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#2d3748;cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid #f0f0f0;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='none'">
+                  <i class="fas fa-file-excel" style="color:#276749;width:14px;"></i> Download Excel
+                </button>
+              </div>
+            </div>
           </div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
             <table class="mek-sum-tbl" id="mekCapTbl">
@@ -4899,181 +4910,12 @@
     <!-- ════ TAB INPUT PLANNING ════ -->
     <div id="mekInputPane" style="display:none;">
 
-      <!-- ── Toggle WA / SI / Email ── -->
-      <div style="display:flex;gap:0;background:#fff;border-bottom:2px solid #e2e8f0;padding:0 14px;">
-        <button id="mekPlanModeWa" onclick="mekSwitchPlanMode('wa')"
-          style="padding:9px 20px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#1a3a5c;border-bottom:3px solid #1a3a5c;margin-bottom:-2px;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.5px;">
-          <i class="fab fa-whatsapp" style="color:#25d366;"></i> By WA
-        </button>
-        <button id="mekPlanModeSi" onclick="mekSwitchPlanMode('si')"
-          style="padding:9px 20px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.5px;">
-          <i class="fas fa-file-pdf" style="color:#e53e3e;"></i> By SI
-        </button>
-        <button id="mekPlanModeEmail" onclick="mekSwitchPlanMode('email')"
-          style="padding:9px 20px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.5px;">
-          <i class="fas fa-envelope" style="color:#d69e2e;"></i> By Email
-        </button>
-      </div>
+      <!-- Langsung tampilkan panel Email (WA dan SI dihapus) -->
 
-      <!-- ════ PANEL WA ════ -->
-      <div id="mekWaPanel" style="display:flex;height:calc(100vh - 148px);overflow:hidden;">
 
-        <!-- Mobile tab toggle: Paste / Preview -->
-        <div id="mekMobilePaneToggle" style="display:none;position:absolute;top:0;left:0;right:0;background:#f7fafc;border-bottom:2px solid #e2e8f0;z-index:2;">
-          <button id="mekMobileTabPaste"   onclick="mekMobilePane('paste')"   style="width:50%;padding:9px;border:none;background:none;font-size:12px;font-weight:700;color:#1a3a5c;border-bottom:3px solid #1a3a5c;margin-bottom:-2px;cursor:pointer;">
-            <i class="fab fa-whatsapp" style="color:#25d366;margin-right:4px;"></i> Paste WA
-          </button>
-          <button id="mekMobileTabPreview" onclick="mekMobilePane('preview')" style="width:50%;padding:9px;border:none;background:none;font-size:12px;font-weight:700;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;">
-            <i class="fas fa-table" style="margin-right:4px;"></i> Preview
-          </button>
-        </div>
-
-        <!-- Kiri: textarea WA -->
-        <div id="mekPastePanel" style="width:42%;min-width:260px;display:flex;flex-direction:column;border-right:2px solid #e2e8f0;">
-          <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;">
-            <span style="font-size:12px;font-weight:700;color:#1a3a5c;"><i class="fab fa-whatsapp" style="color:#25d366;"></i> Paste Teks WA</span>
-            <button onclick="mekParseWa()" style="margin-left:auto;padding:6px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#0f2027,#1a3a5c);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
-              <i class="fas fa-magic"></i> Parse
-            </button>
-            <button onclick="mekClearWa()" style="padding:6px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#718096;">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-          <div style="padding:8px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;">
-            <label style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.4px;">Week</label>
-            <input type="number" id="mekWaWeek" min="1" max="53" placeholder="mis. 24"
-              style="width:64px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-            <label style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.4px;">Tahun</label>
-            <input type="number" id="mekWaYear" min="2020" max="2099" placeholder="2025"
-              style="width:72px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-            <label style="font-size:11px;font-weight:700;color:#e53e3e;text-transform:uppercase;letter-spacing:.4px;">Tujuan <span style="color:#e53e3e;">*</span></label>
-            <input type="text" id="mekWaTujuan" placeholder="wajib diisi..."
-              style="flex:1;min-width:100px;border:2px solid #fc8181;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;background:#fff5f5;"
-              oninput="this.style.borderColor=this.value.trim()?'#68d391':'#fc8181';this.style.background=this.value.trim()?'#f0fff4':'#fff5f5';">
-          </div>
-          <textarea id="mekWaTextarea"
-            placeholder="Paste teks WA di sini...&#10;&#10;Contoh:&#10;SKU : 421170&#10;ITEM : Choki Stix 16g&#10;kesanggupan 1 cont&#10;11 Jun : 1 cont"
-            style="flex:1;border:none;outline:none;resize:none;padding:12px 14px;font-size:12px;font-family:monospace;line-height:1.6;color:#2d3748;background:#fff;-webkit-overflow-scrolling:touch;"></textarea>
-        </div>
-
-        <!-- Kanan: preview -->
-        <div id="mekPreviewPanel" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
-          <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;">
-            <span style="font-size:12px;font-weight:700;color:#1a3a5c;"><i class="fas fa-table"></i> Preview Hasil Parse</span>
-            <span id="mekParseCount" style="background:#e2e8f0;border-radius:20px;padding:1px 10px;font-size:11px;font-weight:700;color:#4a5568;">0 baris</span>
-            <div style="margin-left:auto;">
-              <button id="mekBtnSave" onclick="mekSavePlanning()"
-                style="padding:6px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#0f2027,#1a3a5c);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
-                <i class="fas fa-save"></i> Simpan
-              </button>
-            </div>
-          </div>
-          <div style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
-            <table class="mek-plan-tbl" id="mekPreviewTbl">
-              <thead>
-                <tr>
-                  <th style="width:32px;text-align:center;">#</th>
-                  <th>Week</th>
-                  <th>Tanggal</th>
-                  <th>SKU</th>
-                  <th>Nama (ITEM)</th>
-                  <th style="text-align:right;">Cont</th>
-                  <th>Tujuan</th>
-                  <th>Keterangan</th>
-                  <th style="width:28px;"></th>
-                </tr>
-              </thead>
-              <tbody id="mekPreviewTbody">
-                <tr><td colspan="9" style="text-align:center;padding:50px;color:#a0aec0;font-size:12px;">
-                  <i class="fas fa-magic" style="font-size:28px;display:block;margin-bottom:10px;opacity:.2;"></i>
-                  Paste teks WA lalu klik <b>Parse</b>
-                </td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div><!-- /mekWaPanel -->
-
-      <!-- ════ PANEL SI ════ -->
-      <div id="mekSiPanel" style="display:none;height:calc(100vh - 148px);overflow:hidden;flex-direction:column;" onpaste="mekHandleSiPaste(event)">
-
-        <!-- Toolbar SI -->
-        <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;">
-          <span style="font-size:12px;font-weight:700;color:#1a3a5c;">
-            <i class="fas fa-file-alt" style="color:#e53e3e;"></i> Upload Shipping Instruction (PDF / Screenshot)
-          </span>
-          <span style="font-size:11px;color:#a0aec0;"><i class="fas fa-info-circle"></i> Upload file atau <b>Ctrl+V</b> untuk paste screenshot</span>
-          <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
-            <button id="mekSiBtnSave" onclick="mekSavePlanning()"
-              style="padding:6px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#0f2027,#1a3a5c);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
-              <i class="fas fa-save"></i> Simpan
-            </button>
-          </div>
-        </div>
-
-        <!-- Upload area + Tujuan -->
-        <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;">
-          <label style="font-size:11px;font-weight:700;color:#e53e3e;text-transform:uppercase;letter-spacing:.4px;">Tujuan <span>*</span></label>
-          <input type="text" id="mekSiTujuan" placeholder="wajib diisi..."
-            style="width:160px;border:2px solid #fc8181;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;background:#fff5f5;"
-            oninput="this.style.borderColor=this.value.trim()?'#68d391':'#fc8181';this.style.background=this.value.trim()?'#f0fff4':'#fff5f5';">
-          <label style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.4px;">Week (opt.)</label>
-          <input type="number" id="mekSiWeek" min="1" max="53" placeholder="auto"
-            style="width:64px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-          <!-- Upload button -->
-          <label for="mekSiFileInput" style="padding:6px 16px;border-radius:8px;border:2px dashed #cbd5e0;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#4a5568;display:flex;align-items:center;gap:6px;transition:border-color .2s;" onmouseover="this.style.borderColor='#1a3a5c'" onmouseout="this.style.borderColor='#cbd5e0'">
-            <i class="fas fa-upload"></i> Pilih PDF / Gambar
-          </label>
-          <input type="file" id="mekSiFileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple style="display:none;" onchange="mekHandleSiFiles(this.files)">
-          <span id="mekSiParseCount" style="background:#e2e8f0;border-radius:20px;padding:1px 10px;font-size:11px;font-weight:700;color:#4a5568;display:none;">0 baris</span>
-          <button id="mekSiClearBtn" onclick="mekSiClear()" style="display:none;padding:5px 12px;border-radius:8px;border:none;background:#fed7d7;color:#c53030;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-times"></i> Clear</button>
-        </div>
-
-        <!-- Status parsing PDF + hasil tabel -->
-        <div style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
-
-          <!-- Drop zone (tampil saat belum ada file) -->
-          <div id="mekSiDropZone"
-            style="margin:20px;border:2px dashed #cbd5e0;border-radius:16px;padding:50px 20px;text-align:center;color:#a0aec0;cursor:pointer;transition:border-color .2s,background .2s;"
-            onclick="document.getElementById('mekSiFileInput').click()"
-            ondragover="event.preventDefault();this.style.borderColor='#1a3a5c';this.style.background='#f0f4ff';"
-            ondragleave="this.style.borderColor='#cbd5e0';this.style.background='';"
-            ondrop="event.preventDefault();this.style.borderColor='#cbd5e0';this.style.background='';mekHandleSiFiles(event.dataTransfer.files);">
-            <i class="fas fa-file-pdf" style="font-size:40px;display:block;margin-bottom:12px;color:#fc8181;opacity:.5;"></i>
-            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Klik, drag & drop, atau Ctrl+V paste screenshot</div>
-            <div style="font-size:12px;margin-top:4px;color:#a0aec0;">PDF, PNG, JPG, WEBP — bisa beberapa file</div>
-          </div>
-
-          <!-- Log proses & tabel preview SI (diisi JS) -->
-          <div id="mekSiResultWrap" style="display:none;padding:0 14px 14px;">
-            <!-- Status file -->
-            <div id="mekSiFileLog" style="margin-bottom:10px;"></div>
-            <!-- Tabel preview sama seperti WA -->
-            <table class="mek-plan-tbl" id="mekSiPreviewTbl" style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-              <thead>
-                <tr>
-                  <th style="width:32px;text-align:center;">#</th>
-                  <th>Week</th>
-                  <th>Tanggal</th>
-                  <th>No. SO</th>
-                  <th>SKU</th>
-                  <th>Nama (ITEM)</th>
-                  <th style="text-align:right;">Cont</th>
-                  <th>Tujuan</th>
-                  <th>Keterangan</th>
-                  <th style="width:28px;"></th>
-                </tr>
-              </thead>
-              <tbody id="mekSiPreviewTbody"></tbody>
-            </table>
-          </div>
-
-        </div>
-      </div><!-- /mekSiPanel -->
 
       <!-- ════ PANEL EMAIL ════ -->
-      <div id="mekEmailPanel" style="display:none;height:calc(100vh - 154px);overflow:hidden;flex-direction:column;" onpaste="mekHandleEmailPaste(event)">
+      <div id="mekEmailPanel" style="display:flex;height:calc(100vh - 112px);overflow:hidden;flex-direction:column;" onpaste="mekHandleEmailPaste(event)">
 
         <!-- Toolbar -->
         <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;">
