@@ -1383,14 +1383,17 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   if (skuFilter || docFilter || tujFilter || plantFilter) {
     var validKey = {};
     data.forEach(function(r) {
-      var k = r.noSo+'|'+r.planTgl;
+      var k = (r.noSo && r.noSo !== 'undefined' ? r.noSo : 'sku:'+r.sku)+'|'+r.planTgl;
       var skuOk   = !skuFilter   || (r.sku||'').toLowerCase().indexOf(skuFilter)>=0 || (r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
       var docOk   = !docFilter   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilter.toLowerCase())>=0;
       var tujOk   = !tujFilter   || (r.tujuan||'').toLowerCase().indexOf(tujFilter.toLowerCase())>=0;
       var plantOk = !plantFilter || (r.plant||'').toUpperCase().indexOf(plantFilter)>=0;
       if (skuOk && docOk && tujOk && plantOk) validKey[k] = true;
     });
-    filtered = data.filter(function(r){ return validKey[r.noSo+'|'+r.planTgl]; });
+    filtered = data.filter(function(r){
+      var k = (r.noSo && r.noSo !== 'undefined' ? r.noSo : 'sku:'+r.sku)+'|'+r.planTgl;
+      return validKey[k];
+    });
   }
 
   var byDate={}, dateOrder=[];
@@ -1468,9 +1471,10 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   // Update summary cards (By Planning email)
   var _tc=0,_kc=0,_lc=0,_dc=0,_ss={};
   data.forEach(function(r){
-    var k=r.noSo+'|'+r.planTgl;
-    if(!_ss[k] && r.isFirstRow){
-      _ss[k]=true;
+    // Kalau noSo undefined/kosong, pakai sku+planTgl supaya tidak double-merge
+    var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.planTgl;
+    if(!_ss[_key] && r.isFirstRow){
+      _ss[_key]=true;
       _tc += (r.jumlahCont || r.planCont || 0);
     }
     if(r.status==='keluar') _kc++;
@@ -2627,8 +2631,9 @@ function _mekRenderCapaianEmailAktual(data) {
   var totalC=0, keluarC=0, loadingC=0, daftarC=0, belumC=0;
   var seenSo3={};
   _mekCapEmailData.forEach(function(r){
-    if(!seenSo3[r.noSo+'|'+r.planTgl] && r.isFirstRow){
-      seenSo3[r.noSo+'|'+r.planTgl]=true;
+    var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.planTgl;
+    if(!seenSo3[_k3] && r.isFirstRow){
+      seenSo3[_k3]=true;
       totalC += (r.jumlahCont || r.planCont || 0);
     }
     if(r.status==='keluar') keluarC++;
