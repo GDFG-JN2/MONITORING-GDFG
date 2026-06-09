@@ -1430,8 +1430,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
 
     var rowNum=0;
     rows.forEach(function(r){
-      // Skip baris belum yang kosong (tidak ada SO dan nopol)
-      if (r.status === 'belum' && !r.noSo && !r.nopol) return;
+      // Tampilkan semua baris termasuk yang belum datang
 
       if(r.isFirstRow) rowNum++;
       var isPend=r.isPendingan;
