@@ -9,6 +9,42 @@ var _mekFilterMode  = 'date';   // 'date' | 'week'
 var _mekSummaryData = [];
 
 // ── Inisialisasi halaman ─────────────────────────────────────
+// ── Responsive: compact mode untuk mobile portrait ───────────
+function _mekApplyResponsive() {
+  var isMobile = window.innerWidth <= 768;
+  var page = document.getElementById('monitoringEksporPage');
+  if (!page) return;
+
+  // Toolbar padding — semua div yang punya padding inline
+  var toolbars = page.querySelectorAll(
+    '#mekSummaryPane > div, #mekPaneCapaian > div, #mekPaneAll > div, ' +
+    '#mekInputPane > div, #mekPlanningPane > div, #mekEmailPanel > div'
+  );
+  toolbars.forEach(function(el) {
+    if (!el.dataset.origPad) el.dataset.origPad = el.style.padding || '';
+    if (isMobile) {
+      // Kurangi padding toolbar
+      var p = el.style.padding;
+      if (p && (p.indexOf('10px 14px') >= 0 || p.indexOf('12px 14px') >= 0)) {
+        el.style.padding = '6px 10px';
+      } else if (p && p.indexOf('8px 14px') >= 0) {
+        el.style.padding = '5px 8px';
+      }
+    } else {
+      // Restore
+      if (el.dataset.origPad !== undefined) el.style.padding = el.dataset.origPad;
+    }
+  });
+
+  // Cards capaian — 6 cards jadi 3 kolom di mobile
+  var capGrid = page.querySelector('.mek-card-grid');
+  if (capGrid) {
+    capGrid.style.gridTemplateColumns = isMobile
+      ? 'repeat(3,1fr)'
+      : 'repeat(6,1fr)';  // default 6 kolom di desktop
+  }
+}
+
 function mekInitPage() {
   var today  = new Date();
   var yyyy   = today.getFullYear();
@@ -28,6 +64,9 @@ function mekInitPage() {
   mekSwitchFilterMode('date');
   mekSwitchTab('summary');
   mekSwitchSumView('all');
+  _mekApplyResponsive();
+  window.addEventListener('resize', _mekApplyResponsive);
+  window.addEventListener('orientationchange', function(){ setTimeout(_mekApplyResponsive, 300); });
   _mekCapMode = 'all';
   _mekInitPlanningWa();
 }
