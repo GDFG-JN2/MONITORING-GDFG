@@ -4531,7 +4531,7 @@
 
     <!-- ════ TAB SUMMARY ════ -->
     <!-- Toggle ALL / CAPAIAN — di luar scrollable area supaya selalu bisa diklik -->
-    <div style="display:flex;gap:6px;padding:8px 14px 0;background:#fff;flex-shrink:0;">
+    <div id="mekSumViewToggle" style="display:flex;gap:6px;padding:8px 14px 0;background:#fff;flex-shrink:0;">
       <button id="mekSumViewAll" class="sum-view-btn active" onclick="mekSwitchSumView('all')">
         <i class="fas fa-list"></i> All
       </button>
@@ -4632,6 +4632,9 @@
           <span style="font-size:13px;font-weight:800;"><i class="fas fa-table" style="margin-right:6px;"></i>Data Antrian Ekspor</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <span id="mekSumRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 DATA</span>
+            <button onclick="mekDownloadAllPdf()" style="margin-left:4px;padding:5px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+              <i class="fas fa-file-pdf"></i> PDF
+            </button>
             <!-- Download dropdown -->
             <div style="position:relative;display:inline-block;" id="mekDownloadWrap">
               <button onclick="mekToggleDownloadMenu()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
@@ -4693,18 +4696,6 @@
           </button>
         </div>
 
-        <!-- Sub-toggle Email: By Planning / By Aktual (muncul hanya saat mode Email) -->
-        <div id="mekCapEmailViewToggle" style="display:none;padding:6px 14px 0;border-bottom:1px solid #e2e8f0;">
-          <div style="display:flex;gap:6px;">
-            <button id="mekCapEmailByPlan" class="sum-view-btn active" onclick="mekCapEmailSwitchView('plan')">
-              <i class="fas fa-calendar-alt"></i> By Planning
-            </button>
-            <button id="mekCapEmailByAktual" class="sum-view-btn" onclick="mekCapEmailSwitchView('aktual')">
-              <i class="fas fa-truck"></i> By Aktual
-            </button>
-          </div>
-        </div>
-
         <!-- Toggle mode filter Capaian: Tanggal / Week -->
         <div style="padding:8px 14px 0;">
           <div style="display:flex;gap:6px;margin-bottom:8px;">
@@ -4728,6 +4719,9 @@
             <label>No. SO/DOC</label>
             <input type="text" id="mekCapDoc" placeholder="no. SO..."
               style="width:110px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>No. Pol</label>
+            <input type="text" id="mekCapNopol" placeholder="no. pol..."
+              style="width:90px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
             <label>Tujuan</label>
             <input type="text" id="mekCapTujuan" placeholder="tujuan..."
               style="width:100px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
@@ -4752,6 +4746,9 @@
             <label>No. SO/DOC</label>
             <input type="text" id="mekCapDocW" placeholder="no. SO..."
               style="width:100px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
+            <label>No. Pol</label>
+            <input type="text" id="mekCapNopolW" placeholder="no. pol..."
+              style="width:90px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
             <label>Tujuan</label>
             <input type="text" id="mekCapTujuanW" placeholder="tujuan..."
               style="width:90px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;">
@@ -4801,10 +4798,13 @@
           <div class="opname-view-header" style="background:linear-gradient(135deg,#0f2027,#1a3a5c);">
             <span style="font-size:13px;font-weight:800;"><i class="fas fa-chart-pie" style="margin-right:6px;"></i>Capaian Planning Ekspor</span>
             <span id="mekCapRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 data</span>
+            <button onclick="mekDownloadCapaianPdf()" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+              <i class="fas fa-file-pdf"></i> PDF
+            </button>
           </div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
             <table class="mek-sum-tbl" id="mekCapTbl">
-              <thead id="mekCapThead">
+              <thead>
                 <tr>
                   <th style="width:32px;text-align:center;">#</th>
                   <th>Tgl Planning</th>
@@ -5017,9 +5017,9 @@
         <!-- Toolbar -->
         <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;">
           <span style="font-size:12px;font-weight:700;color:#1a3a5c;">
-            <i class="fas fa-envelope" style="color:#d69e2e;"></i> Input Planning Email
+            <i class="fas fa-envelope" style="color:#d69e2e;"></i> Upload Tabel Planning Email (PDF / Screenshot)
           </span>
-          <span style="font-size:11px;color:#a0aec0;"><i class="fas fa-info-circle"></i> Upload Excel/CSV atau input manual (Ctrl+V dari Excel)</span>
+          <span style="font-size:11px;color:#a0aec0;"><i class="fas fa-info-circle"></i> Upload file atau <b>Ctrl+V</b> paste screenshot</span>
           <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
             <button id="mekEmailBtnSave" onclick="mekSavePlanning()"
               style="padding:6px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#0f2027,#1a3a5c);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
@@ -5036,43 +5036,31 @@
           <label style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.4px;">Tahun</label>
           <input type="number" id="mekEmailYear" min="2020" max="2099" placeholder="2026"
             style="width:72px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-          <label for="mekEmailXlsInput"
-            style="padding:6px 16px;border-radius:8px;border:2px dashed #9ae6b4;background:#f0fff4;font-size:12px;font-weight:700;cursor:pointer;color:#276749;display:flex;align-items:center;gap:6px;transition:border-color .2s;"
-            onmouseover="this.style.borderColor='#38a169'" onmouseout="this.style.borderColor='#9ae6b4'">
-            <i class="fas fa-file-excel" style="color:#38a169;"></i> Pilih Excel / CSV
+          <label for="mekEmailFileInput"
+            style="padding:6px 16px;border-radius:8px;border:2px dashed #cbd5e0;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#4a5568;display:flex;align-items:center;gap:6px;transition:border-color .2s;"
+            onmouseover="this.style.borderColor='#d69e2e'" onmouseout="this.style.borderColor='#cbd5e0'">
+            <i class="fas fa-upload"></i> Pilih PDF / Gambar
           </label>
-          <input type="file" id="mekEmailXlsInput" accept=".xlsx,.xls,.csv" multiple style="display:none;" onchange="mekHandleEmailXls(this.files)">
+          <input type="file" id="mekEmailFileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple style="display:none;" onchange="mekHandleEmailFiles(this.files)">
           <span id="mekEmailParseCount" style="background:#e2e8f0;border-radius:20px;padding:1px 10px;font-size:11px;font-weight:700;color:#4a5568;display:none;">0 baris</span>
           <button id="mekEmailBtnClear" onclick="mekClearEmail()" style="display:none;padding:5px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#718096;">
             <i class="fas fa-times"></i> Clear
           </button>
         </div>
 
-        <!-- Toggle Upload / Input Manual -->
-        <div style="display:flex;gap:0;background:#f7fafc;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
-          <button id="mekEmailModeUpload" onclick="mekEmailSwitchMode('upload')"
-            style="padding:7px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#1a3a5c;border-bottom:3px solid #1a3a5c;margin-bottom:-1px;">
-            <i class="fas fa-upload"></i> Upload File
-          </button>
-          <button id="mekEmailModeManual" onclick="mekEmailSwitchMode('manual')"
-            style="padding:7px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-1px;">
-            <i class="fas fa-keyboard"></i> Input Manual
-          </button>
-        </div>
+        <!-- Scrollable area: drop zone + log + tabel -->
+        <div style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
 
-        <!-- ── PANEL UPLOAD (Excel/CSV only) ── -->
-        <div id="mekEmailUploadPanel" style="overflow:auto;flex:1;-webkit-overflow-scrolling:touch;">
-
-          <!-- Drop zone Excel only -->
+          <!-- Drop zone -->
           <div id="mekEmailDropZone"
-            style="margin:20px;border:2px dashed #9ae6b4;border-radius:16px;padding:50px 20px;text-align:center;color:#a0aec0;cursor:pointer;transition:border-color .2s,background .2s;"
-            onclick="document.getElementById('mekEmailXlsInput').click()"
-            ondragover="event.preventDefault();this.style.borderColor='#38a169';this.style.background='#f0fff4';"
-            ondragleave="this.style.borderColor='#9ae6b4';this.style.background='';"
-            ondrop="event.preventDefault();this.style.borderColor='#9ae6b4';this.style.background='';mekHandleEmailXls(event.dataTransfer.files);">
-            <i class="fas fa-file-excel" style="font-size:40px;display:block;margin-bottom:12px;color:#38a169;opacity:.7;"></i>
-            <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#276749;">Klik atau drag & drop file Excel / CSV</div>
-            <div style="font-size:12px;color:#a0aec0;margin-top:4px;">.xlsx, .xls, .csv</div>
+            style="margin:20px;border:2px dashed #f6d860;border-radius:16px;padding:50px 20px;text-align:center;color:#a0aec0;cursor:pointer;transition:border-color .2s,background .2s;"
+            onclick="document.getElementById('mekEmailFileInput').click()"
+            ondragover="event.preventDefault();this.style.borderColor='#d69e2e';this.style.background='#fffff0';"
+            ondragleave="this.style.borderColor='#f6d860';this.style.background='';"
+            ondrop="event.preventDefault();this.style.borderColor='#f6d860';this.style.background='';mekHandleEmailFiles(event.dataTransfer.files);">
+            <i class="fas fa-envelope-open-text" style="font-size:40px;display:block;margin-bottom:12px;color:#d69e2e;opacity:.5;"></i>
+            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Klik, drag & drop, atau Ctrl+V paste screenshot</div>
+            <div style="font-size:12px;color:#a0aec0;margin-top:4px;">PDF, PNG, JPG, WEBP — bisa beberapa file</div>
           </div>
 
           <!-- Log + tabel preview -->
@@ -5100,55 +5088,7 @@
             </table>
           </div>
 
-        </div><!-- /mekEmailUploadPanel -->
-
-        <!-- ── PANEL INPUT MANUAL ── -->
-        <div id="mekEmailManualPanel" style="display:none;overflow:auto;flex:1;-webkit-overflow-scrolling:touch;padding:12px 14px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-            <span style="font-size:12px;color:#718096;">
-              <i class="fas fa-info-circle"></i> Ketik langsung atau <b>Ctrl+V</b> paste dari Excel
-            </span>
-            <button onclick="mekEmailManualAddRow()"
-              style="padding:4px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-size:12px;cursor:pointer;color:#1a3a5c;font-weight:700;">
-              <i class="fas fa-plus"></i> Tambah Baris
-            </button>
-            <button onclick="mekEmailManualClear()"
-              style="padding:4px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-size:12px;cursor:pointer;color:#e53e3e;">
-              <i class="fas fa-trash"></i> Clear
-            </button>
-          </div>
-          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-            <table id="mekEmailManualTbl" class="mek-plan-tbl" style="min-width:1400px;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-              <thead>
-                <tr>
-                  <th style="width:28px;text-align:center;">#</th>
-                  <th style="min-width:130px;">KETERANGAN</th>
-                  <th style="min-width:120px;">SO</th>
-                  <th style="min-width:120px;">QT</th>
-                  <th style="min-width:70px;">NEGARA</th>
-                  <th style="min-width:70px;">KODE</th>
-                  <th style="min-width:200px;">MATERIAL</th>
-                  <th style="min-width:90px;">STUFFING DATE</th>
-                  <th style="min-width:60px;text-align:right;">QTY</th>
-                  <th style="min-width:110px;">STUFFING PLANT</th>
-                  <th style="min-width:90px;">READY/NOT</th>
-                  <th style="min-width:130px;">EMAIL</th>
-                  <th style="min-width:80px;text-align:right;">RSV CRT</th>
-                  <th style="min-width:120px;">PO STO/PO INT</th>
-                  <th style="min-width:120px;">DO STO/DO INT</th>
-                  <th style="min-width:130px;">NOTE</th>
-                  <th style="width:28px;"></th>
-                </tr>
-              </thead>
-              <tbody id="mekEmailManualTbody"></tbody>
-            </table>
-          </div>
-          <div style="margin-top:10px;font-size:11px;color:#a0aec0;">
-            <i class="fas fa-lightbulb" style="color:#d69e2e;"></i>
-            Tips: Copy sel dari Excel → klik sel pertama di tabel → Ctrl+V untuk paste banyak baris sekaligus
-          </div>
         </div>
-
       </div><!-- /mekEmailPanel -->
 
     </div><!-- /mekInputPane -->
