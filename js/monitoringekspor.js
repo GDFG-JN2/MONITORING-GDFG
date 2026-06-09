@@ -498,11 +498,39 @@ function mekDownloadAllPdf() {
 function mekDownloadCapaianPdf() {
   var from = (document.getElementById('mekCapFrom')||{}).value||'';
   var to   = (document.getElementById('mekCapTo')||{}).value||'';
-  var mode = { all:'Semua', wa:'By Cont (WA)', si:'By SO (SI)', email:'By Email' };
+  var mode = { all:'Capaian', email:'Detail' };
   var modeStr = mode[window._mekCapMode||'all'] || '';
   var sub  = (from && to ? _mekFmtTglDisplay(from) + ' s/d ' + _mekFmtTglDisplay(to) : 'Semua Periode') +
     (modeStr ? ' — ' + modeStr : '');
   _mekPrintTable('mekCapTbl', 'Capaian Planning Ekspor', sub);
+}
+
+function mekToggleCapDownloadMenu() {
+  var menu = document.getElementById('mekCapDownloadMenu');
+  if (!menu) return;
+  var isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    setTimeout(function() {
+      document.addEventListener('click', function _close(e) {
+        var wrap = document.getElementById('mekCapDownloadWrap');
+        if (wrap && !wrap.contains(e.target)) {
+          menu.style.display = 'none';
+          document.removeEventListener('click', _close);
+        }
+      });
+    }, 10);
+  }
+}
+
+function mekDownloadCapaianExcel() {
+  var from = (document.getElementById('mekCapFrom')||{}).value||'';
+  var to   = (document.getElementById('mekCapTo')||{}).value||'';
+  var mode = { all:'Capaian', email:'Detail' };
+  var modeStr = mode[window._mekCapMode||'all'] || '';
+  var sub = (from && to ? _mekFmtTglDisplay(from) + ' s/d ' + _mekFmtTglDisplay(to) : 'Semua Periode') +
+    (modeStr ? ' - ' + modeStr : '');
+  _mekExportTableExcel('mekCapTbl', 'Capaian Planning Ekspor', sub);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -594,6 +622,42 @@ function mekDownloadExcel() {
   showToast('File Excel berhasil diunduh.', 'success');
 }
 
+// ── Export tabel dari DOM ke Excel (universal) ───────────────
+function _mekExportTableExcel(tableId, title, subtitle) {
+  var tbl = document.getElementById(tableId);
+  if (!tbl) { showToast('Tidak ada data.', 'warning'); return; }
+  var rows = tbl.querySelectorAll('tr');
+  if (!rows.length) { showToast('Tidak ada data.', 'warning'); return; }
+
+  var BOM = '﻿';
+  var csvRows = [];
+
+  // Info header
+  csvRows.push('"' + title + '"');
+  if (subtitle) csvRows.push('"' + subtitle + '"');
+  csvRows.push('');
+
+  rows.forEach(function(tr) {
+    var cells = tr.querySelectorAll('th, td');
+    if (!cells.length) return;
+    var row = Array.from(cells).map(function(cell) {
+      var txt = (cell.innerText || cell.textContent || '').replace(/[\r\n]+/g,' ').trim();
+      return '"' + txt.replace(/"/g,'""')+'"';
+    });
+    csvRows.push(row.join('\t'));
+  });
+
+  var content  = BOM + csvRows.join('\r\n');
+  var blob     = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  var url      = URL.createObjectURL(blob);
+  var filename = (title||'export').replace(/[^a-zA-Z0-9_]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.xls';
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  showToast('File Excel berhasil diunduh.', 'success');
+}
+
 // ════════════════════════════════════════════════════════════
 // TAB INPUT PLANNING — Parser teks WA
 // ════════════════════════════════════════════════════════════
@@ -606,7 +670,7 @@ function _mekInitPlanningWa() {
   _mekParsedRows = [];
   _mekSiRows     = [];
   _mekEmailRows  = [];
-  _mekPlanMode   = 'wa';
+  _mekPlanMode   = 'email';
   var ta = document.getElementById('mekWaTextarea');
   if (ta) ta.value = '';
   var tj = document.getElementById('mekWaTujuan');
@@ -981,6 +1045,7 @@ function _mekFuzzyMatchStd(itemText, stdCache) {
 // TOGGLE MODE: WA / SI
 // ════════════════════════════════════════════════════════════
 function mekSwitchPlanMode(mode) {
+  mode = 'email';  // hanya email tersisa
   _mekPlanMode = mode;
   var waPanel    = document.getElementById('mekWaPanel');
   var siPanel    = document.getElementById('mekSiPanel');
