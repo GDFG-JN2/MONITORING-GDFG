@@ -196,6 +196,12 @@ function mekLoadSummary() {
     if (nodocStripped) data = data.filter(function (r) { return _mekStripLeadingZero(r.noDoc || '').toLowerCase().indexOf(nodocStripped) >= 0; });
     if (dest)          data = data.filter(function (r) { return (r.tujuan || '').toLowerCase().indexOf(dest)  >= 0; });
 
+    // Sort by waktuDaftar ascending (tanggal terkecil duluan)
+    data.sort(function(a,b){
+      var ta = a.waktuDaftar || '';
+      var tb = b.waktuDaftar || '';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
     _mekSummaryData = data;
     _mekRenderSummaryTable(data);
     _mekRenderSummaryCards(data);
@@ -269,6 +275,75 @@ function _mekRenderSummaryTable(data) {
 
 function _mekEsc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ════════════════════════════════════════════════════════════
+// DOWNLOAD PDF — print tabel dengan warna
+// ════════════════════════════════════════════════════════════
+function _mekPrintTable(tableId, title, subtitle) {
+  var tbl = document.getElementById(tableId);
+  if (!tbl) { showToast('Tidak ada data untuk di-download.', 'warning'); return; }
+  var rows = tbl.querySelectorAll('tbody tr');
+  if (!rows.length) { showToast('Tidak ada data.', 'warning'); return; }
+
+  var css = [
+    '* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }',
+    'body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; }',
+    'h2 { font-size: 14px; margin: 0 0 2px; color: #1a3a5c; }',
+    'p  { font-size: 11px; margin: 0 0 8px; color: #718096; }',
+    'table { width: 100%; border-collapse: collapse; }',
+    'th { background: #1a3a5c !important; color: #fff !important; padding: 6px 8px; font-size: 10px; text-align: left; border: 1px solid #2d4a6a; white-space: nowrap; }',
+    'td { padding: 5px 8px; font-size: 10px; border: 1px solid #e2e8f0; vertical-align: middle; }',
+    'tr:nth-child(even) td { background: #f7fafc !important; }',
+    'span[style*="background:#c6f6d5"] { background: #c6f6d5 !important; color: #276749 !important; border-radius: 8px; padding: 1px 6px; }',
+    'span[style*="background:#fed7d7"] { background: #fed7d7 !important; color: #c53030 !important; border-radius: 8px; padding: 1px 6px; }',
+    'span[style*="background:#feebc8"] { background: #feebc8 !important; color: #744210 !important; border-radius: 8px; padding: 1px 6px; }',
+    'span[style*="background:#bee3f8"] { background: #bee3f8 !important; color: #2b6cb0 !important; border-radius: 8px; padding: 1px 6px; }',
+    'span[style*="background:#f6d860"] { background: #f6d860 !important; color: #744210 !important; border-radius: 8px; padding: 1px 6px; }',
+    'tr[style*="background:#1a3a5c"] td { background: #1a3a5c !important; color: #fff !important; }',
+    'tr[style*="background:#276749"] td { background: #276749 !important; color: #fff !important; }',
+    'tr[style*="background:#2d4a6a"] td { background: #2d4a6a !important; color: #bee3f8 !important; }',
+    'tr[style*="background:#2d6a4f"] td { background: #2d6a4f !important; color: #d8f3dc !important; }',
+    'tr[style*="background:#fffff0"] td { background: #fffff0 !important; }',
+    'tr[style*="background:#fff5f5"] td { background: #fff5f5 !important; }',
+    '@media print { @page { size: A4 landscape; margin: 10mm; } }'
+  ].join('\n');
+
+  var now = new Date();
+  var tglPrint = ('0'+now.getDate()).slice(-2)+'/'+('0'+(now.getMonth()+1)).slice(-2)+'/'+now.getFullYear()+
+    ' '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>' + title + '</title>' +
+    '<style>' + css + '</style></head><body>' +
+    '<h2>' + title + '</h2>' +
+    '<p>' + (subtitle||'') + ' &nbsp;|&nbsp; Dicetak: ' + tglPrint + '</p>' +
+    tbl.outerHTML +
+    '</body></html>';
+
+  var win = window.open('', '_blank', 'width=900,height=700');
+  if (!win) { showToast('Popup diblokir browser. Izinkan popup untuk halaman ini.', 'error'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function() { win.print(); }, 500);
+}
+
+function mekDownloadAllPdf() {
+  var from = (document.getElementById('mekFilterFrom')||{}).value||'';
+  var to   = (document.getElementById('mekFilterTo')||{}).value||'';
+  var sub  = from && to ? _mekFmtTglDisplay(from) + ' s/d ' + _mekFmtTglDisplay(to) : 'Semua Periode';
+  _mekPrintTable('mekSumTbl', 'Data Antrian Ekspor', sub);
+}
+
+function mekDownloadCapaianPdf() {
+  var from = (document.getElementById('mekCapFrom')||{}).value||'';
+  var to   = (document.getElementById('mekCapTo')||{}).value||'';
+  var mode = { all:'Semua', wa:'By Cont (WA)', si:'By SO (SI)', email:'By Email' };
+  var modeStr = mode[window._mekCapMode||'all'] || '';
+  var sub  = (from && to ? _mekFmtTglDisplay(from) + ' s/d ' + _mekFmtTglDisplay(to) : 'Semua Periode') +
+    (modeStr ? ' — ' + modeStr : '');
+  _mekPrintTable('mekCapTbl', 'Capaian Planning Ekspor', sub);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1064,10 +1139,10 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
     var validKey = {};
     data.forEach(function(r) {
       var k = r.noSo+'|'+r.planTgl;
-      var skuOk = !skuFilter||(r.sku||'').toLowerCase().indexOf(skuFilter)>=0||(r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
-      var docOk = !docFilter||_mekStripLeadingZero(r.noSo||'').indexOf(docFilter)>=0;
-      var tujOk = !tujFilter||(r.tujuan||'').toLowerCase().indexOf(tujFilter)>=0;
-      if (skuOk&&docOk&&tujOk) validKey[k]=true;
+      var skuOk = !skuFilter || (r.sku||'').toLowerCase().indexOf(skuFilter)>=0 || (r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
+      var docOk = !docFilter || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilter.toLowerCase())>=0;
+      var tujOk = !tujFilter || (r.tujuan||'').toLowerCase().indexOf(tujFilter.toLowerCase())>=0;
+      if (skuOk && docOk && tujOk) validKey[k] = true;
     });
     filtered = data.filter(function(r){ return validKey[r.noSo+'|'+r.planTgl]; });
   }
@@ -2050,9 +2125,15 @@ function _mekUpdateSiFileStatus(name, state, msg) {
 // ════════════════════════════════════════════════════════════
 // TOGGLE SUMMARY VIEW: ALL / CAPAIAN PLANNING
 // ════════════════════════════════════════════════════════════
-var _mekSumView = 'all';
+var   _mekSumView = 'all';
+  // Sembunyikan toggle All/Capaian saat di tab Input Planning
+  var sumToggle = document.getElementById('mekSumViewToggle');
+  if (sumToggle) sumToggle.style.display = 'none';
 
 function mekSwitchSumView(view) {
+  // Tampilkan toggle kalau sempat disembunyikan
+  var sumToggle = document.getElementById('mekSumViewToggle');
+  if (sumToggle) sumToggle.style.display = '';
   _mekSumView = view;
   var paneAll     = document.getElementById('mekPaneAll');
   var paneCapaian = document.getElementById('mekPaneCapaian');
@@ -2084,6 +2165,7 @@ function mekLoadCapaian() {
   var from   = (document.getElementById('mekCapFrom')    || {}).value || '';
   var to     = (document.getElementById('mekCapTo')      || {}).value || '';
   var sku    = ((document.getElementById('mekCapSku')    || {}).value || '').trim().toLowerCase();
+  var nopol  = ((document.getElementById('mekCapNopol')  || {}).value || '').trim().toLowerCase();
   var doc    = _mekStripLeadingZero(((document.getElementById('mekCapDoc') || {}).value || '').trim());
   var tujuan = ((document.getElementById('mekCapTujuan') || {}).value || '').trim().toLowerCase();
 
@@ -2132,7 +2214,8 @@ function mekLoadCapaian() {
         var skuOk  = !sku    || (r.sku||'').toLowerCase().indexOf(sku)>=0 || (r.nama||'').toLowerCase().indexOf(sku)>=0;
         var docOk  = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
         var tujOk  = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
-        if (skuOk && docOk && tujOk) planKeys[r._planKey] = true;
+        var nopolOk= !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
+        if (skuOk && docOk && tujOk && nopolOk) planKeys[r._planKey] = true;
         else planKeys[r._planKey] = planKeys[r._planKey] || false;
       });
       data = data.filter(function(r){ return planKeys[r._planKey]; });
@@ -2295,6 +2378,7 @@ function mekCapApplyWeek() {
   var et  = document.getElementById('mekCapTo');   if (et)  et.value  = rt.to;
   var es  = document.getElementById('mekCapSku');    if (es)  es.value  = (document.getElementById('mekCapSkuW')||{}).value||'';
   var ed  = document.getElementById('mekCapDoc');    if (ed)  ed.value  = (document.getElementById('mekCapDocW')||{}).value||'';
+  var enp = document.getElementById('mekCapNopol');  if (enp) enp.value = (document.getElementById('mekCapNopolW')||{}).value||'';
   var etj = document.getElementById('mekCapTujuan'); if (etj) etj.value = (document.getElementById('mekCapTujuanW')||{}).value||'';
   var infoTxt = document.getElementById('mekCapWeekInfoText');
   if (infoTxt) infoTxt.innerText = 'Week '+wFrom+(wFrom!==wTo?' – Week '+wTo:'')+' '+year+' = '+_mekFmtTglDisplay(rf.from)+' s/d '+_mekFmtTglDisplay(rt.to);
@@ -2303,7 +2387,7 @@ function mekCapApplyWeek() {
 }
 
 function mekResetCapaian() {
-  ['mekCapSku','mekCapDoc','mekCapTujuan','mekCapSkuW','mekCapDocW','mekCapTujuanW',
+  ['mekCapSku','mekCapDoc','mekCapNopol','mekCapTujuan','mekCapSkuW','mekCapDocW','mekCapNopolW','mekCapTujuanW',
    'mekCapWeekFrom','mekCapWeekTo'].forEach(function(id){ var e=document.getElementById(id); if(e)e.value=''; });
   var today=new Date(), yyyy=today.getFullYear(), mm=String(today.getMonth()+1).padStart(2,'0'), dd=String(today.getDate()).padStart(2,'0');
   var ef=document.getElementById('mekCapFrom'); if(ef) ef.value=yyyy+'-'+mm+'-01';
@@ -2317,39 +2401,21 @@ function _mekRenderCapaian(data, statusFilter) {
   if (!tbody) return;
   statusFilter = statusFilter || 'all';
 
-  // Hitung summary berdasarkan planning (baris pertama saja), per container bukan per baris
+  // Hitung summary — totalCont dari planning, status dari tiap baris realisasi
   var totalCont=0, keluarCont=0, daftarCont=0, loadingCont=0, belumCont=0;
   var seenPlanKey = {};
-
   data.forEach(function(r) {
+    // Total planning: hitung dari _jumlahCont baris pertama per planKey
     if (!seenPlanKey[r._planKey]) {
-      seenPlanKey[r._planKey] = { jumlah: r._jumlahCont||0, realisasi: r._realisasi||0 };
+      seenPlanKey[r._planKey] = true;
+      totalCont += (r._jumlahCont || 0);
     }
+    // Status per baris aktual
+    if      (r.status === 'keluar')  keluarCont++;
+    else if (r.status === 'loading') loadingCont++;
+    else if (r.status === 'daftar')  daftarCont++;
+    else                             belumCont++;
   });
-
-  Object.keys(seenPlanKey).forEach(function(k) {
-    var p = seenPlanKey[k];
-    totalCont  += p.jumlah;
-    keluarCont += Math.min(p.realisasi, p.jumlah); // realisasi tidak melebihi planning
-    belumCont  += Math.max(0, p.jumlah - p.realisasi);
-  });
-
-  // Hitung per status dari data rows
-  data.forEach(function(r) {
-    if      (r.status === 'keluar')  keluarCont = 0; // reset, hitung ulang dari rows
-    else if (r.status === 'loading') loadingCont = 0;
-  });
-  // Hitung ulang dari rows langsung
-  keluarCont=0; loadingCont=0; daftarCont=0; belumCont=0; totalCont=0;
-  var seenPlanKey2 = {};
-  data.forEach(function(r) {
-    if (!seenPlanKey2[r._planKey]) { seenPlanKey2[r._planKey]=true; totalCont+=(r._jumlahCont||0); }
-    if (r.status==='keluar')       keluarCont++;
-    else if (r.status==='loading') loadingCont++;
-    else if (r.status==='daftar')  daftarCont++;
-    else                           belumCont++;
-  });
-  var sudahCont = keluarCont + loadingCont + daftarCont;
   var pct = totalCont > 0 ? Math.round((keluarCont/totalCont)*100) : 0;
 
   _mekSetCard('mekCapCardKeluar',  keluarCont);
