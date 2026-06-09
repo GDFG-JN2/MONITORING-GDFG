@@ -443,7 +443,7 @@ function blInitPage() {
           + '<td style="text-align:right;font-weight:800;color:#2b6cb0">' + r.pallet + '</td>'
           + '<td style="text-align:right;color:#718096">' + pec + '</td>'
           + '<td style="text-align:right;font-weight:800;color:#553c9a">' + eff + '</td>'
-          + '<td style="font-size:11px;color:#718096">' + _blEsc(r.prodate) + '</td>'
+          + '<td style="font-size:11px;color:#718096">' + _blFmtDate(r.prodate) + '</td>'
           + '<td style="font-size:11px;color:#6b46c1;font-weight:700">' + (r.quotation ? _blEsc(r.quotation) : '<span style="color:#cbd5e0">—</span>') + '</td>'
           + '<td style="font-size:11px;font-weight:700;color:#2b6cb0;white-space:nowrap">' + ktnStr + '</td>'
           + '</tr>';
@@ -563,3 +563,12 @@ function blInitPage() {
   }
 
   function _blEsc(v){ return v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;') : '—'; }
+function _blFmtDate(v) {
+  if (!v) return '—';
+  var s = String(v);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[3]+'/'+m[2]+'/'+m[1];
+  var d = new Date(v);
+  if (!isNaN(d.getTime())) return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+  return s.slice(0,10);
+}
