@@ -1445,7 +1445,8 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
         :r.status==='daftar'
         ?'<span style="background:#bee3f8;color:#2b6cb0;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Daftar</span>'
         :'<span style="background:#fed7d7;color:#c53030;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Belum</span>';
-      var ket=isPend?'<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>':'';
+      var ket = isPend ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>' : '';
+      if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
       html+='<tr style="'+bg+'">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'')+'</td>' +
         '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'\u2014'):'')+  '</td>' +
@@ -2604,6 +2605,7 @@ function _mekRenderCapaianEmailAktual(data) {
       var ket = isPend
         ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>'
         : '';
+      if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
 
       html += '<tr style="'+bg+'">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(isFirstSo ? rowNum : '')+'</td>' +
