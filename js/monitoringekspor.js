@@ -1472,8 +1472,8 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   // Update summary cards (By Planning email)
   var _tc=0,_kc=0,_lc=0,_dc=0,_ss={};
   data.forEach(function(r){
-    // Kalau noSo undefined/kosong, pakai sku+planTgl supaya tidak double-merge
-    var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.planTgl;
+    // Key: SO+SKU+planTgl supaya SO multi-SKU tidak collapse
+    var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!_ss[_key] && r.isFirstRow){
       _ss[_key]=true;
       _tc += (r.jumlahCont || r.planCont || 0);
@@ -2632,7 +2632,16 @@ function _mekRenderCapaianEmailAktual(data) {
   // supaya totalCont sama dengan By Planning
   var totalC=0, keluarC=0, loadingC=0, daftarC=0, belumC=0;
   var seenSo3={};
+  // Ambil from/to dari filter aktif untuk batasi totalCont hanya dari range yang dipilih
+  var _aktFrom = ((document.getElementById('mekCapFrom')||{}).value||'') ||
+                 ((document.getElementById('mekCapWeekFrom')||{}).value||'');
+  var _aktTo   = ((document.getElementById('mekCapTo')||{}).value||'') ||
+                 ((document.getElementById('mekCapWeekTo')||{}).value||'');
+
   _mekCapEmailData.forEach(function(r){
+    // Hanya hitung totalCont untuk planning dalam range from-to (bukan lookback)
+    if (_aktFrom && r.planTgl < _aktFrom) return;
+    if (_aktTo   && r.planTgl > _aktTo)   return;
     var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.planTgl;
     if(!seenSo3[_k3] && r.isFirstRow){
       seenSo3[_k3]=true;
