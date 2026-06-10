@@ -1354,7 +1354,10 @@ function _mekCollectManualRows() {
 // ======================================================
 var _mekCapEmailData    = [];
 var _mekCapEmailSummary = {};
-var _mekCapEmailView    = 'plan';  // 'plan' | 'aktual'
+var _mekCapEmailView    = 'plan';
+var _mekCapEmailLastFrom = '';
+var _mekCapEmailLastTo   = '';
+var _mekCapEmailLastView = '';  // 'plan' | 'aktual'
 
 function mekCapEmailSwitchView(view) {
   _mekCapEmailView = view;
@@ -1362,8 +1365,18 @@ function mekCapEmailSwitchView(view) {
   var btnA = document.getElementById('mekCapEmailByAktual');
   if (btnP) btnP.classList.toggle('active', view === 'plan');
   if (btnA) btnA.classList.toggle('active', view === 'aktual');
-  // Reload dari GAS karena filter antrian berbeda per mode
-  mekLoadCapaian();
+  // Re-render dari data yang sudah ada — tidak perlu reload GAS
+  if (!_mekCapEmailData || !_mekCapEmailData.length) {
+    mekLoadCapaian(); return;
+  }
+  var sku    = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
+  var doc    = ((document.getElementById('mekCapDoc')   ||{}).value||'').trim();
+  var tujuan = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
+  if (view === 'aktual') {
+    _mekRenderCapaianEmailAktual(_mekCapEmailData);
+  } else {
+    _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tujuan);
+  }
 }
 
 function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
@@ -1417,6 +1430,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       else sum.belum++;
       if(r.isPendingan) sum.pendingan++;
     });
+    var pct = sum.total ? Math.round(sum.keluar/sum.total*100) : 0;
 
     html+='<tr style="background:#1a3a5c;"><td colspan="14" style="padding:8px 12px;color:#fff;font-size:12px;font-weight:700;">' +
       '<span style="margin-right:12px;">' + _mekFmtTglDisplay(planTgl) + '</span>' +
@@ -2469,6 +2483,22 @@ function mekLoadCapaian() {
   if (emailToggle) emailToggle.style.display = _mekCapMode === 'email' ? '' : 'none';
 
   if (_mekCapMode === 'email') {
+    // Kalau from/to sama dan data sudah ada → re-render lokal (tidak ke GAS)
+    var _sameRange = (_mekCapEmailData.length > 0 &&
+                      _mekCapEmailLastFrom === from && _mekCapEmailLastTo === to &&
+                      _mekCapEmailLastView === _mekCapEmailView);
+    if (_sameRange) {
+      if (_mekCapEmailView === 'aktual') {
+        _mekRenderCapaianEmailAktual(_mekCapEmailData);
+      } else {
+        _mekRenderCapaianEmail(_mekCapEmailData, sku, doc, tujuan);
+      }
+      return;
+    }
+    // Range berubah → reload dari GAS
+    _mekCapEmailLastFrom = from;
+    _mekCapEmailLastTo   = to;
+    _mekCapEmailLastView = _mekCapEmailView;
     API.run('getMekCapaianEmail', { from: from, to: to, viewMode: _mekCapEmailView }, function(res) {
       if (!res || !res.success) {
         tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
@@ -2522,6 +2552,7 @@ var _mekCapFilter = 'all';  // 'all' | 'datang' | 'belum'
 var _mekCapMode   = 'all';  // 'all' | 'wa' | 'si'
 
 function mekCapSwitchMode(mode) {
+  _mekCapEmailLastFrom = ''; _mekCapEmailLastTo = ''; _mekCapEmailLastView = '';
   _mekCapMode = mode;
   ['mekCapModeAll','mekCapModeWA','mekCapModeSI','mekCapModeEmail'].forEach(function(id) {
     var el = document.getElementById(id);
