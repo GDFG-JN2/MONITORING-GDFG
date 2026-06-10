@@ -1,6 +1,6 @@
 {
-  "name": "Monitoring GDFG",
-  "short_name": "MONITORING GDFG",
+  "name": "GDFG INSIGHT",
+  "short_name": "FG-Insight",
   "description": "Dashboard Monitoring Warehouse FG GDFG",
   "start_url": "./",
   "display": "standalone",
