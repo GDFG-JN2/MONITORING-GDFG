@@ -2533,10 +2533,23 @@ function _mekRenderCapaianEmailAktual(data) {
     return;
   }
 
-  // Filter plant
-  var plantFilterA = ((document.getElementById('mekCapPlant')||{}).value||'').trim().toUpperCase();
-  if (plantFilterA) {
-    data = data.filter(function(r){ return (r.plant||'').toUpperCase().indexOf(plantFilterA)>=0; });
+  // Ambil semua filter aktif
+  var skuFilterA   = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
+  var docFilterA   = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
+  var nopolFilterA = ((document.getElementById('mekCapNopol') ||{}).value||'').toLowerCase().trim();
+  var tujFilterA   = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
+  var plantFilterA = ((document.getElementById('mekCapPlant') ||{}).value||'').trim().toUpperCase();
+
+  // Filter data sebelum render
+  if (skuFilterA || docFilterA || nopolFilterA || tujFilterA || plantFilterA) {
+    data = data.filter(function(r){
+      var skuOk   = !skuFilterA   || (r.sku||'').toLowerCase().indexOf(skuFilterA)>=0  || (r.nama||'').toLowerCase().indexOf(skuFilterA)>=0;
+      var docOk   = !docFilterA   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilterA.toLowerCase())>=0;
+      var nopolOk = !nopolFilterA || (r.nopol||'').toLowerCase().indexOf(nopolFilterA)>=0;
+      var tujOk   = !tujFilterA   || (r.tujuan||'').toLowerCase().indexOf(tujFilterA)>=0;
+      var plantOk = !plantFilterA || (r.plant||'').toUpperCase().indexOf(plantFilterA)>=0;
+      return skuOk && docOk && nopolOk && tujOk && plantOk;
+    });
   }
 
   // Group per tanggal aktual (tglDaftar), skip baris belum
@@ -2632,17 +2645,17 @@ function _mekRenderCapaianEmailAktual(data) {
   // supaya totalCont sama dengan By Planning
   var totalC=0, keluarC=0, loadingC=0, daftarC=0, belumC=0;
   var seenSo3={};
-  // Ambil from/to dari filter aktif untuk batasi totalCont hanya dari range yang dipilih
-  var _aktFrom = ((document.getElementById('mekCapFrom')||{}).value||'') ||
-                 ((document.getElementById('mekCapWeekFrom')||{}).value||'');
-  var _aktTo   = ((document.getElementById('mekCapTo')||{}).value||'') ||
-                 ((document.getElementById('mekCapWeekTo')||{}).value||'');
+  var _aktFrom = ((document.getElementById('mekCapFrom')||{}).value||'');
+  var _aktTo   = ((document.getElementById('mekCapTo')||{}).value||'');
 
   _mekCapEmailData.forEach(function(r){
-    // Hanya hitung totalCont untuk planning dalam range from-to (bukan lookback)
     if (_aktFrom && r.planTgl < _aktFrom) return;
     if (_aktTo   && r.planTgl > _aktTo)   return;
-    var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.planTgl;
+    // Apply filter aktif ke summary card juga
+    if (tujFilterA   && (r.tujuan||'').toLowerCase().indexOf(tujFilterA)<0) return;
+    if (plantFilterA && (r.plant||'').toUpperCase().indexOf(plantFilterA)<0) return;
+    if (skuFilterA   && (r.sku||'').toLowerCase().indexOf(skuFilterA)<0 && (r.nama||'').toLowerCase().indexOf(skuFilterA)<0) return;
+    var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!seenSo3[_k3] && r.isFirstRow){
       seenSo3[_k3]=true;
       totalC += (r.jumlahCont || r.planCont || 0);
