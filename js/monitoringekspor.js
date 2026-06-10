@@ -1408,8 +1408,15 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
 
   dateOrder.forEach(function(planTgl){
     var rows=byDate[planTgl];
-    var sum=_mekCapEmailSummary[planTgl]||{total:0,keluar:0,loading:0,daftar:0,belum:0,pendingan:0};
-    var pct=sum.total?Math.round(sum.keluar/sum.total*100):0;
+    // Hitung summary per tanggal dari rows yang sudah filtered
+    var sum = {total:0, keluar:0, loading:0, daftar:0, belum:0, pendingan:0};
+    rows.forEach(function(r){
+      sum.total++;
+      if(r.status==='keluar') sum.keluar++;
+      else if(r.status==='loading'||r.status==='daftar') sum.loading++;
+      else sum.belum++;
+      if(r.isPendingan) sum.pendingan++;
+    });
 
     html+='<tr style="background:#1a3a5c;"><td colspan="14" style="padding:8px 12px;color:#fff;font-size:12px;font-weight:700;">' +
       '<span style="margin-right:12px;">' + _mekFmtTglDisplay(planTgl) + '</span>' +
@@ -1470,20 +1477,23 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   tbody.innerHTML = html;
 
   // Update summary cards (By Planning email)
+  // Update summary cards (By Planning) — dari filtered supaya ikut filter aktif
+  var nopolFilter = ((document.getElementById('mekCapNopol')||{}).value||'').toLowerCase().trim();
   var _tc=0,_kc=0,_lc=0,_dc=0,_ss={};
-  data.forEach(function(r){
-    // Key: SO+SKU+planTgl supaya SO multi-SKU tidak collapse
+  filtered.forEach(function(r){
     var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!_ss[_key] && r.isFirstRow){
       _ss[_key]=true;
       _tc += (r.jumlahCont || r.planCont || 0);
     }
+    // Filter nopol untuk status count
+    if (nopolFilter && (r.nopol||'').toLowerCase().indexOf(nopolFilter)<0) return;
     if(r.status==='keluar') _kc++;
     else if(r.status==='loading') _lc++;
     else if(r.status==='daftar') _dc++;
   });
   var _dtg = _kc+_lc+_dc;
-  var _bc  = Math.max(0, _tc - _dtg);  // belum = planning - datang
+  var _bc  = Math.max(0, _tc - _dtg);
   _mekSetCard('mekCapCardTotal',_tc);
   _mekSetCard('mekCapCardDatang',_dtg);
   _mekSetCard('mekCapCardKeluar',_kc);
