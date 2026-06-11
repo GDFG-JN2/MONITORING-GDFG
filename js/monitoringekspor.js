@@ -2440,6 +2440,22 @@ var   _mekSumView = 'all';
   var sumToggle = document.getElementById('mekSumViewToggle');
   if (sumToggle) sumToggle.style.display = 'none';
 
+function _mekFadeSwitch(showEl, hideEl) {
+  if (!showEl || !hideEl) return;
+  hideEl.style.transition = 'opacity .15s ease';
+  hideEl.style.opacity = '0';
+  setTimeout(function(){
+    hideEl.style.display = 'none';
+    hideEl.style.opacity = '';
+    showEl.style.opacity = '0';
+    showEl.style.display = '';
+    showEl.style.transition = 'opacity .18s ease';
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      showEl.style.opacity = '1';
+    }); });
+  }, 150);
+}
+
 function mekSwitchSumView(view) {
   // Tampilkan toggle kalau sempat disembunyikan
   var sumToggle = document.getElementById('mekSumViewToggle');
@@ -2623,7 +2639,7 @@ function _mekRenderCapaianEmailAktual(data) {
   // Group per tanggal aktual (tglDaftar), skip baris belum
   var byAktual = {}, aktualOrder = [];
   data.forEach(function(r) {
-    if (r.status === 'belum' || !r.tglDaftar) return;
+    if (r.status === 'belum' || !r.tglDaftar) return;  // skip belum dan yang belum daftar
     if (!byAktual[r.tglDaftar]) { byAktual[r.tglDaftar] = []; aktualOrder.push(r.tglDaftar); }
     byAktual[r.tglDaftar].push(r);
   });
@@ -2751,10 +2767,24 @@ function mekShowCardDetail(type) {
   var from = (document.getElementById('mekCapFrom')||{}).value||'';
   var to   = (document.getElementById('mekCapTo')||{}).value||'';
 
-  // Filter data sesuai type
+  // Ambil filter aktif
+  var skuF   = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
+  var docF   = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
+  var tujF   = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
+  var plantF = ((document.getElementById('mekCapPlant') ||{}).value||'').trim().toUpperCase();
+  var nopolF = ((document.getElementById('mekCapNopol') ||{}).value||'').toLowerCase().trim();
+
+  // Filter data sesuai type + filter aktif
   var data = _mekCapEmailData.filter(function(r){
     if (from && r.planTgl < from) return false;
     if (to   && r.planTgl > to)   return false;
+    // Apply filter aktif
+    if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
+    if (docF   && _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docF.toLowerCase())<0) return false;
+    if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
+    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
+    if (nopolF && (r.nopol||'').toLowerCase().indexOf(nopolF)<0) return false;
+    // Filter by type
     if (type === 'keluar')  return r.status === 'keluar';
     if (type === 'proses')  return r.status === 'loading' || r.status === 'daftar';
     if (type === 'datang')  return r.status === 'keluar' || r.status === 'loading' || r.status === 'daftar';
@@ -2765,7 +2795,15 @@ function mekShowCardDetail(type) {
   // Hitung sisa container per SO+SKU+planTgl untuk card Belum
   var sisaMap = {};
   if (type === 'belum' || type === 'total') {
-    _mekCapEmailData.forEach(function(r){
+    // Pakai semua data dalam range (termasuk yg keluar) untuk hitung sisa
+    _mekCapEmailData.filter(function(r){
+      if (from && r.planTgl < from) return false;
+      if (to   && r.planTgl > to)   return false;
+      if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
+      if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
+      if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
+      return true;
+    }).forEach(function(r){
       if (from && r.planTgl < from) return;
       if (to   && r.planTgl > to)   return;
       var k = r.noSo+'|'+r.sku+'|'+r.planTgl;
@@ -2848,11 +2886,18 @@ function mekShowCardDetail(type) {
 
   count.textContent = rows.length + ' baris';
   overlay.style.display = 'flex';
+  // Trigger animasi
+  overlay.classList.remove('show');
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    overlay.classList.add('show');
+  }); });
 }
 
 function mekCloseCardDetail() {
   var overlay = document.getElementById('mekCardDetailOverlay');
-  if (overlay) overlay.style.display = 'none';
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 180);
 }
 
 function mekCapSetFilter(f) {
