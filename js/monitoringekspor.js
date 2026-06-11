@@ -1503,17 +1503,26 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   // Update summary cards (By Planning) — dari filtered supaya ikut filter aktif
   var nopolFilter = ((document.getElementById('mekCapNopol')||{}).value||'').toLowerCase().trim();
   var _tc=0,_kc=0,_lc=0,_dc=0,_ss={};
+  var _planMap={}, _capMap={};
+  // Pass 1: hitung totalCont dan init cap
   filtered.forEach(function(r){
     var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!_ss[_key] && r.isFirstRow){
       _ss[_key]=true;
-      _tc += (r.jumlahCont || r.planCont || 0);
+      var jml = r.jumlahCont || r.planCont || 0;
+      _tc += jml;
+      _planMap[_key] = jml;
+      _capMap[_key]  = jml;  // slot tersedia
     }
-    // Filter nopol untuk status count
+  });
+  // Pass 2: hitung kc/lc/dc dengan cap max jumlahCont per planning
+  filtered.forEach(function(r){
+    var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if (nopolFilter && (r.nopol||'').toLowerCase().indexOf(nopolFilter)<0) return;
-    if(r.status==='keluar') _kc++;
-    else if(r.status==='loading') _lc++;
-    else if(r.status==='daftar') _dc++;
+    if (!_capMap[_key] || _capMap[_key] <= 0) return;  // sudah penuh, tidak hitung
+    if(r.status==='keluar')  { _kc++; _capMap[_key]--; }
+    else if(r.status==='loading'){ _lc++; _capMap[_key]--; }
+    else if(r.status==='daftar' ){ _dc++; _capMap[_key]--; }
   });
   var _dtg = _kc+_lc+_dc;
   var _bc  = Math.max(0, _tc - _dtg);
@@ -2728,21 +2737,35 @@ function _mekRenderCapaianEmailAktual(data) {
   var _aktFrom = ((document.getElementById('mekCapFrom')||{}).value||'');
   var _aktTo   = ((document.getElementById('mekCapTo')||{}).value||'');
 
+  var _planMap3={}, _capMap3={};
+  // Pass 1: totalCont
   _mekCapEmailData.forEach(function(r){
     if (_aktFrom && r.planTgl < _aktFrom) return;
     if (_aktTo   && r.planTgl > _aktTo)   return;
-    // Apply filter aktif ke summary card juga
     if (tujFilterA   && (r.tujuan||'').toLowerCase().indexOf(tujFilterA)<0) return;
     if (plantFilterA && (r.plant||'').toUpperCase().indexOf(plantFilterA)<0) return;
     if (skuFilterA   && (r.sku||'').toLowerCase().indexOf(skuFilterA)<0 && (r.nama||'').toLowerCase().indexOf(skuFilterA)<0) return;
     var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!seenSo3[_k3] && r.isFirstRow){
       seenSo3[_k3]=true;
-      totalC += (r.jumlahCont || r.planCont || 0);
+      var jml3 = r.jumlahCont || r.planCont || 0;
+      totalC += jml3;
+      _planMap3[_k3] = jml3;
+      _capMap3[_k3]  = jml3;
     }
-    if(r.status==='keluar') keluarC++;
-    else if(r.status==='loading') loadingC++;
-    else if(r.status==='daftar') daftarC++;
+  });
+  // Pass 2: kc/lc/dc dengan cap
+  _mekCapEmailData.forEach(function(r){
+    if (_aktFrom && r.planTgl < _aktFrom) return;
+    if (_aktTo   && r.planTgl > _aktTo)   return;
+    if (tujFilterA   && (r.tujuan||'').toLowerCase().indexOf(tujFilterA)<0) return;
+    if (plantFilterA && (r.plant||'').toUpperCase().indexOf(plantFilterA)<0) return;
+    if (skuFilterA   && (r.sku||'').toLowerCase().indexOf(skuFilterA)<0 && (r.nama||'').toLowerCase().indexOf(skuFilterA)<0) return;
+    var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
+    if (!_capMap3[_k3] || _capMap3[_k3] <= 0) return;
+    if(r.status==='keluar')  { keluarC++;  _capMap3[_k3]--; }
+    else if(r.status==='loading'){ loadingC++; _capMap3[_k3]--; }
+    else if(r.status==='daftar' ){ daftarC++;  _capMap3[_k3]--; }
   });
   var datangC  = keluarC+loadingC+daftarC;
   var belumReal = Math.max(0, totalC - datangC);
