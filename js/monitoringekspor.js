@@ -271,11 +271,10 @@ function _mekRenderPlanningTab(data) {
            'min-width:60px;display:block;border-radius:4px;transition:background .15s;';
 
   tbody.innerHTML = data.map(function(r, i) {
-    // Warna baris berdasarkan status antrian
-    var rowBg = r._status === 'done'    ? 'background:#f0fff4;' :   // hijau muda — semua keluar
-                r._status === 'partial' ? 'background:#fff5f5;' :   // merah muda — sebagian
-                r._status === 'pending' ? 'background:#fff5f5;' :   // merah muda — belum ada
-                (i%2===0 ? '' : 'background:#f8fafc;');             // default stripe
+    // Class baris berdasarkan status antrian (CSS handle warna)
+    var rowCls = r._status === 'done'    ? 'plan-done' :
+                 r._status === 'partial' ? 'plan-pending' :
+                 r._status === 'pending' ? 'plan-pending' : '';
 
     var cells = _MEK_PLAN_COLS.map(function(col) {
       var val = r[col.key] !== undefined ? String(r[col.key]) : '';
@@ -293,13 +292,11 @@ function _mekRenderPlanningTab(data) {
       return td;
     }).join('');
 
-    return '<tr style="'+rowBg+'">' +
+    return '<tr class="'+rowCls+'">' +
       '<td style="text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">' + (i+1) + '</td>' +
       cells +
       '<td style="text-align:center;">' +
-        '<button onclick="_mekSavePlanningRow('+i+')" ' +
-          'style="padding:3px 10px;border-radius:6px;border:none;background:#1a3a5c;color:#fff;font-size:11px;cursor:pointer;font-weight:700;">' +
-          'Simpan</button>' +
+        '<button onclick="_mekSavePlanningRow('+i+')" class="btn-simpan">Simpan</button>' +
       '</td>' +
       '</tr>';
   }).join('');
@@ -1241,6 +1238,21 @@ function mekEmailSwitchMode(mode) {
     if(btnU){btnU.style.color='#718096';btnU.style.borderBottomColor='transparent';}
     var tbody = document.getElementById('mekEmailManualTbody');
     if (tbody && !tbody.rows.length) mekEmailManualAddRow();
+  // Apply SISTEM TABEL OK
+  if (typeof _STOKInit === 'function') {
+    _STOKInit({
+      tblId:    'mekEmailManualTbl',
+      tbodyId:  'mekEmailManualTbody',
+      cols:     _MEK_MAN_COLS,
+      autoCols: {},
+      selClass: 'stok-sel',
+      onAfterPaste: function(tr) {
+        // Update nomor baris setelah paste
+        var rows = document.getElementById('mekEmailManualTbody').rows;
+        Array.from(rows).forEach(function(r, i){ if(r.cells[0]) r.cells[0].textContent = i+1; });
+      }
+    });
+  }
   }
 }
 
@@ -1265,19 +1277,6 @@ function mekEmailManualAddRow(vals) {
     if (vals && vals[col] !== undefined) td.textContent = vals[col];
     td.addEventListener('focus', function(){ td.style.background='#fffde7'; });
     td.addEventListener('blur',  function(){ td.style.background=''; });
-    td.addEventListener('keydown', function(e) {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        var cells = tr.querySelectorAll('[contenteditable]');
-        var pos = Array.from(cells).indexOf(td);
-        if (pos < cells.length-1) { cells[pos+1].focus(); }
-        else { mekEmailManualAddRow(); setTimeout(function(){ var rows=tbody.rows; if(rows.length>1)rows[rows.length-1].cells[1].focus(); },50); }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        mekEmailManualAddRow();
-        setTimeout(function(){ var rows=tbody.rows; if(rows.length>1)rows[rows.length-1].cells[1].focus(); },50);
-      }
-    });
     td.addEventListener('paste', function(e) {
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData('text');
