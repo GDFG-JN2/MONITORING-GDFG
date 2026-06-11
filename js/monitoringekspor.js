@@ -2790,6 +2790,32 @@ function mekShowCardDetail(type) {
   var from = (document.getElementById('mekCapFrom')||{}).value||'';
   var to   = (document.getElementById('mekCapTo')||{}).value||'';
 
+  // Popup hanya support mode email untuk sekarang
+  // Mode Capaian (WA/SI) pakai _mekCapData dengan struktur berbeda
+  var _srcData;
+  if (_mekCapMode === 'email') {
+    _srcData = _mekCapEmailData;
+  } else {
+    // Normalisasi _mekCapData ke format yang sama dengan _mekCapEmailData
+    _srcData = _mekCapData.map(function(r){
+      return {
+        planTgl:    r.tanggal || r.tgl || '',
+        noSo:       r.noSo || '',
+        sku:        r.sku  || '',
+        nama:       r.nama || '',
+        tujuan:     r.tujuan || '',
+        plant:      r.stuffingPlant || '',
+        qty:        r.qty || '',
+        jumlahCont: r._jumlahCont || r.jumlahCont || 0,
+        planCont:   r._jumlahCont || 0,
+        isFirstRow: !r._dupKey,
+        status:     r.status || 'belum',
+        statusRaw:  r.statusRaw || '',
+        nopol:      r.nopol || ''
+      };
+    });
+  }
+
   // Ambil filter aktif
   var skuF   = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
   var docF   = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
@@ -2798,7 +2824,7 @@ function mekShowCardDetail(type) {
   var nopolF = ((document.getElementById('mekCapNopol') ||{}).value||'').toLowerCase().trim();
 
   // Filter data sesuai type + filter aktif
-  var data = _mekCapEmailData.filter(function(r){
+  var data = _srcData.filter(function(r){
     if (from && r.planTgl < from) return false;
     if (to   && r.planTgl > to)   return false;
     // Apply filter aktif
@@ -2819,7 +2845,7 @@ function mekShowCardDetail(type) {
   var sisaMap = {};
   if (type === 'belum' || type === 'total') {
     // Pakai semua data dalam range (termasuk yg keluar) untuk hitung sisa
-    _mekCapEmailData.filter(function(r){
+    _srcData.filter(function(r){
       if (from && r.planTgl < from) return false;
       if (to   && r.planTgl > to)   return false;
       if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
@@ -2838,7 +2864,7 @@ function mekShowCardDetail(type) {
 
   // Deduplikasi per SO+SKU+planTgl untuk tampilan
   var seen = {}, rows = [];
-  data.forEach(function(r){
+  data.forEach(function(r){  // deduplikasi
     var k = r.noSo+'|'+r.sku+'|'+r.planTgl;
     if (type === 'belum') {
       // Untuk belum: tampilkan per planning, hitung sisa container
@@ -2864,10 +2890,10 @@ function mekShowCardDetail(type) {
       '<th style="padding:7px 10px;text-align:left;">KODE</th>' +
       '<th style="padding:7px 10px;text-align:left;">MATERIAL</th>' +
       '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
-      '<th style="padding:7px 10px;text-align:right;">PLAN</th>' +
+      '<th style="padding:7px 10px;text-align:right;">CONT</th>' +
       '<th style="padding:7px 10px;text-align:right;">SISA</th>' +
       '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
-      '<th style="padding:7px 10px;text-align:left;">PLANT</th>' +
+      '<th style="padding:7px 10px;text-align:left;">STUFFING</th>' +
       '</tr>';
     tbody.innerHTML = rows.sort(function(a,b){ return a.planTgl < b.planTgl ? -1 : 1; })
       .map(function(r,i){
@@ -2891,7 +2917,7 @@ function mekShowCardDetail(type) {
       '<th style="padding:7px 10px;text-align:left;">KODE</th>' +
       '<th style="padding:7px 10px;text-align:left;">MATERIAL</th>' +
       '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
-      '<th style="padding:7px 10px;text-align:right;">PLAN</th>' +
+      '<th style="padding:7px 10px;text-align:right;">CONT</th>' +
       '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
       '<th style="padding:7px 10px;text-align:left;">STATUS</th>' +
       '</tr>';
