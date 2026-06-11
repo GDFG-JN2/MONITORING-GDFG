@@ -2846,7 +2846,7 @@ function mekShowCardDetail(type) {
         seen[k] = true;
         var sisa = sisaMap[k] ? Math.max(0, sisaMap[k].plan - sisaMap[k].keluar) : (r.jumlahCont||0);
         rows.push({ planTgl:r.planTgl, noSo:r.noSo, sku:r.sku, nama:r.nama,
-                    tujuan:r.tujuan, plant:r.plant,
+                    tujuan:r.tujuan, plant:r.plant, qtyKrt:r.qty||'',
                     plan:r.jumlahCont||r.planCont||0, sisa:sisa });
       }
     } else {
@@ -2863,6 +2863,7 @@ function mekShowCardDetail(type) {
       '<th style="padding:7px 10px;text-align:left;">NO SO</th>' +
       '<th style="padding:7px 10px;text-align:left;">KODE</th>' +
       '<th style="padding:7px 10px;text-align:left;">MATERIAL</th>' +
+      '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
       '<th style="padding:7px 10px;text-align:right;">PLAN</th>' +
       '<th style="padding:7px 10px;text-align:right;">SISA</th>' +
       '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
@@ -2876,6 +2877,7 @@ function mekShowCardDetail(type) {
           '<td style="padding:6px 10px;font-weight:600;color:#2b6cb0;">'+_mekEsc(r.noSo||'—')+'</td>' +
           '<td style="padding:6px 10px;">'+_mekEsc(r.sku)+'</td>' +
           '<td style="padding:6px 10px;max-width:180px;">'+_mekEsc(r.nama)+'</td>' +
+          '<td style="padding:6px 10px;text-align:right;color:#744210;font-weight:600;">'+(r.qtyKrt||'—')+'</td>' +
           '<td style="padding:6px 10px;text-align:right;">'+r.plan+'</td>' +
           '<td style="padding:6px 10px;text-align:right;font-weight:700;color:#c53030;">'+r.sisa+'</td>' +
           '<td style="padding:6px 10px;color:#276749;font-weight:600;">'+_mekEsc(r.tujuan||'—')+'</td>' +
@@ -2888,6 +2890,7 @@ function mekShowCardDetail(type) {
       '<th style="padding:7px 10px;text-align:left;">NO SO</th>' +
       '<th style="padding:7px 10px;text-align:left;">KODE</th>' +
       '<th style="padding:7px 10px;text-align:left;">MATERIAL</th>' +
+      '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
       '<th style="padding:7px 10px;text-align:right;">PLAN</th>' +
       '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
       '<th style="padding:7px 10px;text-align:left;">STATUS</th>' +
@@ -2900,6 +2903,7 @@ function mekShowCardDetail(type) {
           '<td style="padding:6px 10px;font-weight:600;color:#2b6cb0;">'+_mekEsc(r.noSo||'—')+'</td>' +
           '<td style="padding:6px 10px;">'+_mekEsc(r.sku||'')+'</td>' +
           '<td style="padding:6px 10px;max-width:180px;">'+_mekEsc(r.nama||'')+'</td>' +
+          '<td style="padding:6px 10px;text-align:right;color:#744210;font-weight:600;">'+(r.qty||'—')+'</td>' +
           '<td style="padding:6px 10px;text-align:right;">'+(r.jumlahCont||r.planCont||'')+'</td>' +
           '<td style="padding:6px 10px;color:#276749;font-weight:600;">'+_mekEsc(r.tujuan||'—')+'</td>' +
           '<td style="padding:6px 10px;">'+_mekCapBadge(r.status, r.statusRaw)+'</td>' +
@@ -2908,12 +2912,10 @@ function mekShowCardDetail(type) {
   }
 
   count.textContent = rows.length + ' baris';
-  overlay.style.display = 'flex';
-  // Trigger animasi
   overlay.classList.remove('show');
-  requestAnimationFrame(function(){ requestAnimationFrame(function(){
-    overlay.classList.add('show');
-  }); });
+  overlay.style.display = 'flex';
+  void overlay.offsetWidth;  // force reflow - reset animasi
+  overlay.classList.add('show');
 }
 
 function mekCloseCardDetail() {
