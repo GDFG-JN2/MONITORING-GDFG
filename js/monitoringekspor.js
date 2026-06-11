@@ -2493,9 +2493,9 @@ function mekLoadCapaian() {
 
   if (_mekCapMode === 'email') {
     // Kalau from/to sama dan data sudah ada → re-render lokal (tidak ke GAS)
+    // Cache: reload hanya kalau from/to berubah (viewMode tidak pengaruhi data dari GAS)
     var _sameRange = (_mekCapEmailData.length > 0 &&
-                      _mekCapEmailLastFrom === from && _mekCapEmailLastTo === to &&
-                      _mekCapEmailLastView === _mekCapEmailView);
+                      _mekCapEmailLastFrom === from && _mekCapEmailLastTo === to);
     if (_sameRange) {
       if (_mekCapEmailView === 'aktual') {
         _mekRenderCapaianEmailAktual(_mekCapEmailData);
@@ -2504,11 +2504,9 @@ function mekLoadCapaian() {
       }
       return;
     }
-    // Range berubah → reload dari GAS
     _mekCapEmailLastFrom = from;
     _mekCapEmailLastTo   = to;
-    _mekCapEmailLastView = _mekCapEmailView;
-    API.run('getMekCapaianEmail', { from: from, to: to, viewMode: _mekCapEmailView }, function(res) {
+    API.run('getMekCapaianEmail', { from: from, to: to, viewMode: 'plan' }, function(res) {
       if (!res || !res.success) {
         tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
         return;
@@ -2739,6 +2737,122 @@ function _mekRenderCapaianEmailAktual(data) {
   _mekSetCard('mekCapCardBelum',  belumReal);
   var pctEl3=document.getElementById('mekCapCardPct');
   if(pctEl3) pctEl3.textContent = totalC ? Math.round(keluarC/totalC*100)+'%' : '—';
+}
+
+// ── Modal detail card capaian ────────────────────────────────
+function mekShowCardDetail(type) {
+  var overlay = document.getElementById('mekCardDetailOverlay');
+  var title   = document.getElementById('mekCardDetailTitle');
+  var thead   = document.getElementById('mekCardDetailThead');
+  var tbody   = document.getElementById('mekCardDetailTbody');
+  var count   = document.getElementById('mekCardDetailCount');
+  if (!overlay) return;
+
+  var from = (document.getElementById('mekCapFrom')||{}).value||'';
+  var to   = (document.getElementById('mekCapTo')||{}).value||'';
+
+  // Filter data sesuai type
+  var data = _mekCapEmailData.filter(function(r){
+    if (from && r.planTgl < from) return false;
+    if (to   && r.planTgl > to)   return false;
+    if (type === 'keluar')  return r.status === 'keluar';
+    if (type === 'proses')  return r.status === 'loading' || r.status === 'daftar';
+    if (type === 'datang')  return r.status === 'keluar' || r.status === 'loading' || r.status === 'daftar';
+    if (type === 'belum')   return r.status === 'belum';
+    return true; // total
+  });
+
+  // Hitung sisa container per SO+SKU+planTgl untuk card Belum
+  var sisaMap = {};
+  if (type === 'belum' || type === 'total') {
+    _mekCapEmailData.forEach(function(r){
+      if (from && r.planTgl < from) return;
+      if (to   && r.planTgl > to)   return;
+      var k = r.noSo+'|'+r.sku+'|'+r.planTgl;
+      if (!sisaMap[k]) sisaMap[k] = { plan:0, keluar:0 };
+      if (r.isFirstRow) sisaMap[k].plan += (r.jumlahCont||r.planCont||0);
+      if (r.status==='keluar') sisaMap[k].keluar++;
+    });
+  }
+
+  // Deduplikasi per SO+SKU+planTgl untuk tampilan
+  var seen = {}, rows = [];
+  data.forEach(function(r){
+    var k = r.noSo+'|'+r.sku+'|'+r.planTgl;
+    if (type === 'belum') {
+      // Untuk belum: tampilkan per planning, hitung sisa container
+      if (!seen[k]) {
+        seen[k] = true;
+        var sisa = sisaMap[k] ? Math.max(0, sisaMap[k].plan - sisaMap[k].keluar) : (r.jumlahCont||0);
+        rows.push({ planTgl:r.planTgl, noSo:r.noSo, sku:r.sku, nama:r.nama,
+                    tujuan:r.tujuan, plant:r.plant,
+                    plan:r.jumlahCont||r.planCont||0, sisa:sisa });
+      }
+    } else {
+      rows.push(r);
+    }
+  });
+
+  var TITLES = { total:'Total Planning', datang:'Total Kedatangan', keluar:'Sudah Keluar', proses:'Masih Proses', belum:'Belum Datang' };
+  title.textContent = TITLES[type] || '';
+
+  if (type === 'belum') {
+    thead.innerHTML = '<tr>' +
+      '<th style="padding:7px 10px;text-align:left;">TGL PLANNING</th>' +
+      '<th style="padding:7px 10px;text-align:left;">NO SO</th>' +
+      '<th style="padding:7px 10px;text-align:left;">KODE</th>' +
+      '<th style="padding:7px 10px;text-align:left;">MATERIAL</th>' +
+      '<th style="padding:7px 10px;text-align:right;">PLAN</th>' +
+      '<th style="padding:7px 10px;text-align:right;">SISA</th>' +
+      '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
+      '<th style="padding:7px 10px;text-align:left;">PLANT</th>' +
+      '</tr>';
+    tbody.innerHTML = rows.sort(function(a,b){ return a.planTgl < b.planTgl ? -1 : 1; })
+      .map(function(r,i){
+        var bg = i%2===0?'':'background:#f8fafc;';
+        return '<tr style="'+bg+'">' +
+          '<td style="padding:6px 10px;">'+_mekFmtTglDisplay(r.planTgl)+'</td>' +
+          '<td style="padding:6px 10px;font-weight:600;color:#2b6cb0;">'+_mekEsc(r.noSo||'—')+'</td>' +
+          '<td style="padding:6px 10px;">'+_mekEsc(r.sku)+'</td>' +
+          '<td style="padding:6px 10px;max-width:180px;">'+_mekEsc(r.nama)+'</td>' +
+          '<td style="padding:6px 10px;text-align:right;">'+r.plan+'</td>' +
+          '<td style="padding:6px 10px;text-align:right;font-weight:700;color:#c53030;">'+r.sisa+'</td>' +
+          '<td style="padding:6px 10px;color:#276749;font-weight:600;">'+_mekEsc(r.tujuan||'—')+'</td>' +
+          '<td style="padding:6px 10px;">'+_mekEsc(r.plant||'—')+'</td>' +
+          '</tr>';
+      }).join('');
+  } else {
+    thead.innerHTML = '<tr>' +
+      '<th style="padding:7px 10px;text-align:left;">TGL PLANNING</th>' +
+      '<th style="padding:7px 10px;text-align:left;">NO SO</th>' +
+      '<th style="padding:7px 10px;text-align:left;">KODE</th>' +
+      '<th style="padding:7px 10px;text-align:left;">MATERIAL</th>' +
+      '<th style="padding:7px 10px;text-align:right;">PLAN</th>' +
+      '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
+      '<th style="padding:7px 10px;text-align:left;">STATUS</th>' +
+      '</tr>';
+    tbody.innerHTML = rows.sort(function(a,b){ return a.planTgl < b.planTgl ? -1 : 1; })
+      .map(function(r,i){
+        var bg = i%2===0?'':'background:#f8fafc;';
+        return '<tr style="'+bg+'">' +
+          '<td style="padding:6px 10px;">'+_mekFmtTglDisplay(r.planTgl)+'</td>' +
+          '<td style="padding:6px 10px;font-weight:600;color:#2b6cb0;">'+_mekEsc(r.noSo||'—')+'</td>' +
+          '<td style="padding:6px 10px;">'+_mekEsc(r.sku||'')+'</td>' +
+          '<td style="padding:6px 10px;max-width:180px;">'+_mekEsc(r.nama||'')+'</td>' +
+          '<td style="padding:6px 10px;text-align:right;">'+(r.jumlahCont||r.planCont||'')+'</td>' +
+          '<td style="padding:6px 10px;color:#276749;font-weight:600;">'+_mekEsc(r.tujuan||'—')+'</td>' +
+          '<td style="padding:6px 10px;">'+_mekCapBadge(r.status, r.statusRaw)+'</td>' +
+          '</tr>';
+      }).join('');
+  }
+
+  count.textContent = rows.length + ' baris';
+  overlay.style.display = 'flex';
+}
+
+function mekCloseCardDetail() {
+  var overlay = document.getElementById('mekCardDetailOverlay');
+  if (overlay) overlay.style.display = 'none';
 }
 
 function mekCapSetFilter(f) {
