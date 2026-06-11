@@ -262,8 +262,7 @@ function _applyChartZoom() {
       // Belum ada data — load 3 section sekaligus
       var pending = 3;
       ['lokal','ekspor','gdfg'].forEach(function(sec){
-        google.script.run
-          .withSuccessHandler(function(res){
+        API.run('getData', {section: sec}, function(res){
             if(res&&res.success&&res.headers&&res.data){
               var h0=res.headers[0], h1=res.headers[1], h2=res.headers[2];
               res.data.forEach(function(r){
@@ -275,15 +274,13 @@ function _applyChartZoom() {
               });
             }
             if(--pending===0) _skuMapReady=true;
-          })
-          .withFailureHandler(function(){ --pending; })
-          .getData(sec);
+          });
       });
     }
 
     function loadSection(section){
       document.getElementById(section+"Content").innerHTML = "<div class='spinner'></div>";
-      google.script.run.withSuccessHandler(function(res){
+      API.run('getData', {section: section}, function(res){
         if(res.success && res.data.length > 0){
           var jumlahKosong = res.data.filter(function(r){ return r.__stdKosong; }).length;
           var html = "";
@@ -402,29 +399,22 @@ function _applyChartZoom() {
     // Auto refresh setiap 3 menit
     // ── Load daftar tanggal dari HISTORY KAPASITAS ──
     function loadTanggalHistory(){
-      google.script.run
-        .withSuccessHandler(function(res){
+      API.run('getHistoryKapasitas', {from:'', to:'', tipes:[]}, function(res){
           var sel = document.getElementById('kapasitasTanggalSelect');
           if(!sel) return;
-          // Simpan pilihan sekarang
           var cur = sel.value;
-          // Hapus semua kecuali opsi pertama (Terkini)
           while(sel.options.length > 1) sel.remove(1);
           if(res && res.success && res.tanggals){
             res.tanggals.forEach(function(tgl){
               var opt = document.createElement('option');
               opt.value = tgl;
-              // Format dd-MM-yyyy untuk display
               var parts = tgl.split('-');
               opt.textContent = parts.length===3 ? parts[2]+'-'+parts[1]+'-'+parts[0] : tgl;
               sel.appendChild(opt);
             });
           }
-          // Restore pilihan
           if(cur) sel.value = cur;
-        })
-        .withFailureHandler(function(){})
-        .getHistoryKapasitas('','',[]); // ambil semua hanya untuk dapat tanggals
+        });
     }
 
     // ── Load kapasitas by tanggal terpilih ──
@@ -459,24 +449,19 @@ function _applyChartZoom() {
     function loadKapasitasHariIni(){
       var today = _getTodayStr();
       // Cek apakah hari ini ada data — kalau tidak, pakai tanggal terakhir
-      google.script.run
-        .withSuccessHandler(function(res){
+      API.run('getHistoryKapasitas', {from:'', to:'', tipes:[]}, function(res){
           var tanggals = (res && res.success && res.tanggals) ? res.tanggals : [];
           var tglToLoad = today;
           if(tanggals.length && tanggals.indexOf(today) < 0){
-            // Hari ini tidak ada → pakai tanggal terbaru yang ada
             tglToLoad = tanggals[0];
           }
-          // Update Last Update label = tanggal data yang ditampilkan
           var luEl = document.getElementById('lastUpdateValue');
           if(luEl && tglToLoad){
             var p = tglToLoad.split('-');
             luEl.innerText = p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : tglToLoad;
           }
-          // Sync dropdown
           var sel = document.getElementById('kapasitasTanggalSelect');
           if(sel && tglToLoad !== today){
-            // Pastikan opsi ada di dropdown
             var found = false;
             for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===tglToLoad){ found=true; sel.value=tglToLoad; break; } }
             if(!found){ sel.value=''; }
@@ -484,11 +469,7 @@ function _applyChartZoom() {
             sel.value = '';
           }
           _loadKapasitasByTgl(tglToLoad);
-        })
-        .withFailureHandler(function(){
-          _loadKapasitasByTgl(today);
-        })
-        .getHistoryKapasitas('','',[]); // ambil semua untuk dapat tanggals
+        });
     }
 
     function _loadKapasitasByTgl(tgl){
@@ -498,14 +479,12 @@ function _applyChartZoom() {
         if(el) el.innerHTML="<div class='spinner' style='margin:20px auto;'></div>";
       });
 
-      google.script.run
-        .withSuccessHandler(function(res){
+      API.run('getHistoryKapasitas', {from: tgl, to: tgl, tipes: []}, function(res){
           if(!res||!res.success){
             ['lokalContent','eksporContent','gdfgContent'].forEach(function(id){
               var el=document.getElementById(id);
               if(el) el.innerHTML='<div style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data untuk tanggal ini.<br>Silakan input data terlebih dahulu.</div>';
             });
-            // Reset summary cards
             ['totalPalletValue','percentageLokal','percentageEkspor','percentageValue'].forEach(function(id){
               var el=document.getElementById(id); if(el) el.innerText='-';
             });
@@ -583,13 +562,7 @@ function _applyChartZoom() {
           _renderHistorySection('eksporContent', eksporArr, 'eksporRowCount', 'EKSPOR');
           _renderHistorySection('gdfgContent',   gdfgArr,   'gdfgRowCount',   'GDFG');
         })
-        .withFailureHandler(function(){
-          ['lokalContent','eksporContent','gdfgContent'].forEach(function(id){
-            var el=document.getElementById(id);
-            if(el) el.innerHTML='<div style="text-align:center;padding:20px;color:#e53e3e;">Gagal memuat data</div>';
-          });
-        })
-        .getHistoryKapasitas(tgl, tgl, []);
+        // error sudah handled di API.run
     }
 
     // Render section dari array history
@@ -709,23 +682,16 @@ function _applyChartZoom() {
       document.getElementById('trendChartWrap').insertAdjacentHTML('beforeend',
         '<div id="trendLoading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#a0aec0;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Memuat...</div>');
 
-      google.script.run
-        .withSuccessHandler(function(res){
+      API.run('getHistoryKapasitas', {from: from, to: to, tipes: []}, function(res){
           var loader = document.getElementById('trendLoading');
           if(loader) loader.remove();
-          if(!res||!res.success||!res.data.length){
+          if(!res||!res.success||!res.data||!res.data.length){
             document.getElementById('trendEmpty').style.display='flex';
             document.getElementById('trendEmpty').querySelector('span').textContent='Tidak ada data pada rentang tanggal ini';
             return;
           }
           _renderTrendChart(res.data, from, to);
-        })
-        .withFailureHandler(function(){
-          var loader = document.getElementById('trendLoading');
-          if(loader) loader.remove();
-          document.getElementById('trendEmpty').style.display='flex';
-        })
-        .getHistoryKapasitas(from, to, []);
+        });
     }
 
     function _renderTrendChart(data, from, to){
