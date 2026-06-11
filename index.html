@@ -2318,6 +2318,61 @@
       color: #fff;
     }
 
+    /* ── Animasi & Transisi Monitoring Ekspor ──────────────── */
+
+    /* Card hover */
+    #monitoringEksporPage .mek-card {
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    #monitoringEksporPage .mek-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    }
+
+    /* Tab toggle slide underline */
+    #monitoringEksporPage .mek-tab-btn {
+      transition: color .18s ease, border-bottom-color .18s ease;
+    }
+
+    /* Toggle button (All/Capaian, Capaian/Detail, By Planning/By Aktual) */
+    .sum-view-btn {
+      transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+
+    /* Popup modal muncul dengan fade+scale */
+    #mekCardDetailOverlay {
+      animation: none;
+    }
+    #mekCardDetailOverlay.show {
+      animation: mekFadeIn .2s ease forwards;
+    }
+    #mekCardDetailOverlay.show > div {
+      animation: mekSlideUp .22s ease forwards;
+    }
+    @keyframes mekFadeIn {
+      from { opacity:0; }
+      to   { opacity:1; }
+    }
+    @keyframes mekSlideUp {
+      from { opacity:0; transform: translateY(16px) scale(.97); }
+      to   { opacity:1; transform: translateY(0)    scale(1);   }
+    }
+
+    /* Pane switch fade */
+    #mekSummaryPane, #mekInputPane, #mekPlanningPane {
+      transition: opacity .18s ease;
+    }
+
+    /* Tabel baris hover */
+    #monitoringEksporPage .mek-sum-tbl tbody tr,
+    #mekCapTbody tr {
+      transition: background .12s ease;
+    }
+    #monitoringEksporPage .mek-sum-tbl tbody tr:hover,
+    #mekCapTbody tr:hover {
+      background: #ebf4ff !important;
+    }
+
     /* Mobile: layout input planning jadi satu kolom vertikal dengan tab toggle */
     @media(max-width:700px){
       #mekMobilePaneToggle{ display:flex !important; position:relative !important; }
