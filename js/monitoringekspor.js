@@ -1379,6 +1379,21 @@ function mekCapEmailSwitchView(view) {
   }
 }
 
+// Badge status Capaian Planning
+function _mekCapBadge(status, raw) {
+  var r = (raw||status||'').toUpperCase();
+  var sp = function(bg,cl,txt){ return '<span style="background:'+bg+';color:'+cl+';border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">'+txt+'</span>'; };
+  if (status==='keluar'  || r==='KELUAR')           return sp('#c6f6d5','#276749','Keluar');
+  if (status==='ditolak' || r==='DITOLAK')           return sp('#e53e3e','#fff','Ditolak');
+  if (r==='TREATMENT')                               return sp('#d6bcfa','#44337a','Treatment');
+  if (r==='MENUNGGU_SPM' || r==='MENUNGGU SPM')      return sp('#fefcbf','#744210','Menunggu SPE');
+  if (r==='ANTRIAN')                                 return sp('#e2e8f0','#4a5568','Antrian');
+  if (r==='START_LOADING' || r==='FINISH_LOADING')   return sp('#feebc8','#744210','Loading');
+  if (status==='loading')                            return sp('#feebc8','#744210','Loading');
+  if (status==='daftar')                             return sp('#bee3f8','#2b6cb0','Daftar');
+  return sp('#fed7d7','#c53030','Belum');
+}
+
 function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   var tbody = document.getElementById('mekCapTbody');
   if (!tbody) return;
@@ -1459,13 +1474,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       if(r.isFirstRow) rowNum++;
       var isPend=r.isPendingan;
       var bg=isPend?'background:#fffff0;':(r.status==='belum'?'background:#fff5f5;':'');
-      var badge=r.status==='keluar'
-        ?'<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Keluar</span>'
-        :r.status==='loading'
-        ?'<span style="background:#feebc8;color:#744210;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Loading</span>'
-        :r.status==='daftar'
-        ?'<span style="background:#bee3f8;color:#2b6cb0;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Daftar</span>'
-        :'<span style="background:#fed7d7;color:#c53030;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Belum</span>';
+      var badge = _mekCapBadge(r.status, r.statusRaw);
       var ket = isPend ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>' : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
       html+='<tr style="'+bg+'">' +
@@ -2565,6 +2574,26 @@ function mekCapSwitchMode(mode) {
   mekLoadCapaian();
 }
 
+// ── Helper badge status ──────────────────────────────────────
+function _mekCapStatusBadge(status, raw) {
+  var r = (raw||'').toUpperCase();
+  if (status === 'keluar')
+    return '<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Keluar</span>';
+  if (r === 'DITOLAK')
+    return '<span style="background:#fed7d7;color:#9b2c2c;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Ditolak</span>';
+  if (r === 'ANTRIAN')
+    return '<span style="background:#e2e8f0;color:#4a5568;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Antrian</span>';
+  if (r === 'MENUNGGU_SPM')
+    return '<span style="background:#d6bcfa;color:#553c9a;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Menunggu SPE</span>';
+  if (r === 'TREATMENT')
+    return '<span style="background:#fefcbf;color:#744210;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Treatment</span>';
+  if (status === 'loading')
+    return '<span style="background:#feebc8;color:#744210;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Loading</span>';
+  if (status === 'daftar')
+    return '<span style="background:#bee3f8;color:#2b6cb0;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Daftar</span>';
+  return '<span style="background:#fed7d7;color:#c53030;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Belum</span>';
+}
+
 // ── Render By Aktual — grup per tanggal aktual masuk ─────────
 function _mekRenderCapaianEmailAktual(data) {
   var tbody = document.getElementById('mekCapTbody');
@@ -2650,11 +2679,7 @@ function _mekRenderCapaianEmailAktual(data) {
       var isPend = r.isPendingan;
       var bg = isPend ? 'background:#fffff0;' : '';
 
-      var badge = r.status==='keluar'
-        ? '<span style="background:#c6f6d5;color:#276749;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Keluar</span>'
-        : r.status==='loading'
-        ? '<span style="background:#feebc8;color:#744210;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Loading</span>'
-        : '<span style="background:#bee3f8;color:#2b6cb0;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">Daftar</span>';
+      var badge = _mekCapBadge(r.status, r.statusRaw);
 
       var ket = isPend
         ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>'
