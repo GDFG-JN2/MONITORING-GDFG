@@ -3005,10 +3005,16 @@ function mekCapApplyWeek() {
 
 function mekResetCapaian() {
   ['mekCapSku','mekCapDoc','mekCapNopol','mekCapPlant','mekCapTujuan','mekCapSkuW','mekCapDocW','mekCapNopolW','mekCapPlantW','mekCapTujuanW',
-   'mekCapWeekFrom','mekCapWeekTo'].forEach(function(id){ var e=document.getElementById(id); if(e)e.value=''; });
-  var today=new Date(), yyyy=today.getFullYear(), mm=String(today.getMonth()+1).padStart(2,'0'), dd=String(today.getDate()).padStart(2,'0');
-  var ef=document.getElementById('mekCapFrom'); if(ef) ef.value=yyyy+'-'+mm+'-01';
-  var et=document.getElementById('mekCapTo');   if(et) et.value=yyyy+'-'+mm+'-'+dd;
+   'mekCapFrom','mekCapTo','mekCapWeekFrom','mekCapWeekTo','mekCapYear'
+  ].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  // Reset ke week ini
+  var today2=new Date(), dow2=today2.getDay(), diffM2=(dow2===0)?-6:1-dow2;
+  var mon2=new Date(today2); mon2.setDate(today2.getDate()+diffM2);
+  var sun2=new Date(mon2);   sun2.setDate(mon2.getDate()+6);
+  var ef=document.getElementById('mekCapFrom'); if(ef) ef.value=mon2.getFullYear()+'-'+String(mon2.getMonth()+1).padStart(2,'0')+'-'+String(mon2.getDate()).padStart(2,'0');
+  var et=document.getElementById('mekCapTo');   if(et) et.value=sun2.getFullYear()+'-'+String(sun2.getMonth()+1).padStart(2,'0')+'-'+String(sun2.getDate()).padStart(2,'0');
   var info=document.getElementById('mekCapWeekInfo'); if(info) info.style.display='none';
 }
 
