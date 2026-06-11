@@ -51,12 +51,20 @@ function mekInitPage() {
   var mm     = String(today.getMonth() + 1).padStart(2, '0');
   var dd     = String(today.getDate()).padStart(2, '0');
   var ymd    = yyyy + '-' + mm + '-' + dd;
-  var ymFrom = yyyy + '-' + mm + '-01';
+
+  // Default: range week ini (Senin - Minggu)
+  var dow    = today.getDay(); // 0=Minggu, 1=Senin, ...
+  var diffMon = (dow === 0) ? -6 : 1 - dow;  // jarak ke Senin
+  var monday  = new Date(today); monday.setDate(today.getDate() + diffMon);
+  var sunday  = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  function _fmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  var ymFrom = _fmt(monday);
+  var ymTo   = _fmt(sunday);
 
   var elFrom = document.getElementById('mekFilterFrom');
   var elTo   = document.getElementById('mekFilterTo');
   if (elFrom && !elFrom.value) elFrom.value = ymFrom;
-  if (elTo   && !elTo.value)   elTo.value   = ymd;
+  if (elTo   && !elTo.value)   elTo.value   = ymTo;
 
   var elYear = document.getElementById('mekFilterWeekYear');
   if (elYear && !elYear.value) elYear.value = yyyy;
