@@ -69,9 +69,9 @@ function mekInitPage() {
   var elYear = document.getElementById('mekFilterWeekYear');
   if (elYear && !elYear.value) elYear.value = yyyy;
 
-  // Default Capaian Planning: week ini juga
-  var efCap = document.getElementById('mekCapFrom'); if (efCap && !efCap.value) efCap.value = ymFrom;
-  var etCap = document.getElementById('mekCapTo');   if (etCap && !etCap.value) etCap.value = ymTo;
+  // Default Capaian Planning: selalu set ke week ini saat init
+  var efCap = document.getElementById('mekCapFrom'); if (efCap) efCap.value = ymFrom;
+  var etCap = document.getElementById('mekCapTo');   if (etCap) etCap.value = ymTo;
 
   mekSwitchFilterMode('date');
   mekSwitchTab('summary');
