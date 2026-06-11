@@ -2309,13 +2309,76 @@
       #monitoringEksporPage .mek-card-val{ font-size:16px; }
       #monitoringEksporPage .mek-card-lbl{ font-size:9px; }
     }
-    /* Freeze header tabel Planning */
+    /* ── Tab Planning — tabel styling ─────────────────────── */
+    #mekPlanningTbl {
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+    }
     #mekPlanningTbl thead th {
       position: sticky;
       top: 0;
       z-index: 3;
-      background: #1a3a5c;
+      background: #2d4a6a;
+      color: #e2e8f0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .4px;
+      padding: 10px 10px;
+      border-bottom: 2px solid #1a3a5c;
+      white-space: nowrap;
+    }
+    #mekPlanningTbl thead th:first-child { border-radius: 0; }
+    #mekPlanningTbl tbody tr {
+      transition: background .12s ease;
+    }
+    #mekPlanningTbl tbody tr:nth-child(odd)  { background: #fff; }
+    #mekPlanningTbl tbody tr:nth-child(even) { background: #f7fafc; }
+    #mekPlanningTbl tbody tr:hover { background: #ebf8ff !important; }
+    #mekPlanningTbl tbody td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #e8edf2;
+      vertical-align: middle;
+    }
+    /* Baris done — hijau */
+    #mekPlanningTbl tbody tr.plan-done td { background: #f0fff4 !important; }
+    #mekPlanningTbl tbody tr.plan-done:hover td { background: #c6f6d5 !important; }
+    /* Baris pending — merah muda */
+    #mekPlanningTbl tbody tr.plan-pending td { background: #fff5f5 !important; }
+    #mekPlanningTbl tbody tr.plan-pending:hover td { background: #fed7d7 !important; }
+    /* Kolom WEEK — compact */
+    #mekPlanningTbl td:nth-child(2),
+    #mekPlanningTbl th:nth-child(2) { width: 44px; text-align: center; }
+    /* Kolom # */
+    #mekPlanningTbl td:first-child,
+    #mekPlanningTbl th:first-child { width: 30px; text-align: center; color: #a0aec0; font-size: 11px; }
+    /* Tombol simpan */
+    #mekPlanningTbl .btn-simpan {
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: none;
+      background: #2b6cb0;
       color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    #mekPlanningTbl .btn-simpan:hover { background: #2c5282; }
+    /* Cell editable */
+    #mekPlanningTbl [contenteditable] {
+      outline: none;
+      border-radius: 4px;
+      padding: 3px 5px;
+      min-width: 50px;
+      display: block;
+      transition: background .15s, box-shadow .15s;
+    }
+    #mekPlanningTbl [contenteditable]:hover { background: #fffde7; }
+    #mekPlanningTbl [contenteditable]:focus {
+      background: #fff;
+      box-shadow: 0 0 0 2px #4299e1;
     }
 
     /* ── Animasi & Transisi Monitoring Ekspor ──────────────── */
@@ -5126,27 +5189,33 @@
     <!-- ════ TAB PLANNING ════ -->
     <div id="mekPlanningPane" style="display:none;height:calc(100vh - 112px);overflow:hidden;flex-direction:column;">
 
-      <!-- Toolbar -->
-      <div style="padding:10px 14px;background:#f7fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;">
-        <span style="font-size:12px;font-weight:700;color:#1a3a5c;"><i class="fas fa-table" style="color:#d69e2e;"></i> Planning Email</span>
-        <div style="display:flex;align-items:center;gap:6px;margin-left:4px;">
-          <label style="font-size:11px;font-weight:700;color:#718096;">Week</label>
+      <!-- Toolbar Planning -->
+      <div style="padding:10px 16px;background:#fff;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <i class="fas fa-table" style="color:#d69e2e;font-size:13px;"></i>
+          <span style="font-size:13px;font-weight:800;color:#1a3a5c;letter-spacing:.3px;">PLANNING EMAIL</span>
+        </div>
+        <div style="width:1px;height:20px;background:#e2e8f0;"></div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:#718096;font-weight:600;">WEEK</span>
           <input type="number" id="mekPlanWeekFrom" min="1" max="53" placeholder="dari"
-            style="width:58px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-          <span style="font-size:11px;color:#718096;">—</span>
-          <input type="number" id="mekPlanWeekTo" min="1" max="53" placeholder="sampai"
-            style="width:58px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-          <label style="font-size:11px;font-weight:700;color:#718096;">Tahun</label>
+            style="width:54px;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 7px;font-size:13px;font-weight:600;outline:none;text-align:center;transition:border-color .15s;"
+            onfocus="this.style.borderColor='#4299e1'" onblur="this.style.borderColor='#e2e8f0'">
+          <span style="color:#a0aec0;font-size:12px;">–</span>
+          <input type="number" id="mekPlanWeekTo" min="1" max="53" placeholder="s/d"
+            style="width:54px;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 7px;font-size:13px;font-weight:600;outline:none;text-align:center;transition:border-color .15s;"
+            onfocus="this.style.borderColor='#4299e1'" onblur="this.style.borderColor='#e2e8f0'">
+          <span style="font-size:11px;color:#718096;font-weight:600;">TAHUN</span>
           <input type="number" id="mekPlanYear" value="2026" min="2020" max="2099"
-            style="width:68px;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:13px;outline:none;">
-          <button onclick="mekLoadPlanningTab()" style="padding:5px 14px;border-radius:8px;border:none;background:#1a3a5c;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">
+            style="width:66px;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 7px;font-size:13px;font-weight:600;outline:none;text-align:center;transition:border-color .15s;"
+            onfocus="this.style.borderColor='#4299e1'" onblur="this.style.borderColor='#e2e8f0'">
+          <button onclick="mekLoadPlanningTab()" style="padding:6px 16px;border-radius:8px;border:none;background:#1a3a5c;color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .15s;"
+            onmouseover="this.style.background='#2d4a6a'" onmouseout="this.style.background='#1a3a5c'">
             <i class="fas fa-search"></i> Tampilkan
           </button>
         </div>
-        <span id="mekPlanRowCount" style="background:#e2e8f0;border-radius:20px;padding:1px 10px;font-size:11px;font-weight:700;color:#4a5568;display:none;">0 baris</span>
-        <div style="margin-left:auto;display:flex;gap:6px;">
-          <span id="mekPlanSaveStatus" style="font-size:11px;color:#718096;align-self:center;"></span>
-        </div>
+        <span id="mekPlanRowCount" style="background:#ebf8ff;color:#2b6cb0;border-radius:20px;padding:2px 12px;font-size:11px;font-weight:700;display:none;"></span>
+        <span id="mekPlanSaveStatus" style="font-size:11px;color:#38a169;font-weight:600;margin-left:auto;"></span>
       </div>
 
       <!-- Tabel -->
