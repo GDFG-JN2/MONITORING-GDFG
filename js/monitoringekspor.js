@@ -1364,6 +1364,7 @@ function _mekCollectManualRows() {
 // CAPAIAN EMAIL - load dan render
 // ======================================================
 var _mekCapEmailData    = [];
+var _mekCapEmailRowData = [];  // data per baris untuk popup detail
 var _mekCapEmailSummary = {};
 var _mekCapEmailView    = 'plan';
 var _mekCapEmailLastFrom = '';
@@ -1435,6 +1436,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
     });
   }
 
+  _mekCapEmailRowData = [];  // reset
   var byDate={}, dateOrder=[];
   filtered.forEach(function(r){
     if (!byDate[r.planTgl]){byDate[r.planTgl]=[];dateOrder.push(r.planTgl);}
@@ -1488,7 +1490,8 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var badge = _mekCapBadge(r.status, r.statusRaw);
       var ket = isPend ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>' : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
-      html+='<tr style="'+bg+'">' +
+      _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||''});
+      html+='<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'')+'</td>' +
         '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'\u2014'):'')+  '</td>' +
         '<td style="'+CS+'font-weight:700;">'+_mekEsc(r.sku||'')+'</td>' +
@@ -2656,6 +2659,7 @@ function _mekRenderCapaianEmailAktual(data) {
     });
   }
 
+  _mekCapEmailRowData = [];  // reset
   // Group per tanggal aktual (tglDaftar), skip baris belum
   var byAktual = {}, aktualOrder = [];
   data.forEach(function(r) {
@@ -2720,8 +2724,8 @@ function _mekRenderCapaianEmailAktual(data) {
         : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
 
-      html += '<tr style="'+bg+'">' +
-        '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(isFirstSo ? rowNum : '')+'</td>' +
+      _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||''});
+      html += '<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
         '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(isFirstSo ? _mekEsc(r.noSo||'—') : '')+'</td>' +
         '<td style="'+CS+'font-weight:700;">'+(isFirstSo ? _mekEsc(r.sku||'') : '')+'</td>' +
         '<td style="'+CS+'">'+(isFirstSo ? _mekEsc(r.nama||'') : '')+'</td>' +
@@ -2790,6 +2794,46 @@ function _mekRenderCapaianEmailAktual(data) {
 }
 
 // ── Modal detail card capaian ────────────────────────────────
+function mekShowRowDetail(trEl) {
+  // Data disimpan di variable saat render - ambil dari _mekCapEmailRowData
+  var idx = trEl ? parseInt(trEl.dataset.rowidx) : -1;
+  var d = (idx >= 0 && _mekCapEmailRowData[idx]) ? _mekCapEmailRowData[idx] : null;
+  if (!d) return;
+
+  // Pakai overlay yang sama dengan card detail
+  var overlay = document.getElementById('mekCardDetailOverlay');
+  var title   = document.getElementById('mekCardDetailTitle');
+  var thead   = document.getElementById('mekCardDetailThead');
+  var tbody   = document.getElementById('mekCardDetailTbody');
+  var count   = document.getElementById('mekCardDetailCount');
+  if (!overlay) return;
+
+  title.textContent = 'Detail Baris';
+  thead.innerHTML = '';
+  count.textContent = '';
+
+  var rows = [
+    {label:'SKU / Kode',    val: d.sku},
+    {label:'Nama Barang',   val: d.nama},
+    {label:'QTY Karton',    val: d.qty  || '—'},
+    {label:'QT (Quotation)',val: d.qt   || '—'},
+    {label:'Keterangan',    val: d.keterangan || '—'},
+    {label:'Note',          val: d.note || '—'},
+  ];
+
+  tbody.innerHTML = rows.map(function(r, i) {
+    return '<tr style="'+(i%2===0?'':'background:#f8fafc;')+'">' +
+      '<td style="padding:10px 16px;font-size:11px;font-weight:700;color:#718096;white-space:nowrap;width:140px;">'+r.label+'</td>' +
+      '<td style="padding:10px 16px;font-size:13px;color:#2d3748;font-weight:600;">'+_mekEsc(r.val)+'</td>' +
+      '</tr>';
+  }).join('');
+
+  overlay.classList.remove('show');
+  overlay.style.display = 'flex';
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
+}
+
 function mekShowCardDetail(type) {
   var overlay = document.getElementById('mekCardDetailOverlay');
   var title   = document.getElementById('mekCardDetailTitle');
@@ -2894,6 +2938,78 @@ function mekShowCardDetail(type) {
   var TITLES = { total:'Total Planning', datang:'Total Kedatangan', keluar:'Sudah Keluar', proses:'Masih Proses', belum:'Belum Datang' };
   title.textContent = TITLES[type] || '';
 
+  // Tambah tombol By Tujuan untuk card belum dan total
+  var btnBar = document.getElementById('mekCardDetailBtnBar');
+  if (btnBar) {
+    // Semua card tampilkan tombol Detail dan By Tujuan
+    btnBar.innerHTML =
+      '<button id="mekCardDetailBtnDetail" onclick="mekCardDetailSetView(&quot;detail&quot;)" ' +
+      'style="padding:4px 12px;border-radius:6px;border:1.5px solid #2b6cb0;background:#2b6cb0;color:#fff;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;">Detail</button>' +
+      '<button id="mekCardDetailBtnTujuan" onclick="mekCardDetailSetView(&quot;tujuan&quot;)" ' +
+      'style="padding:4px 12px;border-radius:6px;border:1.5px solid #e2e8f0;background:#fff;color:#4a5568;font-size:11px;font-weight:700;cursor:pointer;">By Tujuan</button>';
+    btnBar.style.display = '';
+  }
+
+  // Simpan rows dan type untuk dipakai saat switch view
+  window._mekCardDetailRows = rows;
+  window._mekCardDetailType = type;
+
+  _mekCardDetailRender(rows, type, 'detail');
+}
+
+function mekCardDetailSetView(view) {
+  var rows = window._mekCardDetailRows || [];
+  var type = window._mekCardDetailType || 'belum';
+  // Update style tombol
+  var btnD = document.getElementById('mekCardDetailBtnDetail');
+  var btnT = document.getElementById('mekCardDetailBtnTujuan');
+  if (btnD) { btnD.style.background = view==='detail' ? '#2b6cb0' : '#fff'; btnD.style.color = view==='detail' ? '#fff' : '#4a5568'; btnD.style.borderColor = view==='detail' ? '#2b6cb0' : '#e2e8f0'; }
+  if (btnT) { btnT.style.background = view==='tujuan' ? '#2b6cb0' : '#fff'; btnT.style.color = view==='tujuan' ? '#fff' : '#4a5568'; btnT.style.borderColor = view==='tujuan' ? '#2b6cb0' : '#e2e8f0'; }
+  _mekCardDetailRender(rows, type, view);
+}
+
+function _mekCardDetailRender(rows, type, view) {
+  var thead = document.getElementById('mekCardDetailThead');
+  var tbody = document.getElementById('mekCardDetailTbody');
+  var count = document.getElementById('mekCardDetailCount');
+  if (!thead || !tbody) return;
+
+  if (view === 'tujuan') {
+    var tujMap = {};
+    rows.forEach(function(r) {
+      var tuj = r.tujuan || '—';
+      if (!tujMap[tuj]) tujMap[tuj] = { tujuan: tuj, cont: 0, sisa: 0 };
+      // Untuk belum/total: pakai sisa. Untuk lainnya: pakai plan/jumlahCont
+      if (type === 'belum' || type === 'total') {
+        tujMap[tuj].cont += (r.plan || 0);
+        tujMap[tuj].sisa += (r.sisa !== undefined ? r.sisa : (r.plan || 0));
+      } else {
+        tujMap[tuj].cont += (r.jumlahCont || r.planCont || 1);
+        tujMap[tuj].sisa += 1;  // setiap baris = 1 container
+      }
+    });
+    var tujRows = Object.values(tujMap).sort(function(a,b){ return b.sisa-a.sisa; });
+    var sisaLabel = (type==='belum'||type==='total') ? 'SISA CONT' : 'JUMLAH';
+
+    thead.innerHTML = '<tr>' +
+      '<th style="padding:7px 12px;text-align:left;">TUJUAN</th>' +
+      '<th style="padding:7px 12px;text-align:right;">TOTAL CONT</th>' +
+      '<th style="padding:7px 12px;text-align:right;">'+sisaLabel+'</th>' +
+      '</tr>';
+    tbody.innerHTML = tujRows.map(function(r, i) {
+      var bg = i%2===0?'':'background:#f8fafc;';
+      var valColor = (type==='belum') ? 'color:#c53030;' : (type==='keluar') ? 'color:#276749;' : 'color:#2d3748;';
+      return '<tr style="'+bg+'">' +
+        '<td style="padding:8px 12px;font-weight:700;color:#276749;">'+_mekEsc(r.tujuan)+'</td>' +
+        '<td style="padding:8px 12px;text-align:right;font-weight:600;">'+r.cont+'</td>' +
+        '<td style="padding:8px 12px;text-align:right;font-weight:800;font-size:14px;'+valColor+'">'+r.sisa+'</td>' +
+        '</tr>';
+    }).join('');
+    if (count) count.textContent = tujRows.length + ' tujuan';
+    return;
+  }
+
+  // View detail (default)
   if (type === 'belum') {
     thead.innerHTML = '<tr>' +
       '<th style="padding:7px 10px;text-align:left;">TGL PLANNING</th>' +
@@ -2951,9 +3067,9 @@ function mekShowCardDetail(type) {
   count.textContent = rows.length + ' baris';
   overlay.classList.remove('show');
   overlay.style.display = 'flex';
-  void overlay.offsetWidth;  // force reflow - reset animasi
+  void overlay.offsetWidth;
   overlay.classList.add('show');
-}
+}  // end _mekCardDetailRender
 
 function mekCloseCardDetail() {
   var overlay = document.getElementById('mekCardDetailOverlay');
