@@ -2987,35 +2987,64 @@ function _mekCardDetailRender(rows, type, view) {
 
   if (view === 'tujuan') {
     var tujMap = {};
+    var seenPlan = {};  // untuk total planning - hitung jumlahCont sekali per planning
+
     rows.forEach(function(r) {
       var tuj = r.tujuan || '—';
-      if (!tujMap[tuj]) tujMap[tuj] = { tujuan: tuj, cont: 0, sisa: 0 };
-      // Untuk belum/total: pakai sisa. Untuk lainnya: pakai plan/jumlahCont
-      if (type === 'belum' || type === 'total') {
-        tujMap[tuj].cont += (r.plan || 0);
-        tujMap[tuj].sisa += (r.sisa !== undefined ? r.sisa : (r.plan || 0));
+      if (!tujMap[tuj]) tujMap[tuj] = { tujuan: tuj, planCont: 0, val: 0 };
+
+      if (type === 'total') {
+        // Total planning: hitung jumlahCont per SO+SKU+planTgl unik
+        var pk = (r.noSo||r.sku||'')+'|'+(r.sku||'')+'|'+(r.planTgl||'');
+        if (!seenPlan[pk] && r.isFirstRow) {
+          seenPlan[pk] = true;
+          tujMap[tuj].planCont += (r.jumlahCont || r.planCont || 0);
+          tujMap[tuj].val      += (r.jumlahCont || r.planCont || 0);
+        }
+      } else if (type === 'belum') {
+        // Belum: sisa container
+        tujMap[tuj].planCont += (r.plan || 0);
+        tujMap[tuj].val      += (r.sisa !== undefined ? r.sisa : (r.plan || 0));
       } else {
-        tujMap[tuj].cont += (r.jumlahCont || r.planCont || 1);
-        tujMap[tuj].sisa += 1;  // setiap baris = 1 container
+        // Keluar/Proses/Datang: 1 baris = 1 truk/container, hitung jumlahCont planning sekali
+        var pk2 = (r.noSo||r.sku||'')+'|'+(r.sku||'')+'|'+(r.planTgl||'');
+        if (!seenPlan[pk2] && r.isFirstRow) {
+          seenPlan[pk2] = true;
+          tujMap[tuj].planCont += (r.jumlahCont || r.planCont || 0);
+        }
+        tujMap[tuj].val += 1;  // 1 truk per baris
       }
     });
-    var tujRows = Object.values(tujMap).sort(function(a,b){ return b.sisa-a.sisa; });
-    var sisaLabel = (type==='belum'||type==='total') ? 'SISA CONT' : 'JUMLAH';
+
+    var tujRows = Object.values(tujMap).sort(function(a,b){ return b.val - a.val; });
+
+    // Label kolom sesuai tipe
+    var col1 = 'PLAN CONT';
+    var col2 = type==='belum' ? 'SISA' : type==='total' ? 'TOTAL' :
+               type==='keluar' ? 'KELUAR' : type==='proses' ? 'PROSES' : 'DATANG';
+
+    // Untuk total: hanya 2 kolom (tidak perlu plan cont terpisah)
+    var showPlan = (type !== 'total');
 
     thead.innerHTML = '<tr>' +
       '<th style="padding:7px 12px;text-align:left;">TUJUAN</th>' +
-      '<th style="padding:7px 12px;text-align:right;">TOTAL CONT</th>' +
-      '<th style="padding:7px 12px;text-align:right;">'+sisaLabel+'</th>' +
+      (showPlan ? '<th style="padding:7px 12px;text-align:right;">'+col1+'</th>' : '') +
+      '<th style="padding:7px 12px;text-align:right;">'+col2+'</th>' +
       '</tr>';
+
     tbody.innerHTML = tujRows.map(function(r, i) {
       var bg = i%2===0?'':'background:#f8fafc;';
-      var valColor = (type==='belum') ? 'color:#c53030;' : (type==='keluar') ? 'color:#276749;' : 'color:#2d3748;';
+      var valColor = type==='belum'   ? 'color:#c53030;'  :
+                     type==='keluar'  ? 'color:#276749;'  :
+                     type==='proses'  ? 'color:#c05621;'  :
+                     type==='datang'  ? 'color:#553c9a;'  : 'color:#2d3748;';
       return '<tr style="'+bg+'">' +
         '<td style="padding:8px 12px;font-weight:700;color:#276749;">'+_mekEsc(r.tujuan)+'</td>' +
-        '<td style="padding:8px 12px;text-align:right;font-weight:600;">'+r.cont+'</td>' +
-        '<td style="padding:8px 12px;text-align:right;font-weight:800;font-size:14px;'+valColor+'">'+r.sisa+'</td>' +
+        (showPlan ? '<td style="padding:8px 12px;text-align:right;color:#718096;">'+r.planCont+'</td>' : '') +
+        '<td style="padding:8px 12px;text-align:right;font-weight:800;font-size:14px;'+valColor+'">'+r.val+'</td>' +
         '</tr>';
     }).join('');
+
     if (count) count.textContent = tujRows.length + ' tujuan';
     return;
   }
