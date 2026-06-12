@@ -2828,6 +2828,10 @@ function mekShowRowDetail(trEl) {
       '</tr>';
   }).join('');
 
+  // Sembunyikan btnBar untuk popup baris
+  var bb = document.getElementById('mekCardDetailBtnBar');
+  if (bb) bb.style.display = 'none';
+
   overlay.classList.remove('show');
   overlay.style.display = 'flex';
   void overlay.offsetWidth;
@@ -2953,6 +2957,12 @@ function mekShowCardDetail(type) {
   // Simpan rows dan type untuk dipakai saat switch view
   window._mekCardDetailRows = rows;
   window._mekCardDetailType = type;
+
+  // Show overlay dulu supaya popup muncul meski rows kosong
+  overlay.classList.remove('show');
+  overlay.style.display = 'flex';
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
 
   _mekCardDetailRender(rows, type, 'detail');
 }
