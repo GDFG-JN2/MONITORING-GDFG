@@ -60,32 +60,24 @@ function login(){
   btn.classList.add("loading");
   btn.innerHTML = '<span class="btn-spinner"></span> Memuat...';
 
-  google.script.run
-    .withSuccessHandler(function(res){
-      if(res.success){
-        _currentUser = u;
-        _userRole    = res.role || 'admin';
-        _patternLoaded = false; // reset cache saat login user baru
-        _patternCache  = null;
-        document.getElementById("loginWrap").style.display = "none";
-        document.getElementById("dashboard").style.display = "block";
-        applyRoleRestrictions(_userRole);
-        refreshData();
-        switchView('horizontal');
-        // Preload pola di background — supaya tidak lag saat pertama kali klik
-        _patternLoadAsync(function(){});
-      } else {
-        btn.classList.remove("loading");
-        btn.innerHTML = "Login";
-        showLoginError(res.message || "Login gagal.");
-      }
-    })
-    .withFailureHandler(function(){
+  API.run('verifyLogin', { username: u, password: p }, function(res){
+    if(res && res.success){
+      _currentUser = u;
+      _userRole    = res.role || 'admin';
+      _patternLoaded = false;
+      _patternCache  = null;
+      document.getElementById("loginWrap").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      applyRoleRestrictions(_userRole);
+      refreshData();
+      switchView('horizontal');
+      _patternLoadAsync(function(){});
+    } else {
       btn.classList.remove("loading");
       btn.innerHTML = "Login";
-      showLoginError("Terjadi kesalahan. Coba lagi.");
-    })
-    .verifyLogin(u, p);
+      showLoginError((res&&res.message) || "Login gagal.");
+    }
+  });
 }
 
 function showLoginError(msg) {
@@ -119,19 +111,17 @@ function applyRoleRestrictions(role){
 
   // ── PPIC: hanya Monitoring Ekspor ────────────────────────────
   if (isPPIC) {
-    // Sembunyikan semua nav item kecuali Monitoring Ekspor
-    document.querySelectorAll('.nav-item, [data-page], .sidebar-link').forEach(function(el){
-      var oc = el.getAttribute('onclick')||el.getAttribute('data-page')||'';
-      if (oc.indexOf('monitoringEkspor') < 0) el.style.display = 'none';
-    });
-    // Sembunyikan halaman lain
-    ['kapasitasPage','antrianPage','binLocPage','stockJalurPage',
-     'rdcPage','opnamePage','realisasiPage','portalPage'].forEach(function(id){
-      var el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
-    // Langsung ke halaman Monitoring Ekspor
-    setTimeout(function(){ showPage('monitoringEksporPage'); }, 200);
+    try {
+      ['menuDashboard','menuRealisasi','menuOpname','menuRdc',
+       'menuStockJalur','menuBinLoc','menuApps'].forEach(function(id){
+        var el = document.getElementById(id); if (el) el.style.display = 'none';
+      });
+      ['dashboard','realisasiPage','opnamePage','rdcPage',
+       'stockJalurPage','binLocPage','appsPage'].forEach(function(id){
+        var el = document.getElementById(id); if (el) el.style.display = 'none';
+      });
+      setTimeout(function(){ if(typeof showPage==='function') showPage('monitoringEksporPage'); }, 300);
+    } catch(e) { console.warn('PPIC restrict error:', e); }
     return;
   }
 
