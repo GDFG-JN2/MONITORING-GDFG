@@ -1344,8 +1344,8 @@ function _mekCollectManualRows() {
     var tgl=parseTgl(g('stuffing_date'));
     var wk=weekOverride?String(weekOverride):weekFromTgl(tgl);
     var qty=parseInt(g('qty').replace(/\D/g,''))||0;
-    var extra=[g('ready'),g('email'),g('rsv_crt'),g('po_sto'),g('do_sto')]
-      .map(function(v,i){var L=['READY','EMAIL','RSV','PO','DO'];return v?L[i]+':'+v:'';}).filter(Boolean).join(' | ');
+    var extra=[g('ready'),g('email'),g('rsv_crt'),g('po_sto'),g('do_sto'),g('note')]
+      .map(function(v,i){var L=['READY','EMAIL','RSV','PO','DO','NOTE'];return v?L[i]+':'+v:'';}).filter(Boolean).join(' | ');
     var negara=g('negara').toUpperCase();
     var noQt=g('qt').replace(/\D/g,'');
     var soQtStr=[so?'SO:'+so:'',noQt?'QT:'+noQt:''].filter(Boolean).join(' | ');
