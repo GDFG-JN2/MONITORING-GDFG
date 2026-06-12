@@ -1436,7 +1436,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
     });
   }
 
-  _mekCapEmailRowData = [];  // reset
+  _mekCapEmailRowData = [];
   var byDate={}, dateOrder=[];
   filtered.forEach(function(r){
     if (!byDate[r.planTgl]){byDate[r.planTgl]=[];dateOrder.push(r.planTgl);}
@@ -2659,7 +2659,7 @@ function _mekRenderCapaianEmailAktual(data) {
     });
   }
 
-  _mekCapEmailRowData = [];  // reset
+  _mekCapEmailRowData = [];
   // Group per tanggal aktual (tglDaftar), skip baris belum
   var byAktual = {}, aktualOrder = [];
   data.forEach(function(r) {
@@ -2969,9 +2969,10 @@ function mekCardDetailSetView(view) {
 }
 
 function _mekCardDetailRender(rows, type, view) {
-  var thead = document.getElementById('mekCardDetailThead');
-  var tbody = document.getElementById('mekCardDetailTbody');
-  var count = document.getElementById('mekCardDetailCount');
+  var overlay = document.getElementById('mekCardDetailOverlay');
+  var thead   = document.getElementById('mekCardDetailThead');
+  var tbody   = document.getElementById('mekCardDetailTbody');
+  var count   = document.getElementById('mekCardDetailCount');
   if (!thead || !tbody) return;
 
   if (view === 'tujuan') {
