@@ -115,6 +115,25 @@ function applyRoleRestrictions(role){
   var isAdmin   = (role === 'admin');
   var isViewer  = (role === 'viewer' || role === 'visitor');
   var isVisitor = (role === 'visitor');
+  var isPPIC    = (role === 'ppic');
+
+  // ── PPIC: hanya Monitoring Ekspor ────────────────────────────
+  if (isPPIC) {
+    // Sembunyikan semua nav item kecuali Monitoring Ekspor
+    document.querySelectorAll('.nav-item, [data-page], .sidebar-link').forEach(function(el){
+      var oc = el.getAttribute('onclick')||el.getAttribute('data-page')||'';
+      if (oc.indexOf('monitoringEkspor') < 0) el.style.display = 'none';
+    });
+    // Sembunyikan halaman lain
+    ['kapasitasPage','antrianPage','binLocPage','stockJalurPage',
+     'rdcPage','opnamePage','realisasiPage','portalPage'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    // Langsung ke halaman Monitoring Ekspor
+    setTimeout(function(){ showPage('monitoringEksporPage'); }, 200);
+    return;
+  }
 
   function hide(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
   function hideEl(el){ if(el) el.style.display='none'; }
