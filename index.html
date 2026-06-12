@@ -2620,6 +2620,8 @@
           <span id="zoomLabel"><span id="zoomLevelLabel">100%</span></span>
           <button onclick="_zoomIn()" title="Zoom in">+</button>
         </div>
+        <span id="headerUsername" style="font-size:11px;font-weight:700;color:rgba(255,255,255,.8);padding:4px 10px;background:rgba(255,255,255,.15);border-radius:6px;display:none;"></span>
+        <button class="btn-hdr" onclick="_doLogout()" id="btnGdfgLogout" style="display:none;" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
         <button class="btn-hdr" onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span class="btn-hdr-text">Logout</span></button>
       </div>
     </div>
@@ -5451,6 +5453,7 @@
     setTimeout(_loadAppVersion, 1000);
   });
   </script>
+
 
 <script>
 // ── Global zoom via viewport initial-scale ───────────────────
