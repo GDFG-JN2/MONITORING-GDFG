@@ -2726,6 +2726,7 @@ function _mekRenderCapaianEmailAktual(data) {
 
       _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||''});
       html += '<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
+        '<td style="'+CS+'text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">'+(isFirstSo ? rowNum : '')+'</td>' +
         '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(isFirstSo ? _mekEsc(r.noSo||'—') : '')+'</td>' +
         '<td style="'+CS+'font-weight:700;">'+(isFirstSo ? _mekEsc(r.sku||'') : '')+'</td>' +
         '<td style="'+CS+'">'+(isFirstSo ? _mekEsc(r.nama||'') : '')+'</td>' +
