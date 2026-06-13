@@ -1341,16 +1341,28 @@ function _mekCollectManualRows() {
     function g(col){ var el=tr.querySelector('[data-col="'+col+'"]'); return el?el.textContent.trim():''; }
     var so=g('so').replace(/\D/g,''), kode=g('kode').replace(/\D/g,'');
     if (!so && !kode) return;
+
     var tgl=parseTgl(g('stuffing_date'));
     var wk=weekOverride?String(weekOverride):weekFromTgl(tgl);
     var qty=parseInt(g('qty').replace(/\D/g,''))||0;
+
+    // Baris SO kosong = barang tambahan dari container sebelumnya
+    if (!so && kode && rows.length > 0) {
+      var prev = rows[rows.length-1];
+      // Hitung ITEM index (ITEM2, ITEM3, dst)
+      var itemIdx = 2;
+      while (prev.ket.indexOf('ITEM'+itemIdx+':') >= 0) itemIdx++;
+      var itemStr = 'ITEM'+itemIdx+':'+kode+'|'+g('material')+'|'+(qty||'');
+      prev.ket = prev.ket + ' | ' + itemStr;
+      return;
+    }
+
     var extra=[g('ready'),g('email'),g('rsv_crt'),g('po_sto'),g('do_sto'),g('note')]
       .map(function(v,i){var L=['READY','EMAIL','RSV','PO','DO','NOTE'];return v?L[i]+':'+v:'';}).filter(Boolean).join(' | ');
     var negara=g('negara').toUpperCase();
     var noQt=g('qt').replace(/\D/g,'');
     var soQtStr=[so?'SO:'+so:'',noQt?'QT:'+noQt:''].filter(Boolean).join(' | ');
-    // Simpan QTY karton di KET — akan digabung comma-separated saat grouping
-    var qtyStr  = qty ? 'QTY_KRT:'+qty : '';
+    var qtyStr   = qty ? 'QTY_KRT:'+qty : '';
     var plantStr = g('plant') ? 'PLANT:'+g('plant').trim() : '';
     var ket=[soQtStr,g('keterangan'),extra,qtyStr,plantStr].filter(Boolean).join(' | ');
     rows.push({ week:wk, tanggal:tgl, sku:kode, nama:g('material'),
