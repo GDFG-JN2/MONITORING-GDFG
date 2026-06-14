@@ -45,6 +45,48 @@ function _mekApplyResponsive() {
   }
 }
 
+// ── Auto refresh Monitoring Ekspor ───────────────────────────
+var _mekAutoRefreshTimer = null;
+var _mekAutoRefreshSecs  = 20;
+var _mekAutoRefreshCount = 0;
+
+function mekStartAutoRefresh() {
+  mekStopAutoRefresh();
+  _mekAutoRefreshCount = _mekAutoRefreshSecs;
+  _mekUpdateRefreshLabel();
+  _mekAutoRefreshTimer = setInterval(function() {
+    _mekAutoRefreshCount--;
+    _mekUpdateRefreshLabel();
+    if (_mekAutoRefreshCount <= 0) {
+      _mekAutoRefreshCount = _mekAutoRefreshSecs;
+      mekRefreshData();
+    }
+  }, 1000);
+}
+
+function mekStopAutoRefresh() {
+  if (_mekAutoRefreshTimer) { clearInterval(_mekAutoRefreshTimer); _mekAutoRefreshTimer = null; }
+}
+
+function _mekUpdateRefreshLabel() {
+  var el = document.getElementById('mekRefreshCountdown');
+  if (el) el.textContent = _mekAutoRefreshCount + 's';
+}
+
+function mekRefreshData() {
+  // Reset cache supaya reload dari GAS
+  _mekCapEmailLastFrom = ''; _mekCapEmailLastTo = '';
+  // Reload sesuai mode aktif
+  if (_mekCapMode === 'email') {
+    mekLoadCapaian();
+  } else if (_mekCapMode !== 'all' || document.getElementById('mekSumViewCapaian') &&
+             document.getElementById('mekSumViewCapaian').classList.contains('active')) {
+    mekLoadCapaian();
+  } else {
+    mekLoadSummary();
+  }
+}
+
 function mekInitPage() {
   var today  = new Date();
   var yyyy   = today.getFullYear();
@@ -79,6 +121,7 @@ function mekInitPage() {
   _mekApplyResponsive();
   window.addEventListener('resize', _mekApplyResponsive);
   window.addEventListener('orientationchange', function(){ setTimeout(_mekApplyResponsive, 300); });
+  mekStartAutoRefresh();
   _mekCapMode = 'all';
   _mekInitPlanningWa();
 }
