@@ -1612,7 +1612,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var badge = _mekCapBadge(r.status, r.statusRaw);
       var ket = isPend ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>' : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
-      _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||''});
+      _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||'',items:r.items||[]});
       html+='<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'')+'</td>' +
         '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'\u2014'):'')+  '</td>' +
@@ -2846,7 +2846,7 @@ function _mekRenderCapaianEmailAktual(data) {
         : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
 
-      _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||''});
+      _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||'',items:r.items||[]});
       html += '<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;">'+(isFirstSo ? rowNum : '')+'</td>' +
         '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(isFirstSo ? _mekEsc(r.noSo||'—') : '')+'</td>' +
@@ -2944,12 +2944,25 @@ function mekShowRowDetail(trEl) {
     {label:'Note',          val: d.note || '—'},
   ];
 
+  // Tambah barang tambahan (ITEM2, ITEM3 dst)
+  var itemRows = '';
+  if (d.items && d.items.length) {
+    itemRows = '<tr><td colspan="2" style="padding:6px 16px;font-size:11px;font-weight:800;color:#1a3a5c;background:#ebf8ff;letter-spacing:.5px;">BARANG LAIN DALAM CONTAINER</td></tr>';
+    d.items.forEach(function(it, i) {
+      var bg = i%2===0?'':'background:#f8fafc;';
+      itemRows += '<tr style="'+bg+'">' +
+        '<td style="padding:8px 16px;font-size:11px;color:#718096;white-space:nowrap;">SKU '+_mekEsc(it.sku)+'</td>' +
+        '<td style="padding:8px 16px;font-size:12px;color:#2d3748;font-weight:600;">'+_mekEsc(it.nama)+(it.qty?' <span style="color:#744210;font-size:11px;">('+it.qty+' krt)</span>':'')+'</td>' +
+        '</tr>';
+    });
+  }
+
   tbody.innerHTML = rows.map(function(r, i) {
     return '<tr style="'+(i%2===0?'':'background:#f8fafc;')+'">' +
       '<td style="padding:10px 16px;font-size:11px;font-weight:700;color:#718096;white-space:nowrap;width:140px;">'+r.label+'</td>' +
       '<td style="padding:10px 16px;font-size:13px;color:#2d3748;font-weight:600;">'+_mekEsc(r.val)+'</td>' +
       '</tr>';
-  }).join('');
+  }).join('') + itemRows;
 
   // Sembunyikan btnBar untuk popup baris
   var bb = document.getElementById('mekCardDetailBtnBar');
