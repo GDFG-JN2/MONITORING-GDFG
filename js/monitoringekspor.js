@@ -59,7 +59,7 @@ function mekStartAutoRefresh() {
     _mekUpdateRefreshLabel();
     if (_mekAutoRefreshCount <= 0) {
       _mekAutoRefreshCount = _mekAutoRefreshSecs;
-      mekRefreshData();
+      _mekAutoRefreshData();  // seamless — tidak re-render tabel
     }
   }, 1000);
 }
@@ -85,6 +85,73 @@ function mekRefreshData() {
   } else {
     mekLoadSummary();
   }
+}
+
+function _mekAutoRefreshData() {
+  // Auto refresh — seamless: skip kalau popup terbuka
+  var overlay = document.getElementById('mekCardDetailOverlay');
+  if (overlay && overlay.style.display !== 'none') return;  // popup terbuka, skip
+
+  // Update data di background tanpa re-render kalau popup row detail terbuka
+  var _from = ((document.getElementById('mekCapFrom')||{}).value||'');
+  var _to   = ((document.getElementById('mekCapTo')||{}).value||'');
+  if (!_from || !_to) return;  // tidak ada filter aktif, skip
+
+  // Reload data dari GAS tanpa re-render (update cache saja)
+  _mekCapEmailLastFrom = ''; _mekCapEmailLastTo = '';
+  API.run('getMekCapaianEmail', { from: _from, to: _to, viewMode: 'plan' }, function(res) {
+    if (!res || !res.success) return;
+    _mekCapEmailData    = res.data || [];
+    _mekCapEmailSummary = res.summaryByDate || {};
+    _mekCapEmailLastFrom = _from;
+    _mekCapEmailLastTo   = _to;
+    // Re-render hanya summary cards (tidak re-render tabel)
+    _mekRefreshCardsOnly();
+  });
+}
+
+function _mekRefreshCardsOnly() {
+  // Update cards tanpa re-render tabel
+  var from = ((document.getElementById('mekCapFrom')||{}).value||'');
+  var to   = ((document.getElementById('mekCapTo')||{}).value||'');
+  var skuF   = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
+  var tujF   = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
+  var plantF = ((document.getElementById('mekCapPlant') ||{}).value||'').trim().toUpperCase();
+
+  var _tc=0,_kc=0,_lc=0,_dc=0,_ss={},_planMap={},_capMap={};
+  _mekCapEmailData.forEach(function(r){
+    if (from && r.planTgl < from) return;
+    if (to   && r.planTgl > to)   return;
+    if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return;
+    if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return;
+    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return;
+    var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
+    if(!_ss[_key] && r.isFirstRow){
+      _ss[_key]=true;
+      var jml = r.jumlahCont || r.planCont || 0;
+      _tc += jml; _planMap[_key]=jml; _capMap[_key]=jml;
+    }
+  });
+  _mekCapEmailData.forEach(function(r){
+    if (from && r.planTgl < from) return;
+    if (to   && r.planTgl > to)   return;
+    if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return;
+    if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return;
+    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return;
+    var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
+    if (!_capMap[_key] || _capMap[_key] <= 0) return;
+    if(r.status==='keluar')  { _kc++; _capMap[_key]--; }
+    else if(r.status==='loading'){ _lc++; _capMap[_key]--; }
+    else if(r.status==='daftar' ){ _dc++; _capMap[_key]--; }
+  });
+  var _dtg=_kc+_lc+_dc, _bc=Math.max(0,_tc-_dtg);
+  _mekSetCard('mekCapCardTotal',_tc);
+  _mekSetCard('mekCapCardDatang',_dtg);
+  _mekSetCard('mekCapCardKeluar',_kc);
+  _mekSetCard('mekCapCardDaftar',_lc+_dc);
+  _mekSetCard('mekCapCardBelum',_bc);
+  var _pe=document.getElementById('mekCapCardPct');
+  if(_pe) _pe.textContent=_tc?Math.round(_kc/_tc*100)+'%':'—';
 }
 
 function mekInitPage() {
