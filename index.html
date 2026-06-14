@@ -4694,6 +4694,9 @@
         <button class="btn-hdr" id="btnMekInput" onclick="mekSwitchTab('input')">
           <i class="fas fa-calendar-plus"></i> <span class="btn-hdr-text">Input Planning</span>
         </button>
+        <button class="btn-hdr" onclick="mekRefreshData();mekStartAutoRefresh();" title="Refresh">
+          <i class="fas fa-sync-alt"></i> <span id="mekRefreshCountdown" style="font-size:10px;opacity:.8;">20s</span>
+        </button>
       </div>
     </div>
 
@@ -4915,7 +4918,7 @@
             <select id="mekCapPlant" onchange="mekLoadCapaian()"
               style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;">
               <option value="">All</option>
-              <option value="JAYANTI 2">JAYANTI 2</option>
+              <option value="JAYANTI 2" selected>JAYANTI 2</option>
             </select>
             <button class="btn-filter" onclick="mekLoadCapaian()"><i class="fas fa-search"></i> Tampilkan</button>
             <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
@@ -4948,7 +4951,7 @@
             <select id="mekCapPlantW" onchange="mekCapApplyWeek()"
               style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;">
               <option value="">All</option>
-              <option value="JAYANTI 2">JAYANTI 2</option>
+              <option value="JAYANTI 2" selected>JAYANTI 2</option>
             </select>
             <button class="btn-filter" onclick="mekCapApplyWeek()"><i class="fas fa-search"></i> Tampilkan</button>
             <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
