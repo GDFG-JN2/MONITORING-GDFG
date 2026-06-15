@@ -346,10 +346,15 @@ function switchView(view) {
     tbl.style.display = 'none';
   }
 
-  if      (view === 'chart')      renderCharts();
-  else if (view === 'horizontal') renderChartsHorizontal();
-  else if (view === 'pie')        renderPieChart();
-  else if (view === 'trend')      initTrendView();
+  // rAF supaya browser sempat layout canvas sebelum Chart.js render
+  if (view === 'chart' || view === 'horizontal' || view === 'pie' || view === 'trend') {
+    requestAnimationFrame(function() {
+      if      (view === 'chart')      renderCharts();
+      else if (view === 'horizontal') renderChartsHorizontal();
+      else if (view === 'pie')        renderPieChart();
+      else if (view === 'trend')      initTrendView();
+    });
+  }
 }
 
 // ============================================================
