@@ -3,7 +3,7 @@
 // Ganti CACHE_VERSION setiap kali ada update file
 // ============================================================
 
-const CACHE_VERSION  = 'v2.1.9';
+const CACHE_VERSION  = 'v2.2.0';
 const CACHE_NAME     = 'monitoring-gdfg-' + CACHE_VERSION;
 
 // File yang di-cache saat install
@@ -28,9 +28,6 @@ self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
       return cache.addAll(PRECACHE_URLS);
-    }).then(function() {
-      // Langsung aktif tanpa tunggu tab lama tutup
-      return self.skipWaiting();
     })
   );
 });
