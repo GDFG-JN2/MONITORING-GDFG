@@ -551,10 +551,13 @@ function _applyChartZoom() {
           // Selalu build divisi dari history (agar siap saat user switch ke pie)
           _buildDivisiFromHistory(lokalArr, eksporArr);
           if(document.getElementById('summary').classList.contains('active')){
-            if(currentView==='chart') renderCharts();
-            else if(currentView==='horizontal') renderChartsHorizontal();
-            else if(currentView==='pie') renderPieChart();
-            else renderTableView();
+            // requestAnimationFrame supaya browser sempat layout canvas dulu
+            requestAnimationFrame(function(){
+              if(currentView==='chart') renderCharts();
+              else if(currentView==='horizontal') renderChartsHorizontal();
+              else if(currentView==='pie') renderPieChart();
+              else renderTableView();
+            });
           }
 
           // ── Render tab Lokal / Ekspor / GDFG ──
