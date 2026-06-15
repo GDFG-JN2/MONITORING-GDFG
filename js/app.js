@@ -46,6 +46,26 @@ function toggleShowPassword() {
   }
 }
 
+// Restore session dari localStorage saat halaman load/reload
+function _restoreSession() {
+  try {
+    var sess = localStorage.getItem('gdfgSession');
+    if (!sess) return false;
+    var data = JSON.parse(sess);
+    // Session expire 7 hari
+    if (Date.now() - data.ts > 7 * 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('gdfgSession');
+      return false;
+    }
+    _currentUser = data.user;
+    _userRole    = data.role || 'admin';
+    document.getElementById("loginWrap").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+    applyRoleRestrictions(_userRole);
+    return true;
+  } catch(e) { return false; }
+}
+
 function login(){
   var u   = document.getElementById("username").value.trim();
   var pwEl = document.getElementById("password"); var pwElV = document.getElementById("passwordVisible"); var p = (pwEl&&pwEl.style.display!=="none"?pwEl:pwElV).value;
@@ -64,6 +84,14 @@ function login(){
     if(res && res.success){
       _currentUser = u;
       _userRole    = res.role || 'admin';
+      // Simpan session — pakai localStorage supaya persist setelah reload
+      var remember = document.getElementById('loginRemember') && document.getElementById('loginRemember').checked;
+      var sess = JSON.stringify({ user: u, role: _userRole, ts: Date.now() });
+      try { localStorage.setItem('gdfgSession', sess); } catch(e){}
+      if (!remember) {
+        // Kalau tidak remember me, hapus saat tab ditutup
+        try { sessionStorage.setItem('gdfgSessionTemp', sess); } catch(e){}
+      }
       _patternLoaded = false;
       _patternCache  = null;
       document.getElementById("loginWrap").style.display = "none";
@@ -491,3 +519,6 @@ window.addEventListener('load', function() {
     window.history.replaceState({ page: 'dashboard' }, '', '#dashboard');
   }
 });
+
+// Auto-restore session saat load/reload
+window.addEventListener("load", function(){ setTimeout(_restoreSession, 100); });
