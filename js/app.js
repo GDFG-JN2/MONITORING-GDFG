@@ -631,7 +631,7 @@ async function _kaCallAPI(userMsg) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         provider: 'gemini',
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash-lite',
         max_tokens: 1000,
         system: _kaSystemPrompt,
         messages: _kaHistory
