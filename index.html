@@ -5363,7 +5363,7 @@
 
   function _forceAppUpdate() {
     if (_swWaiting) {
-      // Kirim pesan ke SW baru untuk ambil alih
+      window._swUserTriggered = true;  // tandai bahwa user yang trigger
       _swWaiting.postMessage({ type: 'SKIP_WAITING' });
     } else {
       // Fallback: hapus semua cache lalu reload
@@ -5422,8 +5422,10 @@
           console.warn('[SW] Register failed:', err);
         });
 
-      // controllerchange: SW baru sudah aktif — reload hanya kalau user minta
-      // (tidak auto reload supaya tidak ganggu user yang sedang kerja)
+      // Reload hanya kalau user yang klik tombol update (bukan auto)
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (window._swUserTriggered) location.reload();
+      });
     });
   }
 
