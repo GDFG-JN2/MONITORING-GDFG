@@ -5422,10 +5422,8 @@
           console.warn('[SW] Register failed:', err);
         });
 
-      // Setelah SW baru ambil alih → reload otomatis
-      navigator.serviceWorker.addEventListener('controllerchange', function() {
-        location.reload();
-      });
+      // controllerchange: SW baru sudah aktif — reload hanya kalau user minta
+      // (tidak auto reload supaya tidak ganggu user yang sedang kerja)
     });
   }
 
