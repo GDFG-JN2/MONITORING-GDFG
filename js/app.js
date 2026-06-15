@@ -49,6 +49,8 @@ function toggleShowPassword() {
 // Restore session dari localStorage saat halaman load/reload
 function _restoreSession() {
   try {
+    // Kalau user sengaja logout, jangan restore
+    if (sessionStorage.getItem('gdfgLoggedOut')) return false;
     var sess = localStorage.getItem('gdfgSession');
     if (!sess) return false;
     var data = JSON.parse(sess);
@@ -126,7 +128,10 @@ function logout() {
   document.getElementById('loginMsg').style.display = 'none';
   var btn = document.querySelector('.btn-login');
   if (btn) { btn.classList.remove('loading'); btn.innerHTML = 'Login'; }
-}
+  if (btn) { btn.classList.remove('loading'); btn.innerHTML = 'Login'; }
+  // Hapus session supaya hard refresh tidak auto-login
+  try { localStorage.removeItem('gdfgSession'); } catch(e) {}
+  try { sessionStorage.setItem('gdfgLoggedOut', '1'); } catch(e) {}
 
 // ============================================================
 // ROLE-BASED ACCESS CONTROL
@@ -238,6 +243,9 @@ function closeSidebar() {
 // ============================================================
 // ROUTING — SHOW PAGE
 // ============================================================
+// Pages yang perlu display:flex bukan block
+var _flexPages = ['karinaPage'];
+
 function showPage(page) {
   // Push ke history agar tombol back HP kembali ke halaman sebelumnya
   if (window.history && window.history.pushState) {
@@ -247,7 +255,7 @@ function showPage(page) {
   if (page !== 'opnamePage')   _opClearSel();
   if (page !== 'inputPage')    _inResetSel();
 
-  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage'];
+  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage','karinaPage'];
   pages.forEach(function (p) {
     var el = document.getElementById(p);
     if (!el) return;
@@ -258,8 +266,8 @@ function showPage(page) {
   if (page !== 'realisasiPage') hideStickyFooter();
 
   var target = document.getElementById(page);
-  target.style.display = page === 'monitoringEksporPage' ? 'flex' : 'block';
-  if (page === 'monitoringEksporPage') target.style.flexDirection = 'column';
+  target.style.display = (page === 'monitoringEksporPage' || page === 'karinaPage') ? 'flex' : 'block';
+  if (page === 'monitoringEksporPage' || page === 'karinaPage') target.style.flexDirection = 'column';
   requestAnimationFrame(function () { target.classList.add('page-enter'); });
   closeSidebar();
 
@@ -271,6 +279,7 @@ function showPage(page) {
   document.getElementById('menuStockJalur').classList.toggle('active-page', page === 'stockJalurPage');
   document.getElementById('menuBinLoc').classList.toggle('active-page',            page === 'binLocPage');
   document.getElementById('menuMonitoringEkspor').classList.toggle('active-page',  page === 'monitoringEksporPage');
+  var mkEl = document.getElementById('menuKarina'); if(mkEl) mkEl.classList.toggle('active-page', page === 'karinaPage');
   document.getElementById('menuApps').classList.toggle('active-page',              page === 'appsPage');
 
   // Page-specific init
@@ -679,4 +688,5 @@ async function _kaCallAPI(userMsg) {
   }
 
   if (btn) btn.disabled = false;
+}
 }
