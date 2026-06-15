@@ -628,11 +628,12 @@ function _kaAddWelcome() {
       _kaDataContext.push('Last update data: ' + (d.lastUpdate||'-'));
 
       var msg = 'Data gudang berhasil dimuat!\n\n';
-      msg += 'Kapasitas: ' + (kap.total||0) + ' pallet (' + (kap.persentaseLokal||0) + '% Lokal, ' + (kap.persentaseEkspor||0) + '% Ekspor)\n';
+      msg += 'Total Pallet: ' + (kap.total||0) + ' / ' + (kap.kapasitasGudang||7096) + ' (' + (kap.persentaseTotal||0) + '%)\n';
+      msg += 'Lokal: ' + (kap.lokal||0) + ' pallet (' + (kap.persentaseLokal||0) + '% dari kap ' + (kap.kapasitasLokal||5800) + ')\n';
+      msg += 'Ekspor: ' + (kap.ekspor||0) + ' pallet (' + (kap.persentaseEkspor||0) + '% dari kap ' + (kap.kapasitasEkspor||1296) + ')\n';
       msg += 'Ekspor week ini: ' + (eks.sudahKeluar||0) + '/' + (eks.totalPlanning||0) + ' container keluar (' + (eks.pctCapaian||0) + '%)\n';
       msg += 'Antrian hari ini: ' + (ant.total||0) + ' truk (' + (ant.sedangMuat||0) + ' muat, ' + (ant.sudahKeluar||0) + ' keluar)\n';
       if (bin.totalPallet) msg += 'BinLoc: ' + bin.totalPallet + ' pallet terlacak (' + bin.jumlahSku + ' SKU)\n';
-      if (topSku.length) msg += 'Top SKU: ' + topSku[0].nama + (topSku[1] ? ', ' + topSku[1].nama : '') + ', dst\n';
       msg += '\nApa yang ingin Anda ketahui?';
       _kaAddMessage(msg, 'assistant');
     } else {
