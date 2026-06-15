@@ -530,21 +530,26 @@ function karinaToggle() {
   if (!popup) return;
   var isOpen = popup.classList.contains('open');
   if (isOpen) {
+    // Tutup dengan animasi
+    popup.classList.add('closing');
     popup.classList.remove('open');
-    setTimeout(function(){ popup.style.display='none'; }, 200);
+    setTimeout(function(){
+      popup.classList.remove('closing');
+      popup.style.display = 'none';
+    }, 220);
   } else {
-    popup.style.display = 'flex';
+    // Buka — set display dulu, lalu force reflow, lalu add class
     if (badge) badge.style.display = 'none';
-    setTimeout(function(){ popup.classList.add('open'); }, 10);
-    // Tambah pesan selamat datang kalau belum ada
+    popup.style.display = 'flex';
+    void popup.offsetHeight;  // force reflow sekali saja
+    popup.classList.add('open');
+    // Welcome message
     var area = document.getElementById('karinaChatArea');
-    if (area && !area.hasChildNodes()) {
-      _kaAddWelcome();
-    }
+    if (area && !area.hasChildNodes()) _kaAddWelcome();
     setTimeout(function(){
       var input = document.getElementById('karinaInput');
       if (input) input.focus();
-    }, 250);
+    }, 230);
   }
 }
 
