@@ -626,10 +626,11 @@ async function _kaCallAPI(userMsg) {
   _kaHistory.push({ role: 'user', content: userMsg });
   var typing = _kaAddTyping();
   try {
-    var response = await fetch('https://monitorgdfg.kemalrifael71.workers.dev/gemini', {
+    var response = await fetch('https://monitorgdfg.kemalrifael71.workers.dev/karina', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        provider: 'gemini',
         model: 'gemini-1.5-flash',
         max_tokens: 1000,
         system: _kaSystemPrompt,
