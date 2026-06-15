@@ -554,8 +554,94 @@ function karinaToggle() {
 }
 
 function _kaAddWelcome() {
-  _kaAddMessage('Halo! Saya Karina, asisten AI untuk gudang GDFG. Apa yang bisa saya bantu? 🏭', 'assistant');
+  _kaAddMessage('Halo! Saya Karina 👋 Sedang mengambil data gudang terkini...', 'assistant');
+  // Fetch data gudang dari GAS
+  API.run('getKarinaSummary', {}, function(res) {
+    // Hapus pesan loading
+    var area = document.getElementById('karinaChatArea');
+    if (area && area.lastChild) area.removeChild(area.lastChild);
+    if (res && res.success && res.data) {
+      var d = res.data;
+      var eks = d.eksporWeekIni || {};
+      var kap = d.kapasitas || {};
+      var ant = d.antrianHariIni || {};
+      // Tambah data ke system prompt untuk sesi ini
+      _kaDataContext = [
+        'DATA GUDANG TERKINI (' + d.tanggal + '):',
+        '',
+        '📦 KAPASITAS GUDANG:',
+        '  - Total pallet: ' + (kap.total||0) + ' / ' + (kap.kapasitasGudang||5800),
+        '  - Lokal: ' + (kap.lokal||0) + ' pallet (' + (kap.persentaseLokal||0) + '%)',
+        '  - Ekspor: ' + (kap.ekspor||0) + ' pallet (' + (kap.persentaseEkspor||0) + '%)',
+        '  - GDFG: ' + (kap.gdfg||0) + ' pallet',
+        '',
+        '🚢 CAPAIAN EKSPOR WEEK INI (' + (eks.weekRange||'-') + '):',
+        '  - Total planning: ' + (eks.totalPlanning||0) + ' container',
+        '  - Sudah keluar: ' + (eks.sudahKeluar||0) + ' container (' + (eks.pctCapaian||0) + '%)',
+        '  - Masih proses: ' + (eks.masihProses||0) + ' container',
+        '  - Belum datang: ' + (eks.belumDatang||0) + ' container',
+      ];
+      // Tambah by tujuan
+      if (eks.byTujuan) {
+        _kaDataContext.push('  - Per tujuan:');
+        Object.keys(eks.byTujuan).forEach(function(t) {
+          var bt = eks.byTujuan[t];
+          _kaDataContext.push('    · ' + t + ': plan=' + bt.plan + ', keluar=' + bt.keluar);
+        });
+      }
+      _kaDataContext.push('');
+      _kaDataContext.push('🚛 ANTRIAN TRUK HARI INI:');
+      _kaDataContext.push('  - Menunggu: ' + (ant.menunggu||0) + ' truk');
+      _kaDataContext.push('  - Sedang muat: ' + (ant.sedangMuat||0) + ' truk');
+      _kaDataContext.push('  - Sudah keluar: ' + (ant.sudahKeluar||0) + ' truk');
+      _kaDataContext.push('  - Ditolak: ' + (ant.ditolak||0) + ' truk');
+      _kaDataContext.push('  - Total: ' + (ant.total||0) + ' truk');
+      _kaDataContext.push('');
+
+      // BinLoc
+      var bin = d.binLoc || {};
+      if (bin.totalPallet !== undefined) {
+        _kaDataContext.push('BIN LOC (lokasi pallet di gudang):');
+        _kaDataContext.push('  - Total pallet terlacak: ' + bin.totalPallet);
+        _kaDataContext.push('  - Pallet Lokal: ' + bin.totalPalletLokal);
+        _kaDataContext.push('  - Pallet Ekspor: ' + bin.totalPalletEkspor);
+        _kaDataContext.push('  - Jumlah SKU: ' + bin.jumlahSku);
+        _kaDataContext.push('');
+      }
+      // Top SKU Ekspor
+      var topSku = d.topSkuEkspor || [];
+      if (topSku.length) {
+        _kaDataContext.push('TOP SKU EKSPOR (berdasarkan pallet):');
+        topSku.forEach(function(s, i) {
+          _kaDataContext.push('  ' + (i+1) + '. ' + s.nama + ' (' + s.sku + '): ' + s.pallet + ' pallet');
+        });
+        _kaDataContext.push('');
+      }
+      // Stock Opname
+      var op = d.stockOpname || {};
+      if (op.lastOpnameLokal) {
+        _kaDataContext.push('STOCK OPNAME:');
+        _kaDataContext.push('  - Opname Lokal terakhir: ' + op.lastOpnameLokal + ' (' + op.totalRowsLokal + ' baris)');
+        _kaDataContext.push('  - Opname Ekspor terakhir: ' + op.lastOpnameEkspor + ' (' + op.totalRowsEkspor + ' baris)');
+        _kaDataContext.push('');
+      }
+      _kaDataContext.push('Last update data: ' + (d.lastUpdate||'-'));
+
+      var msg = 'Data gudang berhasil dimuat!\n\n';
+      msg += 'Kapasitas: ' + (kap.total||0) + ' pallet (' + (kap.persentaseLokal||0) + '% Lokal, ' + (kap.persentaseEkspor||0) + '% Ekspor)\n';
+      msg += 'Ekspor week ini: ' + (eks.sudahKeluar||0) + '/' + (eks.totalPlanning||0) + ' container keluar (' + (eks.pctCapaian||0) + '%)\n';
+      msg += 'Antrian hari ini: ' + (ant.total||0) + ' truk (' + (ant.sedangMuat||0) + ' muat, ' + (ant.sudahKeluar||0) + ' keluar)\n';
+      if (bin.totalPallet) msg += 'BinLoc: ' + bin.totalPallet + ' pallet terlacak (' + bin.jumlahSku + ' SKU)\n';
+      if (topSku.length) msg += 'Top SKU: ' + topSku[0].nama + (topSku[1] ? ', ' + topSku[1].nama : '') + ', dst\n';
+      msg += '\nApa yang ingin Anda ketahui?';
+      _kaAddMessage(msg, 'assistant');
+    } else {
+      _kaAddMessage('Halo! Saya Karina 🤖 Asisten AI gudang GDFG. Apa yang bisa saya bantu?', 'assistant');
+    }
+  });
 }
+
+var _kaDataContext = [];
 var _kaHistory = [];
 
 var _kaSystemPrompt = 'Kamu adalah Karina (Knowledge-based Administrative Resource & Inventory Network AI), asisten AI untuk sistem manajemen gudang GDFG (Finished Goods) milik PT Mars Indonesia. Gudang ini menangani produk MALKIST, CHOKI STIX, dan produk lainnya untuk ekspor ke Thailand, India, Malaysia, Cambodia, Philippines, dan negara ASEAN lainnya.\n\nSistem gudang GDFG:\n1. MONITORING GDFG — dashboard monitoring ekspor, kapasitas gudang, stock opname\n2. BinLoc — manajemen lokasi pallet\n3. Sistem Antrian GDFG — antrian truk ekspor\n\nStatus truk: ANTRIAN=menunggu, START/FINISH_LOADING=muat, MENUNGGU_SPM=menunggu surat, TREATMENT=fumigasi, DITOLAK=ditolak, KELUAR=sudah berangkat.\n\nJawab dalam Bahasa Indonesia yang ramah dan profesional. Gunakan emoji yang relevan.';
@@ -633,7 +719,7 @@ async function _kaCallAPI(userMsg) {
         provider: 'gemini',
         model: 'gemini-2.5-flash-lite',
         max_tokens: 1000,
-        system: _kaSystemPrompt,
+        system: _kaSystemPrompt + (_kaDataContext.length ? '\n\n' + _kaDataContext.join('\n') : ''),
         messages: _kaHistory
       })
     });
