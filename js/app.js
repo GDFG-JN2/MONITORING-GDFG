@@ -116,12 +116,9 @@ function applyRoleRestrictions(role){
   var isPPIC    = (role === 'ppic');
   var isOwner   = (role === 'owner');
 
-  // ── Sembunyikan Karina untuk non-owner ──
-  if (!isOwner) {
-    var elKarina = document.getElementById('menuKarina');
-    if (elKarina) elKarina.style.display = 'none';
-  }
-
+  // ── Tampilkan Karina hanya untuk owner ──
+  var karinaFloat = document.getElementById('karinaFloat');
+  if (karinaFloat) karinaFloat.style.display = isOwner ? 'block' : 'none';
   // ── PPIC: hanya Monitoring Ekspor ──
   if (isPPIC) {
     try {
@@ -226,7 +223,7 @@ function showPage(page) {
   if (page !== 'opnamePage')   _opClearSel();
   if (page !== 'inputPage')    _inResetSel();
 
-  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage','karinaPage'];
+  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage'];
   pages.forEach(function (p) {
     var el = document.getElementById(p);
     if (!el) return;
@@ -237,8 +234,8 @@ function showPage(page) {
   if (page !== 'realisasiPage') hideStickyFooter();
 
   var target = document.getElementById(page);
-  target.style.display = (page === 'monitoringEksporPage' || page === 'karinaPage') ? 'flex' : 'block';
-  if (page === 'monitoringEksporPage' || page === 'karinaPage') target.style.flexDirection = 'column';
+  target.style.display = page === 'monitoringEksporPage' ? 'flex' : 'block';
+  if (page === 'monitoringEksporPage') target.style.flexDirection = 'column';
   requestAnimationFrame(function () { target.classList.add('page-enter'); });
   closeSidebar();
 
@@ -527,6 +524,33 @@ function _restoreSession() {
 window.addEventListener('load', function(){ setTimeout(_restoreSession, 100); });
 
 // ── KARINA AI ─────────────────────────────────────────────────
+function karinaToggle() {
+  var popup = document.getElementById('karinaChatPopup');
+  var badge = document.getElementById('karinaBadge');
+  if (!popup) return;
+  var isOpen = popup.classList.contains('open');
+  if (isOpen) {
+    popup.classList.remove('open');
+    setTimeout(function(){ popup.style.display='none'; }, 200);
+  } else {
+    popup.style.display = 'flex';
+    if (badge) badge.style.display = 'none';
+    setTimeout(function(){ popup.classList.add('open'); }, 10);
+    // Tambah pesan selamat datang kalau belum ada
+    var area = document.getElementById('karinaChatArea');
+    if (area && !area.hasChildNodes()) {
+      _kaAddWelcome();
+    }
+    setTimeout(function(){
+      var input = document.getElementById('karinaInput');
+      if (input) input.focus();
+    }, 250);
+  }
+}
+
+function _kaAddWelcome() {
+  _kaAddMessage('Halo! Saya Karina, asisten AI untuk gudang GDFG. Apa yang bisa saya bantu? 🏭', 'assistant');
+}
 var _kaHistory = [];
 
 var _kaSystemPrompt = 'Kamu adalah Karina (Knowledge-based Administrative Resource & Inventory Network AI), asisten AI untuk sistem manajemen gudang GDFG (Finished Goods) milik PT Mars Indonesia. Gudang ini menangani produk MALKIST, CHOKI STIX, dan produk lainnya untuk ekspor ke Thailand, India, Malaysia, Cambodia, Philippines, dan negara ASEAN lainnya.\n\nSistem gudang GDFG:\n1. MONITORING GDFG — dashboard monitoring ekspor, kapasitas gudang, stock opname\n2. BinLoc — manajemen lokasi pallet\n3. Sistem Antrian GDFG — antrian truk ekspor\n\nStatus truk: ANTRIAN=menunggu, START/FINISH_LOADING=muat, MENUNGGU_SPM=menunggu surat, TREATMENT=fumigasi, DITOLAK=ditolak, KELUAR=sudah berangkat.\n\nJawab dalam Bahasa Indonesia yang ramah dan profesional. Gunakan emoji yang relevan.';
