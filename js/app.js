@@ -553,13 +553,27 @@ function karinaToggle() {
   }
 }
 
+var _kaDataFetched = false;  // flag supaya fetch hanya 1x
+
 function _kaAddWelcome() {
-  _kaAddMessage('Halo! Saya Karina 👋 Sedang mengambil data gudang terkini...', 'assistant');
-  // Fetch data gudang dari GAS
+  _kaAddMessage('Halo! Saya Karina 👋\n\nSaya siap membantu pertanyaan seputar gudang GDFG — kapasitas, ekspor, antrian truk, BinLoc, dan lainnya.\n\nData akan diambil otomatis saat Anda bertanya. Silakan ketik pertanyaan Anda!', 'assistant');
+}
+
+function _kaFetchDataIfNeeded(callback) {
+  if (_kaDataFetched) { callback(); return; }
+  // Tambah pesan loading sementara
+  var area = document.getElementById('karinaChatArea');
+  var loadEl = document.createElement('div');
+  loadEl.id = 'karinaLoadMsg';
+  loadEl.style.cssText = 'font-size:11px;color:#a0aec0;text-align:center;padding:4px;';
+  loadEl.textContent = 'Mengambil data gudang...';
+  if (area) area.appendChild(loadEl);
+
   API.run('getKarinaSummary', {}, function(res) {
-    // Hapus pesan loading
-    var area = document.getElementById('karinaChatArea');
-    if (area && area.lastChild) area.removeChild(area.lastChild);
+    // Hapus loading
+    var el = document.getElementById('karinaLoadMsg');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+
     if (res && res.success && res.data) {
       var d = res.data;
       var eks = d.eksporWeekIni || {};
@@ -635,10 +649,9 @@ function _kaAddWelcome() {
       msg += 'Antrian hari ini: ' + (ant.total||0) + ' truk (' + (ant.sedangMuat||0) + ' muat, ' + (ant.sudahKeluar||0) + ' keluar)\n';
       if (bin.totalPallet) msg += 'BinLoc: ' + bin.totalPallet + ' pallet terlacak (' + bin.jumlahSku + ' SKU)\n';
       msg += '\nApa yang ingin Anda ketahui?';
-      _kaAddMessage(msg, 'assistant');
-    } else {
-      _kaAddMessage('Halo! Saya Karina 🤖 Asisten AI gudang GDFG. Apa yang bisa saya bantu?', 'assistant');
+      _kaDataFetched = true;
     }
+    callback();
   });
 }
 
@@ -680,9 +693,12 @@ function kaSend() {
   if (!msg) return;
   input.value = '';
   _kaAddMessage(msg, 'user');
-  _kaCallAPI(msg);
   var qp = document.getElementById('karinaQuickPrompts');
   if (qp) qp.style.display = 'none';
+  // Fetch data gudang dulu kalau belum (hanya 1x per session)
+  _kaFetchDataIfNeeded(function() {
+    _kaCallAPI(msg);
+  });
 }
 
 function kaSendQuick(msg) {
