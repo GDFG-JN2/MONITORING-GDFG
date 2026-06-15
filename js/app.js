@@ -137,6 +137,12 @@ function applyRoleRestrictions(role){
   var isVisitor = (role === 'visitor');
   var isPPIC    = (role === 'ppic');
 
+  // ── Sembunyikan Karina untuk non-owner ──────────────────────
+  if (role !== 'owner') {
+    var elKarina = document.getElementById('menuKarina');
+    if (elKarina) elKarina.style.display = 'none';
+  }
+
   // ── PPIC: hanya Monitoring Ekspor ────────────────────────────
   if (isPPIC) {
     try {
