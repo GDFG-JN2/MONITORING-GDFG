@@ -46,28 +46,6 @@ function toggleShowPassword() {
   }
 }
 
-// Restore session dari localStorage saat halaman load/reload
-function _restoreSession() {
-  try {
-    // Kalau user sengaja logout, jangan restore
-    if (sessionStorage.getItem('gdfgLoggedOut')) return false;
-    var sess = localStorage.getItem('gdfgSession');
-    if (!sess) return false;
-    var data = JSON.parse(sess);
-    // Session expire 7 hari
-    if (Date.now() - data.ts > 7 * 24 * 60 * 60 * 1000) {
-      localStorage.removeItem('gdfgSession');
-      return false;
-    }
-    _currentUser = data.user;
-    _userRole    = data.role || 'admin';
-    document.getElementById("loginWrap").style.display = "none";
-    document.getElementById("dashboard").style.display = "block";
-    applyRoleRestrictions(_userRole);
-    return true;
-  } catch(e) { return false; }
-}
-
 function login(){
   var u   = document.getElementById("username").value.trim();
   var pwEl = document.getElementById("password"); var pwElV = document.getElementById("passwordVisible"); var p = (pwEl&&pwEl.style.display!=="none"?pwEl:pwElV).value;
@@ -86,14 +64,10 @@ function login(){
     if(res && res.success){
       _currentUser = u;
       _userRole    = res.role || 'admin';
-      // Simpan session — pakai localStorage supaya persist setelah reload
       var remember = document.getElementById('loginRemember') && document.getElementById('loginRemember').checked;
       var sess = JSON.stringify({ user: u, role: _userRole, ts: Date.now() });
-      try { localStorage.setItem('gdfgSession', sess); } catch(e){}
-      if (!remember) {
-        // Kalau tidak remember me, hapus saat tab ditutup
-        try { sessionStorage.setItem('gdfgSessionTemp', sess); } catch(e){}
-      }
+      try { if(remember) localStorage.setItem('gdfgSession', sess); } catch(e){}
+      try { sessionStorage.removeItem('gdfgLoggedOut'); } catch(e){}
       _patternLoaded = false;
       _patternCache  = null;
       document.getElementById("loginWrap").style.display = "none";
@@ -117,6 +91,8 @@ function showLoginError(msg) {
 }
 
 function logout() {
+  try { localStorage.removeItem('gdfgSession'); } catch(e) {}
+  try { sessionStorage.setItem('gdfgLoggedOut', '1'); } catch(e) {}
   _currentUser   = '';
   _userRole      = 'admin';
   _patternLoaded = false;
@@ -128,10 +104,7 @@ function logout() {
   document.getElementById('loginMsg').style.display = 'none';
   var btn = document.querySelector('.btn-login');
   if (btn) { btn.classList.remove('loading'); btn.innerHTML = 'Login'; }
-  if (btn) { btn.classList.remove('loading'); btn.innerHTML = 'Login'; }
-  // Hapus session supaya hard refresh tidak auto-login
-  try { localStorage.removeItem('gdfgSession'); } catch(e) {}
-  try { sessionStorage.setItem('gdfgLoggedOut', '1'); } catch(e) {}
+}
 
 // ============================================================
 // ROLE-BASED ACCESS CONTROL
@@ -141,22 +114,23 @@ function applyRoleRestrictions(role){
   var isViewer  = (role === 'viewer' || role === 'visitor');
   var isVisitor = (role === 'visitor');
   var isPPIC    = (role === 'ppic');
+  var isOwner   = (role === 'owner');
 
-  // ── Sembunyikan Karina untuk non-owner ──────────────────────
-  if (role !== 'owner') {
+  // ── Sembunyikan Karina untuk non-owner ──
+  if (!isOwner) {
     var elKarina = document.getElementById('menuKarina');
     if (elKarina) elKarina.style.display = 'none';
   }
 
-  // ── PPIC: hanya Monitoring Ekspor ────────────────────────────
+  // ── PPIC: hanya Monitoring Ekspor ──
   if (isPPIC) {
     try {
       ['menuDashboard','menuRealisasi','menuOpname','menuRdc',
-       'menuStockJalur','menuBinLoc','menuApps'].forEach(function(id){
+       'menuStockJalur','menuBinLoc','menuApps','menuKarina'].forEach(function(id){
         var el = document.getElementById(id); if (el) el.style.display = 'none';
       });
       ['dashboard','realisasiPage','opnamePage','rdcPage',
-       'stockJalurPage','binLocPage','appsPage'].forEach(function(id){
+       'stockJalurPage','binLocPage','appsPage','karinaPage'].forEach(function(id){
         var el = document.getElementById(id); if (el) el.style.display = 'none';
       });
       setTimeout(function(){ if(typeof showPage==='function') showPage('monitoringEksporPage'); }, 300);
@@ -243,9 +217,6 @@ function closeSidebar() {
 // ============================================================
 // ROUTING — SHOW PAGE
 // ============================================================
-// Pages yang perlu display:flex bukan block
-var _flexPages = ['karinaPage'];
-
 function showPage(page) {
   // Push ke history agar tombol back HP kembali ke halaman sebelumnya
   if (window.history && window.history.pushState) {
@@ -279,7 +250,6 @@ function showPage(page) {
   document.getElementById('menuStockJalur').classList.toggle('active-page', page === 'stockJalurPage');
   document.getElementById('menuBinLoc').classList.toggle('active-page',            page === 'binLocPage');
   document.getElementById('menuMonitoringEkspor').classList.toggle('active-page',  page === 'monitoringEksporPage');
-  var mkEl = document.getElementById('menuKarina'); if(mkEl) mkEl.classList.toggle('active-page', page === 'karinaPage');
   document.getElementById('menuApps').classList.toggle('active-page',              page === 'appsPage');
 
   // Page-specific init
@@ -506,7 +476,7 @@ window.addEventListener('popstate', function(e) {
     // Kembali ke halaman sebelumnya tanpa push history baru
     var page = e.state.page;
     var pages = ['dashboard','inputPage','realisasiPage','opnamePage',
-                 'rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage','karinaPage'];
+                 'rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage'];
     pages.forEach(function(p) {
       var el = document.getElementById(p);
       if (el) { el.style.display = 'none'; el.classList.remove('page-enter'); }
@@ -535,41 +505,31 @@ window.addEventListener('load', function() {
   }
 });
 
-// Auto-restore session saat load/reload
-window.addEventListener("load", function(){ setTimeout(_restoreSession, 100); });
+// ── Session persistence ───────────────────────────────────────
+function _restoreSession() {
+  try {
+    if (sessionStorage.getItem('gdfgLoggedOut')) return false;
+    var sess = localStorage.getItem('gdfgSession');
+    if (!sess) return false;
+    var data = JSON.parse(sess);
+    if (Date.now() - data.ts > 7 * 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('gdfgSession');
+      return false;
+    }
+    _currentUser = data.user;
+    _userRole    = data.role || 'admin';
+    document.getElementById("loginWrap").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+    applyRoleRestrictions(_userRole);
+    return true;
+  } catch(e) { return false; }
+}
+window.addEventListener('load', function(){ setTimeout(_restoreSession, 100); });
 
-// ══════════════════════════════════════════════════════════════
-// KARINA AI — Chat interface dengan Claude API
-// ══════════════════════════════════════════════════════════════
+// ── KARINA AI ─────────────────────────────────────────────────
+var _kaHistory = [];
 
-var _kaHistory = [];  // riwayat chat untuk context
-
-var _kaSystemPrompt = [
-  'Kamu adalah Karina (Knowledge-based Administrative Resource & Inventory Network AI), ',
-  'asisten AI untuk sistem manajemen gudang GDFG (Finished Goods) milik PT Mars Indonesia. ',
-  'Gudang ini menangani produk MALKIST, CHOKI STIX, dan produk lainnya untuk ekspor ke ',
-  'Thailand, India, Malaysia, Cambodia, Philippines, dan negara ASEAN lainnya. ',
-  '',
-  'Sistem yang ada di gudang GDFG:',
-  '1. MONITORING GDFG — dashboard monitoring ekspor, kapasitas gudang, stock opname, realisasi SPE',
-  '2. BinLoc — sistem manajemen lokasi pallet di dalam gudang',  
-  '3. Sistem Antrian GDFG — manajemen antrian truk ekspor',
-  '',
-  'Status truk di sistem antrian:',
-  '- ANTRIAN: truk sudah daftar, menunggu giliran',
-  '- START_LOADING / FINISH_LOADING: sedang proses muat',
-  '- MENUNGGU_SPM: menunggu Surat Persetujuan Muat',
-  '- TREATMENT: dalam proses treatment/fumigasi',
-  '- DITOLAK: truk ditolak, tidak dianggap realisasi planning',
-  '- KELUAR: truk sudah keluar, container sudah berangkat',
-  '',
-  'Format data planning ekspor di KET: SO:xxx | QT:xxx | QTY_KRT:xxx | PLANT:xxx | ITEM2:SKU|NAMA|QTY',
-  '',
-  'Jawab dalam Bahasa Indonesia yang ramah dan profesional. ',
-  'Jika tidak tahu informasi spesifik real-time (data aktual gudang), ',
-  'jelaskan cara melihatnya di sistem yang ada. ',
-  'Gunakan emoji yang relevan untuk memperindah jawaban.'
-].join('');
+var _kaSystemPrompt = 'Kamu adalah Karina (Knowledge-based Administrative Resource & Inventory Network AI), asisten AI untuk sistem manajemen gudang GDFG (Finished Goods) milik PT Mars Indonesia. Gudang ini menangani produk MALKIST, CHOKI STIX, dan produk lainnya untuk ekspor ke Thailand, India, Malaysia, Cambodia, Philippines, dan negara ASEAN lainnya.\n\nSistem gudang GDFG:\n1. MONITORING GDFG — dashboard monitoring ekspor, kapasitas gudang, stock opname\n2. BinLoc — manajemen lokasi pallet\n3. Sistem Antrian GDFG — antrian truk ekspor\n\nStatus truk: ANTRIAN=menunggu, START/FINISH_LOADING=muat, MENUNGGU_SPM=menunggu surat, TREATMENT=fumigasi, DITOLAK=ditolak, KELUAR=sudah berangkat.\n\nJawab dalam Bahasa Indonesia yang ramah dan profesional. Gunakan emoji yang relevan.';
 
 function kaSend() {
   var input = document.getElementById('karinaInput');
@@ -577,10 +537,8 @@ function kaSend() {
   var msg = (input.value || '').trim();
   if (!msg) return;
   input.value = '';
-  input.style.height = 'auto';
   _kaAddMessage(msg, 'user');
   _kaCallAPI(msg);
-  // Sembunyikan quick prompts setelah pertama kali kirim
   var qp = document.getElementById('karinaQuickPrompts');
   if (qp) qp.style.display = 'none';
 }
@@ -596,36 +554,29 @@ function _kaAddMessage(text, role) {
   if (!area) return;
   var isUser = role === 'user';
   var time = new Date().toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'});
-
   var wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;gap:10px;align-items:flex-start;' + (isUser ? 'flex-direction:row-reverse;' : '');
-
   if (!isUser) {
     var avatar = document.createElement('div');
     avatar.style.cssText = 'width:32px;height:32px;background:linear-gradient(135deg,#1a3a5c,#2d6a4f);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
     avatar.innerHTML = '<i class="fas fa-robot" style="color:#f6ad55;font-size:13px;"></i>';
     wrap.appendChild(avatar);
   }
-
   var bubble = document.createElement('div');
   bubble.style.cssText = isUser
     ? 'background:linear-gradient(135deg,#1a3a5c,#2d4a6a);color:#fff;border-radius:14px 4px 14px 14px;padding:10px 14px;max-width:80%;box-shadow:0 2px 8px rgba(0,0,0,.1);'
     : 'background:#fff;border-radius:4px 14px 14px 14px;padding:12px 14px;max-width:80%;box-shadow:0 2px 8px rgba(0,0,0,.06);';
-
   var content = document.createElement('div');
   content.style.cssText = 'font-size:13px;line-height:1.6;white-space:pre-wrap;' + (isUser ? 'color:#fff;' : 'color:#2d3748;');
   content.textContent = text;
   bubble.appendChild(content);
-
   var timeEl = document.createElement('div');
   timeEl.style.cssText = 'font-size:10px;margin-top:4px;' + (isUser ? 'color:rgba(255,255,255,.5);text-align:right;' : 'color:#a0aec0;');
   timeEl.textContent = (isUser ? 'Kamu' : 'Karina') + ' • ' + time;
   bubble.appendChild(timeEl);
-
   wrap.appendChild(bubble);
   area.appendChild(wrap);
   area.scrollTop = area.scrollHeight;
-  return content;  // return untuk update saat streaming
 }
 
 function _kaAddTyping() {
@@ -634,29 +585,17 @@ function _kaAddTyping() {
   var wrap = document.createElement('div');
   wrap.id = 'karinaTyping';
   wrap.style.cssText = 'display:flex;gap:10px;align-items:flex-start;';
-  wrap.innerHTML = '<div style="width:32px;height:32px;background:linear-gradient(135deg,#1a3a5c,#2d6a4f);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-robot" style="color:#f6ad55;font-size:13px;"></i></div>' +
-    '<div style="background:#fff;border-radius:4px 14px 14px 14px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">' +
-    '<div style="display:flex;gap:4px;align-items:center;height:16px;">' +
-    '<span style="width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:kaTypeDot 1.2s infinite 0s;"></span>' +
-    '<span style="width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:kaTypeDot 1.2s infinite .2s;"></span>' +
-    '<span style="width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:kaTypeDot 1.2s infinite .4s;"></span>' +
-    '</div></div>';
+  wrap.innerHTML = '<div style="width:32px;height:32px;background:linear-gradient(135deg,#1a3a5c,#2d6a4f);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-robot" style="color:#f6ad55;font-size:13px;"></i></div><div style="background:#fff;border-radius:4px 14px 14px 14px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);"><div style="display:flex;gap:4px;align-items:center;height:16px;"><span style="width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:kaTypeDot 1.2s infinite 0s;"></span><span style="width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:kaTypeDot 1.2s infinite .2s;"></span><span style="width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:kaTypeDot 1.2s infinite .4s;"></span></div></div>';
   area.appendChild(wrap);
   area.scrollTop = area.scrollHeight;
   return wrap;
 }
 
 async function _kaCallAPI(userMsg) {
-  // Disable send btn
   var btn = document.getElementById('karinaSendBtn');
   if (btn) btn.disabled = true;
-
-  // Tambah ke history
   _kaHistory.push({ role: 'user', content: userMsg });
-
-  // Typing indicator
   var typing = _kaAddTyping();
-
   try {
     var response = await fetch('https://monitorgdfg.kemalrifael71.workers.dev/claude', {
       method: 'POST',
@@ -668,25 +607,15 @@ async function _kaCallAPI(userMsg) {
         messages: _kaHistory
       })
     });
-
     var data = await response.json();
     var reply = (data.content && data.content[0] && data.content[0].text) || 'Maaf, terjadi kesalahan.';
-
-    // Hapus typing indicator
     if (typing && typing.parentNode) typing.parentNode.removeChild(typing);
-
-    // Tambah response ke chat
     _kaAddMessage(reply, 'assistant');
-
-    // Simpan ke history (max 20 pesan untuk hemat token)
     _kaHistory.push({ role: 'assistant', content: reply });
     if (_kaHistory.length > 20) _kaHistory = _kaHistory.slice(-20);
-
   } catch(e) {
     if (typing && typing.parentNode) typing.parentNode.removeChild(typing);
-    _kaAddMessage('Maaf, tidak bisa terhubung ke Karina saat ini. Coba lagi beberapa saat. (' + e.message + ')', 'assistant');
+    _kaAddMessage('Maaf, tidak bisa terhubung ke Karina. (' + e.message + ')', 'assistant');
   }
-
   if (btn) btn.disabled = false;
-}
 }
