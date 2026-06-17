@@ -252,8 +252,7 @@ function showPage(page) {
   // Page-specific init
   if (page === 'dashboard') {
     updateLastRefresh();
-    loadTanggalHistory();
-    loadKapasitasHariIni();
+    loadTanggalHistoryThenHariIni();
   }
   if (page === 'inputPage')    initEmptyRows(30);
   if (page === 'opnamePage')   { initOpnamePage(); switchOpnameTab('input'); }
@@ -417,82 +416,11 @@ function switchView(view) {
 }
 
 // ============================================================
-// LOAD SUMMARY (Chart data)
-// ============================================================
-function loadSummary() {
-  API.getSummaryLokal(function (res) {
-    if (res.success) {
-      var sorted = res.data.slice().sort(function (a, b) { return b.jmlPallet - a.jmlPallet; });
-      res.data.forEach(function (i) {
-        if (i.skuBarang) {
-          var sku = String(i.skuBarang).trim();
-          _skuNamaMap[sku]  = i.namaBarang || '';
-          _opnameNamaMap[sku] = i.namaBarang || '';
-          if (!_skuDataMap[sku]) _skuDataMap[sku] = { nama: i.namaBarang || '', sap: Number(i.jmlKarton) || 0 };
-        }
-      });
-      lokalChartData = {
-        labels:  sorted.slice(0, 10).map(function (i) { return i.namaBarang; }),
-        skus:    sorted.slice(0, 10).map(function (i) { return i.skuBarang; }),
-        values:  sorted.slice(0, 10).map(function (i) { return i.jmlPallet; }),
-        kartons: sorted.slice(0, 10).map(function (i) { return i.jmlKarton || 0; })
-      };
-      if (document.getElementById('summary').classList.contains('active')) {
-        if      (currentView === 'chart')      renderCharts();
-        else if (currentView === 'horizontal') renderChartsHorizontal();
-        else                                   renderTableView();
-      }
-    }
-  });
-
-  API.getSummaryEkspor(function (res) {
-    if (res.success) {
-      var sorted = res.data.slice().sort(function (a, b) { return b.jmlPallet - a.jmlPallet; });
-      res.data.forEach(function (i) {
-        if (i.skuBarang) {
-          var sku = String(i.skuBarang).trim();
-          _skuNamaMap[sku]  = i.namaBarang || '';
-          _opnameNamaMap[sku] = i.namaBarang || '';
-          if (!_skuDataMap[sku]) _skuDataMap[sku] = { nama: i.namaBarang || '', sap: Number(i.jmlKarton) || 0 };
-        }
-      });
-      eksporChartData = {
-        labels:  sorted.slice(0, 10).map(function (i) { return i.namaBarang; }),
-        skus:    sorted.slice(0, 10).map(function (i) { return i.skuBarang; }),
-        values:  sorted.slice(0, 10).map(function (i) { return i.jmlPallet; }),
-        kartons: sorted.slice(0, 10).map(function (i) { return i.jmlKarton || 0; })
-      };
-      if (document.getElementById('summary').classList.contains('active')) {
-        if      (currentView === 'chart')      renderCharts();
-        else if (currentView === 'horizontal') renderChartsHorizontal();
-        else                                   renderTableView();
-      }
-    }
-  });
-}
-
-// ============================================================
-// LOAD DIVISI (Pie chart data)
-// ============================================================
-function loadDivisi() {
-  API.getSummaryDivisi(function (res) {
-    if (res.success) {
-      divisiChartData = res;
-      if (currentView === 'pie' && document.getElementById('summary').classList.contains('active')) {
-        renderPieChart();
-      }
-    }
-  });
-}
-
-// ============================================================
-// UPDATE LAST REFRESH (timestamp di header dashboard)
+// UPDATE LAST REFRESH — tidak lagi fetch GAS, cukup timestamp lokal
+// (Last Update dari sheet sudah ditampilkan di label tanggal history)
 // ============================================================
 function updateLastRefresh() {
-  API.getLastUpdate(function (res) {
-    var el = document.getElementById('lastUpdateValue');
-    if (el) el.innerText = (res && res.value) ? res.value : '-';
-  });
+  // Tidak perlu fetch GAS — last update ditampilkan dari tanggal history kapasitas
 }
 
 // ============================================================
