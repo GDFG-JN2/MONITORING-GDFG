@@ -74,7 +74,6 @@ function login(){
       document.getElementById("dashboard").style.display = "block";
       applyRoleRestrictions(_userRole);
       refreshData();
-      switchView('horizontal');
       _patternLoadAsync(function(){});
     } else {
       btn.classList.remove("loading");
@@ -517,6 +516,7 @@ function _restoreSession() {
     document.getElementById("loginWrap").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
     applyRoleRestrictions(_userRole);
+    loadTanggalHistoryThenHariIni();
     return true;
   } catch(e) { return false; }
 }
