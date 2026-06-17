@@ -364,10 +364,17 @@ function showTab(tabId) {
   var content = document.getElementById(tabId);
   if (content) content.classList.add('active');
   if (tabId === 'summary') {
-    if      (currentView === 'chart')      renderCharts();
-    else if (currentView === 'horizontal') renderChartsHorizontal();
-    else if (currentView === 'pie')        renderPieChart();
-    else                                   renderTableView();
+    // Hanya render kalau data sudah ada
+    if (lokalChartData || eksporChartData) {
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          if      (currentView === 'chart')      renderCharts();
+          else if (currentView === 'horizontal') renderChartsHorizontal();
+          else if (currentView === 'pie')        renderPieChart();
+          else                                   renderTableView();
+        });
+      });
+    }
   }
 }
 
