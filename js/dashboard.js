@@ -566,6 +566,21 @@ function _applyChartZoom() {
           // Render chart/tabel jika tab summary aktif
           // Selalu build divisi dari history (agar siap saat user switch ke pie)
           _buildDivisiFromHistory(lokalArr, eksporArr);
+          // Pastikan hanya view aktif yang visible, sisanya none
+          var _views = {
+            'chart':      'viewChart',
+            'horizontal': 'viewHorizontal',
+            'pie':        'viewPie',
+            'trend':      'viewTrend'
+          };
+          if(!currentView) currentView = 'horizontal';
+          Object.keys(_views).forEach(function(v) {
+            var el = document.getElementById(_views[v]);
+            if(!el) return;
+            var isActive = (v === currentView);
+            el.style.display = isActive ? (v==='pie'?'flex':'grid') : 'none';
+          });
+
           if(document.getElementById('summary').classList.contains('active')){
             // Pastikan view yang aktif sudah display:grid sebelum render
             // (kalau tidak, canvas ukuran 0 dan Chart.js tidak bisa render)
