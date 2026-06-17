@@ -499,6 +499,20 @@ function _applyChartZoom() {
           var eksp = data.filter(function(r){ return r.tipe==='EKSPOR'; });
           var gdfg = data.filter(function(r){ return r.tipe==='GDFG'; });
 
+          // Reset _skuDataMap dari history kapasitas (BB = karton)
+          // Ini menggantikan getSummaryLokal/Ekspor yang lama baca REKAP STOCK
+          data.forEach(function(r){
+            if(!r.sku) return;
+            var tipe = r.tipe;
+            var section = (tipe==='GDI2'||tipe==='GDIN') ? 'lokal' : tipe==='EKSPOR' ? 'ekspor' : 'gdfg';
+            if(!_skuDataMap[r.sku]) _skuDataMap[r.sku] = {nama:r.nama, sap:0, lokal:0, ekspor:0, gdfg:0};
+            _skuDataMap[r.sku].nama = r.nama;
+            _skuDataMap[r.sku][section] = (_skuDataMap[r.sku][section]||0) + (r.bb||0);
+            // sap = BB lokal (untuk autofill opname, sama dengan sebelumnya dari REKAP STOCK)
+            if(section==='lokal') _skuDataMap[r.sku].sap = (_skuDataMap[r.sku].sap||0) + (r.bb||0);
+            else if(!_skuDataMap[r.sku].sap) _skuDataMap[r.sku].sap = r.bb||0;
+          });
+
           // Lokal = GDI2+GDIN, gabung & sum by SKU
           var lokalMap = {};
           gdi2.concat(gdin).forEach(function(r){
