@@ -301,7 +301,8 @@ function loadTanggalHistoryThenHariIni() {
     return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
   })();
 
-  API.run('getHistoryKapasitas', {from:'', to:'', tipes:[]}, function(res) {
+  // Step 1: Ambil daftar tanggal saja (scan dari bawah, cepat)
+  API.run('getHistoryTanggals', {}, function(res) {
     var tanggals = (res && res.success && res.tanggals) ? res.tanggals : [];
 
     // Isi dropdown
@@ -319,10 +320,10 @@ function loadTanggalHistoryThenHariIni() {
       if (cur) sel.value = cur;
     }
 
-    // Tentukan tanggal yang di-load
+    // Tentukan tanggal yang di-load (terbaru = index 0)
     var tglToLoad = today;
     if (tanggals.length && tanggals.indexOf(today) < 0) {
-      tglToLoad = tanggals[0]; // tanggal terbaru
+      tglToLoad = tanggals[0];
     }
 
     // Update Last Update label
@@ -345,7 +346,7 @@ function loadTanggalHistoryThenHariIni() {
       }
     }
 
-    // Load data untuk tanggal yang dipilih (1 request saja)
+    // Step 2: Load data hanya untuk tanggal terpilih
     if (typeof _loadKapasitasByTgl === 'function') {
       _loadKapasitasByTgl(tglToLoad);
     }
