@@ -293,8 +293,65 @@ function refreshData() {
   var sel = document.getElementById('kapasitasTanggalSelect');
   if (sel) sel.value = '';
   updateLastRefresh();
-  loadTanggalHistory();
-  loadKapasitasHariIni();
+  // Gabung jadi 1 request — ambil semua tanggal sekaligus lalu load terkini
+  loadTanggalHistoryThenHariIni();
+}
+
+function loadTanggalHistoryThenHariIni() {
+  var today = (function(){
+    var t=new Date();
+    return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  })();
+
+  API.run('getHistoryKapasitas', {from:'', to:'', tipes:[]}, function(res) {
+    var tanggals = (res && res.success && res.tanggals) ? res.tanggals : [];
+
+    // Isi dropdown
+    var sel = document.getElementById('kapasitasTanggalSelect');
+    if (sel) {
+      var cur = sel.value;
+      while (sel.options.length > 1) sel.remove(1);
+      tanggals.forEach(function(tgl) {
+        var opt = document.createElement('option');
+        opt.value = tgl;
+        var parts = tgl.split('-');
+        opt.textContent = parts.length===3 ? parts[2]+'-'+parts[1]+'-'+parts[0] : tgl;
+        sel.appendChild(opt);
+      });
+      if (cur) sel.value = cur;
+    }
+
+    // Tentukan tanggal yang di-load
+    var tglToLoad = today;
+    if (tanggals.length && tanggals.indexOf(today) < 0) {
+      tglToLoad = tanggals[0]; // tanggal terbaru
+    }
+
+    // Update Last Update label
+    var luEl = document.getElementById('lastUpdateValue');
+    if (luEl && tglToLoad) {
+      var p = tglToLoad.split('-');
+      luEl.innerText = p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : tglToLoad;
+    }
+
+    // Update select value
+    if (sel) {
+      if (tglToLoad !== today) {
+        var found = false;
+        for (var i=0; i<sel.options.length; i++) {
+          if (sel.options[i].value===tglToLoad) { found=true; sel.value=tglToLoad; break; }
+        }
+        if (!found) sel.value = '';
+      } else {
+        sel.value = '';
+      }
+    }
+
+    // Load data untuk tanggal yang dipilih (1 request saja)
+    if (typeof _loadKapasitasByTgl === 'function') {
+      _loadKapasitasByTgl(tglToLoad);
+    }
+  });
 }
 
 // ============================================================
@@ -665,29 +722,32 @@ var _kaHistory = [];
 
 var _kaSystemPrompt = [
   'Kamu adalah Karina (Knowledge-based Administrative Resource & Inventory Network AI), ',
-  'asisten AI untuk sistem manajemen gudang GDFG (Finished Goods) milik PT Mars Indonesia. ',
-  'Gudang ini menangani produk MALKIST, CHOKI STIX, dan produk lainnya untuk ekspor ke ',
-  'Thailand, India, Malaysia, Cambodia, Philippines, dan negara ASEAN lainnya.',
+  'asisten AI untuk sistem manajemen gudang GDFG (Finished Goods) milik PT Mars Indonesia.',
   '',
-  'Sistem gudang GDFG:',
-  '1. MONITORING GDFG - dashboard monitoring ekspor, kapasitas gudang, stock opname',
-  '2. BinLoc - manajemen lokasi pallet',
-  '3. Sistem Antrian GDFG - antrian truk ekspor',
+  'SISTEM GDFG terdiri dari beberapa halaman/modul:',
+  '1. KAPASITAS — stok pallet GDI2+GDIN (lokal), EKSPOR, GDFG dari HISTORY KAPASITAS. Cap: Lokal 5800, Ekspor 1296, Total 7096.',
+  '2. REALISASI — realisasi SPE (Surat Perintah Ekspor) per shift (1/2/3) dan tim per tanggal.',
+  '3. STOCK OPNAME — opname fisik vs SAP untuk lokal, ekspor, FIFO wafer/biskuit, QT Ready.',
+  '4. MONITORING RDC — jadwal dan realisasi pengiriman ke RDC: waktu muat, durasi, rute, ekspedisi.',
+  '5. STOCK JALUR — kartu stock produksi per SKU: output shift 1/2/3, sisa stok, pengiriman keluar.',
+  '6. BIN LOC — lokasi pallet di dalam gudang: bin location, SKU, prodate, quotation, pallet.',
+  '7. MONITORING EKSPOR — planning container ekspor vs realisasi antrian truk per SO/tujuan/tanggal.',
+  '8. SISTEM ANTRIAN GDFG — antrian truk semua jenis (lokal/ekspor/MDC): daftar, muat, keluar, dock status.',
+  '9. BINLOC APP — tracking pallet di gudang: bin location, SKU, prodate, quotation, karton, pecahan.',
   '',
-  'Status truk: ANTRIAN=menunggu, START/FINISH_LOADING=muat, MENUNGGU_SPM=menunggu surat, TREATMENT=fumigasi, DITOLAK=ditolak, KELUAR=sudah berangkat.',
+  'STATUS TRUK ANTRIAN: ANTRIAN=menunggu, START_LOADING/FINISH_LOADING=sedang muat, ',
+  'MENUNGGU_SPM=menunggu surat, TREATMENT=fumigasi, DITOLAK=ditolak, KELUAR=sudah berangkat.',
   '',
-  'PENTING - KONVERSI WEEK NUMBER KE TANGGAL (ISO 8601, Senin=hari pertama):',
-  'Week selalu dimulai SENIN dan berakhir MINGGU.',
-  'Referensi tahun 2026:',
-  '  Week 23 = 01 Jun - 07 Jun 2026',
-  '  Week 24 = 08 Jun - 14 Jun 2026',
-  '  Week 25 = 15 Jun - 21 Jun 2026',
-  '  Week 26 = 22 Jun - 28 Jun 2026',
-  '  Week 27 = 29 Jun - 05 Jul 2026',
-  'Ketika user sebut week N, hitung from=Senin week N, to=Minggu week N, panggil tool dengan tanggal tepat.',
+  'KONVERSI WEEK NUMBER (ISO 8601, Senin=hari pertama):',
+  '  Week 23=01-07 Jun 2026, Week 24=08-14 Jun 2026, Week 25=15-21 Jun 2026,',
+  '  Week 26=22-28 Jun 2026, Week 27=29 Jun-05 Jul 2026.',
+  'Saat user sebut week N -> hitung from=Senin, to=Minggu, panggil tool dengan tanggal tepat.',
   '',
-  'Jawab dalam Bahasa Indonesia yang ramah dan profesional.',
-  'Saat menjawab data numerik, tampilkan dengan jelas dan terstruktur.',
+  'CARA MENJAWAB:',
+  '- Selalu gunakan tool untuk ambil data real-time sebelum menjawab pertanyaan data.',
+  '- Jawab dalam Bahasa Indonesia yang ramah dan profesional.',
+  '- Data numerik tampilkan dengan jelas: angka, satuan, persentase.',
+  '- Kalau ada beberapa tool relevan, panggil paralel.',
   'Hari ini: ' + new Date().toISOString().substring(0,10)
 ].join('\n');
 
