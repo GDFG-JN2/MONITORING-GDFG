@@ -422,8 +422,10 @@ function _applyChartZoom() {
       var sel = document.getElementById('kapasitasTanggalSelect');
       var tgl = sel ? sel.value : '';
       if(!tgl){
-        // Terkini = hari ini
-        loadKapasitasHariIni();
+        // Terkini = load ulang via fungsi utama
+        if(typeof loadTanggalHistoryThenHariIni === 'function'){
+          loadTanggalHistoryThenHariIni();
+        }
         return;
       }
       // Update Last Update label
