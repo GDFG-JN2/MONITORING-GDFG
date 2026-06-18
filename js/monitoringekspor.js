@@ -1532,7 +1532,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   var tbody = document.getElementById('mekCapTbody');
   if (!tbody) return;
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data.</td></tr>';
     return;
   }
   skuFilter = (skuFilter||'').toLowerCase();
@@ -1582,21 +1582,24 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
     });
     var pct = sum.total ? Math.round(sum.keluar/sum.total*100) : 0;
 
-    html+='<tr style="background:#1a3a5c;"><td colspan="14" style="padding:8px 12px;color:#fff;font-size:12px;font-weight:700;">' +
-      '<span style="margin-right:12px;">' + _mekFmtTglDisplay(planTgl) + '</span>' +
-      '<span style="background:rgba(255,255,255,.15);border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">Total: '+sum.total+' truk</span>' +
-      '<span style="background:#48bb78;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">' + sum.keluar + ' keluar</span>' +
-      ((sum.loading+sum.daftar)?'<span style="background:#ed8936;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">'+(sum.loading+sum.daftar)+' proses</span>':'') +
-      (sum.belum?'<span style="background:#fc8181;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">'+sum.belum+' belum</span>':'') +
+    html+='<tr style="background:#1a3a5c;"><td colspan="15" style="padding:0;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;color:#fff;font-size:12px;font-weight:700;flex-wrap:wrap;gap:4px;">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+      '<span style="margin-right:4px;">' + _mekFmtTglDisplay(planTgl) + '</span>' +
+      '<span style="background:rgba(255,255,255,.15);border-radius:10px;padding:2px 10px;font-size:11px;">Total: '+sum.total+' truk</span>' +
+      '<span style="background:#48bb78;border-radius:10px;padding:2px 10px;font-size:11px;">' + sum.keluar + ' keluar</span>' +
+      ((sum.loading+sum.daftar)?'<span style="background:#ed8936;border-radius:10px;padding:2px 10px;font-size:11px;">'+(sum.loading+sum.daftar)+' proses</span>':'') +
+      (sum.belum?'<span style="background:#fc8181;border-radius:10px;padding:2px 10px;font-size:11px;">'+sum.belum+' belum</span>':'') +
       (sum.pendingan?'<span style="background:#f6d860;color:#744210;border-radius:10px;padding:2px 10px;font-size:11px;">'+sum.pendingan+' pendingan</span>':'') +
-      '<span style="float:right;font-size:11px;opacity:.8;">'+pct+'% keluar</span>' +
-      '</td></tr>';
+      '</div>' +
+      '<span style="font-size:11px;opacity:.8;white-space:nowrap;">'+pct+'% keluar</span>' +
+      '</div></td></tr>';
 
     html+='<tr style="background:#2d4a6a;color:#bee3f8;font-size:11px;font-weight:700;">' +
       '<th style="padding:5px 8px;width:30px;">#</th><th style="padding:5px 8px;">NO SO</th>' +
       '<th style="padding:5px 8px;">SKU</th><th style="padding:5px 8px;">Nama Item</th>' +
       '<th style="padding:5px 8px;text-align:right;">Plan</th><th style="padding:5px 8px;">Tujuan</th>' +
-      '<th style="padding:5px 8px;">No Pol</th><th style="padding:5px 8px;">No Container</th><th style="padding:5px 8px;">Ekspedisi</th>' +
+      '<th style="padding:5px 8px;white-space:nowrap;">No Pol</th><th style="padding:5px 8px;white-space:nowrap;">No Container</th><th style="padding:5px 8px;white-space:nowrap;">Ekspedisi</th>' +
       '<th style="padding:5px 8px;">Waktu Daftar</th><th style="padding:5px 8px;">Proses Loading</th>' +
       '<th style="padding:5px 8px;">Waktu Keluar</th><th style="padding:5px 8px;">Status</th>' +
       '<th style="padding:5px 8px;">Tgl Aktual</th><th style="padding:5px 8px;">Keterangan</th></tr>';
@@ -2686,7 +2689,7 @@ function mekLoadCapaian() {
 
   API.run('getMekCapaianPlanning', { from: from, to: to, mode: _mekCapMode }, function(res) {
     if (!res || !res.success) {
-      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#fc8181;">Gagal: ' +
+      tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:30px;color:#fc8181;">Gagal: ' +
         (res && res.message ? res.message : 'error') + '</td></tr>';
       return;
     }
@@ -2712,7 +2715,7 @@ function mekLoadCapaian() {
     _mekCapData = data;
     _mekRenderCapaian(data, _mekCapFilter);
   }, function() {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#fc8181;">Koneksi gagal.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:30px;color:#fc8181;">Koneksi gagal.</td></tr>';
   });
 }
 
@@ -2759,7 +2762,7 @@ function _mekRenderCapaianEmailAktual(data) {
   var tbody = document.getElementById('mekCapTbody');
   if (!tbody) return;
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data.</td></tr>';
     return;
   }
 
@@ -3377,7 +3380,7 @@ function _mekRenderCapaian(data, statusFilter) {
   }
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#a0aec0;">' +
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#a0aec0;">' +
       '<i class="fas fa-box-open" style="font-size:28px;display:block;margin-bottom:8px;opacity:.2;"></i>Tidak ada data</td></tr>';
     return;
   }
