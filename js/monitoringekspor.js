@@ -2673,7 +2673,7 @@ function mekLoadCapaian() {
     _mekCapEmailLastTo   = to;
     API.run('getMekCapaianEmail', { from: from, to: to, viewMode: 'plan' }, function(res) {
       if (!res || !res.success) {
-        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:30px;color:#fc8181;">Gagal: '+(res&&res.message?res.message:'error')+'</td></tr>';
         return;
       }
       _mekCapEmailData = res.data || [];
