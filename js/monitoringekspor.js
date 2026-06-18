@@ -1596,7 +1596,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       '<th style="padding:5px 8px;width:30px;">#</th><th style="padding:5px 8px;">NO SO</th>' +
       '<th style="padding:5px 8px;">SKU</th><th style="padding:5px 8px;">Nama Item</th>' +
       '<th style="padding:5px 8px;text-align:right;">Plan</th><th style="padding:5px 8px;">Tujuan</th>' +
-      '<th style="padding:5px 8px;">No Pol</th><th style="padding:5px 8px;">Ekspedisi</th>' +
+      '<th style="padding:5px 8px;">No Pol</th><th style="padding:5px 8px;">No Container</th><th style="padding:5px 8px;">Ekspedisi</th>' +
       '<th style="padding:5px 8px;">Waktu Daftar</th><th style="padding:5px 8px;">Proses Loading</th>' +
       '<th style="padding:5px 8px;">Waktu Keluar</th><th style="padding:5px 8px;">Status</th>' +
       '<th style="padding:5px 8px;">Tgl Aktual</th><th style="padding:5px 8px;">Keterangan</th></tr>';
@@ -1621,6 +1621,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
         '<td style="'+CS+'text-align:right;font-weight:700;">'+(r.isFirstRow&&r.planCont?r.planCont:'')+'</td>' +
         '<td style="'+CS+'color:#276749;font-weight:600;">'+(r.isFirstRow?_mekEsc(r.tujuan||''):'')+'</td>' +
         '<td style="'+CS+'font-weight:600;">'+_mekEsc(r.nopol||'\u2014')+'</td>' +
+        '<td style="'+CS+'font-size:11px;color:#4a5568;">'+_mekEsc(r.noContainer||'\u2014')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'\u2014')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'\u2014')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'\u2014')+'</td>' +
@@ -2820,6 +2821,7 @@ function _mekRenderCapaianEmailAktual(data) {
       '<th style="padding:5px 8px;text-align:right;">Plan</th>' +
       '<th style="padding:5px 8px;">Tgl Plan</th>' +
       '<th style="padding:5px 8px;">No Pol</th>' +
+      '<th style="padding:5px 8px;">No Container</th>' +
       '<th style="padding:5px 8px;">Ekspedisi</th>' +
       '<th style="padding:5px 8px;">Waktu Daftar</th>' +
       '<th style="padding:5px 8px;">Proses Loading</th>' +
@@ -2855,6 +2857,7 @@ function _mekRenderCapaianEmailAktual(data) {
         '<td style="'+CS+'text-align:right;font-weight:700;">'+(isFirstSo && r.planCont ? r.planCont : '')+'</td>' +
         '<td style="'+CS+'font-size:11px;color:#718096;">'+(isFirstSo ? _mekFmtTglDisplay(r.planTgl) : '')+'</td>' +
         '<td style="'+CS+'font-weight:600;">'+_mekEsc(r.nopol||'—')+'</td>' +
+        '<td style="'+CS+'font-size:11px;color:#4a5568;">'+_mekEsc(r.noContainer||'—')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'—')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'—')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.prosesLoading||'—')+'</td>' +
