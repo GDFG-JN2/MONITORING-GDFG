@@ -1613,15 +1613,13 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var ket = isPend ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>' : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
       _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||'',items:r.items||[]});
-      // Baris non-first: tampilkan info dengan style tipis supaya tidak terlihat disconnected
-      var subStyle = r.isFirstRow ? '' : 'opacity:0.45;font-style:italic;';
       html+='<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
-        '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'&#x21B3;')+'</td>' +
-        '<td style="'+CS+'font-weight:600;color:#2b6cb0;'+subStyle+'">'+(r.noSo?_mekEsc(r.noSo):'&mdash;')+'</td>' +
-        '<td style="'+CS+'font-weight:700;'+subStyle+'">'+_mekEsc(r.sku||'')+'</td>' +
-        '<td style="'+CS+subStyle+'">'+_mekEsc(r.nama||'')+'</td>' +
-        '<td style="'+CS+'text-align:right;font-weight:700;'+subStyle+'">'+(r.isFirstRow&&r.planCont?r.planCont:'')+'</td>' +
-        '<td style="'+CS+'color:#276749;font-weight:600;'+subStyle+'">'+(r.tujuan?_mekEsc(r.tujuan):'')+'</td>' +
+        '<td style="'+CS+'text-align:center;color:#a0aec0;">'+(r.isFirstRow?rowNum:'')+'</td>' +
+        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'—'):'')+  '</td>' +
+        '<td style="'+CS+'font-weight:700;">'+_mekEsc(r.sku||'')+'</td>' +
+        '<td style="'+CS+'">'+_mekEsc(r.nama||'')+'</td>' +
+        '<td style="'+CS+'text-align:right;font-weight:700;">'+(r.isFirstRow&&r.planCont?r.planCont:'')+'</td>' +
+        '<td style="'+CS+'color:#276749;font-weight:600;">'+(r.isFirstRow?_mekEsc(r.tujuan||''):'')+'</td>' +
         '<td style="'+CS+'font-weight:600;">'+_mekEsc(r.nopol||'\u2014')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.ekspedisi||'\u2014')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.waktuDaftar||'\u2014')+'</td>' +
