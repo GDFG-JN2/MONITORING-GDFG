@@ -2807,7 +2807,7 @@ function _mekRenderCapaianEmailAktual(data) {
 
     // Header tanggal aktual
     html += '<tr style="background:#276749;">' +
-      '<td colspan="14" style="padding:8px 12px;color:#fff;font-size:12px;font-weight:700;">' +
+      '<td colspan="15" style="padding:8px 12px;color:#fff;font-size:12px;font-weight:700;">' +
         '<span style="margin-right:12px;">' + _mekFmtTglDisplay(aktualTgl) + '</span>' +
         '<span style="background:rgba(255,255,255,.15);border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">Total: '+rows.length+' truk</span>' +
         (keluar  ? '<span style="background:#48bb78;border-radius:10px;padding:2px 10px;font-size:11px;margin-right:6px;">'+keluar+' keluar</span>' : '') +
