@@ -3272,6 +3272,147 @@ function mekCloseCardDetail() {
   setTimeout(function(){ overlay.style.display = 'none'; }, 180);
 }
 
+// ════════════════════════════════════════════════════════════
+// BY SKU — rekap planning vs termuat vs belum per SKU
+// ════════════════════════════════════════════════════════════
+function _mekSumQtyKrt(v) {
+  // v bisa berupa "1154", "1154,1078" (multi container), atau angka
+  if (!v) return 0;
+  var parts = String(v).split(',');
+  var total = 0;
+  parts.forEach(function(p){ total += Number(String(p).trim()) || 0; });
+  return total;
+}
+function _mekExtractQtyKrt(ket) {
+  // KET bisa berisi QTY_KRT:1154 atau QTY_KRT:1154,2300 (multi container)
+  var m = String(ket||'').match(/QTY_KRT:([^|]+)/);
+  if (!m) return 0;
+  return _mekSumQtyKrt(m[1]);
+}
+
+function mekShowBySkuDetail() {
+  var overlay = document.getElementById('mekCardDetailOverlay');
+  var title   = document.getElementById('mekCardDetailTitle');
+  var thead   = document.getElementById('mekCardDetailThead');
+  var tbody   = document.getElementById('mekCardDetailTbody');
+  var count   = document.getElementById('mekCardDetailCount');
+  var btnBar  = document.getElementById('mekCardDetailBtnBar');
+  if (!overlay) return;
+
+  var from = (document.getElementById('mekCapFrom')||{}).value||'';
+  var to   = (document.getElementById('mekCapTo')||{}).value||'';
+
+  // Sumber data tergantung mode aktif (sama seperti mekShowCardDetail)
+  var _srcData;
+  var isEmailMode = (_mekCapMode === 'email');
+  if (isEmailMode) {
+    _srcData = _mekCapEmailData;
+  } else {
+    _srcData = (_mekCapData||[]).map(function(r){
+      return {
+        planTgl:    r.tanggal || r.tgl || '',
+        noSo:       r.noSo || '',
+        sku:        r.sku  || '',
+        nama:       r.nama || '',
+        tujuan:     r.tujuan || '',
+        ket:        r.ket || '',
+        jumlahCont: r._jumlahCont || r.jumlahCont || 0,
+        isFirstRow: !!r.isFirstRow,
+        status:     r.status || 'belum'
+      };
+    });
+  }
+
+  // Filter aktif yang sama dengan tabel utama
+  var skuF   = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
+  var tujF   = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
+  var plantF = ((document.getElementById('mekCapPlant') ||{}).value||'').trim().toUpperCase();
+
+  var filtered = _srcData.filter(function(r){
+    if (from && r.planTgl < from) return false;
+    if (to   && r.planTgl > to)   return false;
+    if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
+    if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
+    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
+    return true;
+  });
+
+  // Rekap per SKU
+  var skuMap = {};
+  var seenPlanKey = {};
+  filtered.forEach(function(r){
+    var key = r.sku || '—';
+    if (!skuMap[key]) {
+      skuMap[key] = { sku: r.sku||'—', nama: r.nama||'', planCont: 0, qtyKrt: 0, termuat: 0, belum: 0 };
+    }
+    var m = skuMap[key];
+
+    // Plan cont + qty karton dihitung sekali per planning (baris pertama)
+    var pk = (r.noSo||r.sku||'') + '|' + (r.sku||'') + '|' + (r.planTgl||'');
+    if (r.isFirstRow && !seenPlanKey[pk]) {
+      seenPlanKey[pk] = true;
+      m.planCont += (r.jumlahCont || 0);
+      m.qtyKrt   += isEmailMode ? _mekSumQtyKrt(r.qty) : _mekExtractQtyKrt(r.ket);
+    }
+
+    // Termuat = sudah ada di antrian (keluar/loading/daftar)
+    // Belum = baris status 'belum' (termasuk baris sisa sintetis di mode email)
+    // 'ditolak' tidak dihitung di kedua sisi
+    if (r.status === 'keluar' || r.status === 'loading' || r.status === 'daftar') {
+      m.termuat += 1;
+    } else if (r.status === 'belum') {
+      m.belum += 1;
+    }
+  });
+
+  // Mode 'all'/'wa'/'si': baris 'belum' di _mekCapData mewakili 1 planning yg
+  // belum punya realisasi sama sekali (bukan per sisa container), jadi belum
+  // dihitung ulang dari plan-sisa supaya konsisten dengan card "Belum" di dashboard
+  if (!isEmailMode) {
+    Object.keys(skuMap).forEach(function(k){
+      var m = skuMap[k];
+      m.belum = Math.max(0, m.planCont - m.termuat);
+    });
+  }
+
+  var rows = Object.values(skuMap).sort(function(a,b){ return b.planCont - a.planCont; });
+
+  title.textContent = 'Capaian By SKU';
+  if (btnBar) btnBar.style.display = 'none';
+
+  thead.innerHTML = '<tr>' +
+    '<th style="padding:7px 10px;text-align:left;">SKU</th>' +
+    '<th style="padding:7px 10px;text-align:left;">NAMA</th>' +
+    '<th style="padding:7px 10px;text-align:right;">PLAN CONT</th>' +
+    '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
+    '<th style="padding:7px 10px;text-align:right;">TERMUAT</th>' +
+    '<th style="padding:7px 10px;text-align:right;">BELUM</th>' +
+    '</tr>';
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(function(r, i){
+      var bg = i%2===0 ? '' : 'background:#f8fafc;';
+      return '<tr style="'+bg+'">' +
+        '<td style="padding:7px 10px;font-weight:700;color:#2b6cb0;">'+_mekEsc(r.sku)+'</td>' +
+        '<td style="padding:7px 10px;max-width:200px;">'+_mekEsc(r.nama)+'</td>' +
+        '<td style="padding:7px 10px;text-align:right;font-weight:600;">'+r.planCont+'</td>' +
+        '<td style="padding:7px 10px;text-align:right;color:#744210;font-weight:600;">'+(r.qtyKrt ? r.qtyKrt.toLocaleString('id-ID') : '—')+'</td>' +
+        '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#276749;">'+r.termuat+'</td>' +
+        '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c53030;">'+r.belum+'</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  if (count) count.textContent = rows.length + ' SKU';
+
+  overlay.classList.remove('show');
+  overlay.style.display = 'flex';
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
+}
+
 function mekCapSetFilter(f) {
   _mekCapFilter = f;
   var btns = ['mekCapFAll','mekCapFDatang','mekCapFBelum'];
