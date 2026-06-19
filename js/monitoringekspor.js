@@ -3366,7 +3366,7 @@ function mekShowBySkuDetail() {
   filtered.forEach(function(r){
     var key = r.sku || '—';
     if (!skuMap[key]) {
-      skuMap[key] = { sku: r.sku||'—', nama: r.nama||'', planCont: 0, qtyKrt: 0, termuat: 0, belum: 0 };
+      skuMap[key] = { sku: r.sku||'—', nama: r.nama||'', planCont: 0, termuatCont: 0, qtyKrt: 0, termuat: 0, belum: 0 };
     }
     var m = skuMap[key];
     var pk = (r.noSo||r.sku||'') + '|' + (r.sku||'') + '|' + (r.planTgl||'');
@@ -3382,7 +3382,8 @@ function mekShowBySkuDetail() {
       var idx = groupRowIdx[pk]++;
       var krt = (groupQtyArr[pk]||[])[idx] || 0;
       groupQtyUsed[pk] += krt;
-      m.termuat += krt;
+      m.termuat     += krt;
+      m.termuatCont += 1;
     }
   });
 
@@ -3398,6 +3399,12 @@ function mekShowBySkuDetail() {
     m.belum += sisaKrt;
   });
 
+  // Sisa Cont = container yang belum ada truknya (plan cont - termuat cont)
+  Object.keys(skuMap).forEach(function(k){
+    var m = skuMap[k];
+    m.sisaCont = Math.max(0, m.planCont - m.termuatCont);
+  });
+
   var rows = Object.values(skuMap).sort(function(a,b){ return b.planCont - a.planCont; });
 
   title.textContent = 'Capaian By SKU';
@@ -3407,13 +3414,14 @@ function mekShowBySkuDetail() {
     '<th style="padding:7px 10px;text-align:left;">SKU</th>' +
     '<th style="padding:7px 10px;text-align:left;">NAMA</th>' +
     '<th style="padding:7px 10px;text-align:right;">PLAN CONT</th>' +
+    '<th style="padding:7px 10px;text-align:right;">SISA CONT</th>' +
     '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
     '<th style="padding:7px 10px;text-align:right;">TERMUAT (KRT)</th>' +
     '<th style="padding:7px 10px;text-align:right;">BELUM (KRT)</th>' +
     '</tr>';
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada data</td></tr>';
   } else {
     tbody.innerHTML = rows.map(function(r, i){
       var bg = i%2===0 ? '' : 'background:#f8fafc;';
@@ -3421,6 +3429,7 @@ function mekShowBySkuDetail() {
         '<td style="padding:7px 10px;font-weight:700;color:#2b6cb0;">'+_mekEsc(r.sku)+'</td>' +
         '<td style="padding:7px 10px;max-width:200px;">'+_mekEsc(r.nama)+'</td>' +
         '<td style="padding:7px 10px;text-align:right;font-weight:600;">'+r.planCont+'</td>' +
+        '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c05621;">'+(r.sisaCont ? r.sisaCont.toLocaleString('id-ID') : '—')+'</td>' +
         '<td style="padding:7px 10px;text-align:right;color:#744210;font-weight:600;">'+(r.qtyKrt ? r.qtyKrt.toLocaleString('id-ID') : '—')+'</td>' +
         '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#276749;">'+(r.termuat ? r.termuat.toLocaleString('id-ID') : '—')+'</td>' +
         '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c53030;">'+(r.belum ? r.belum.toLocaleString('id-ID') : '—')+'</td>' +
