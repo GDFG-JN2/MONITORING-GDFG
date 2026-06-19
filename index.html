@@ -5004,8 +5004,12 @@
           <div class="opname-view-header" style="background:linear-gradient(135deg,#0f2027,#1a3a5c);">
             <span style="font-size:13px;font-weight:800;"><i class="fas fa-chart-pie" style="margin-right:6px;"></i>Capaian Planning Ekspor</span>
             <span id="mekCapRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 data</span>
+            <!-- By SKU -->
+            <button onclick="mekShowBySkuDetail()" style="margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+              <i class="fas fa-boxes-stacked"></i> By SKU
+            </button>
             <!-- Download dropdown Capaian -->
-            <div style="position:relative;display:inline-block;margin-left:auto;" id="mekCapDownloadWrap">
+            <div style="position:relative;display:inline-block;" id="mekCapDownloadWrap">
               <button onclick="mekToggleCapDownloadMenu()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
                 <i class="fas fa-download"></i> Download <i class="fas fa-chevron-down" style="font-size:9px;"></i>
               </button>
@@ -5020,7 +5024,7 @@
             </div>
           </div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-            <table class="mek-sum-tbl" id="mekCapTbl" style="min-width:1200px;">
+            <table class="mek-sum-tbl" id="mekCapTbl">
               <thead id="mekCapThead">
                 <tr>
                   <th style="width:32px;text-align:center;">#</th>
