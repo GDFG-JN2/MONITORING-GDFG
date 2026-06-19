@@ -581,13 +581,13 @@ function _mekPrintTable(tableId, title, subtitle) {
   if (!rows.length) { showToast('Tidak ada data.', 'warning'); return; }
 
   var css = [
-    '* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }',
-    'body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 12px; }',
-    'h2 { font-size: 14px; margin: 0 0 2px; color: #1a3a5c; }',
-    'p  { font-size: 11px; margin: 0 0 8px; color: #718096; }',
-    'table { width: 100%; border-collapse: collapse; }',
-    'th { background: #1a3a5c !important; color: #fff !important; padding: 6px 8px; font-size: 10px; text-align: left; border: 1px solid #2d4a6a; white-space: nowrap; }',
-    'td { padding: 5px 8px; font-size: 10px; border: 1px solid #e2e8f0; vertical-align: middle; }',
+    '* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }',
+    'body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 8px; }',
+    'h2 { font-size: 13px; margin: 0 0 2px; color: #1a3a5c; }',
+    'p  { font-size: 10px; margin: 0 0 6px; color: #718096; }',
+    'table { width: 100%; table-layout: auto; border-collapse: collapse; }',
+    'th { background: #1a3a5c !important; color: #fff !important; padding: 4px 5px; font-size: 9px; text-align: left; border: 1px solid #2d4a6a; white-space: normal; word-break: break-word; }',
+    'td { padding: 3px 5px; font-size: 9px; border: 1px solid #e2e8f0; vertical-align: middle; white-space: normal !important; word-break: break-word; }',
     'tr:nth-child(even) td { background: #f7fafc !important; }',
     'span[style*="background:#c6f6d5"] { background: #c6f6d5 !important; color: #276749 !important; border-radius: 8px; padding: 1px 6px; }',
     'span[style*="background:#fed7d7"] { background: #fed7d7 !important; color: #c53030 !important; border-radius: 8px; padding: 1px 6px; }',
@@ -600,7 +600,7 @@ function _mekPrintTable(tableId, title, subtitle) {
     'tr[style*="background:#2d6a4f"] td { background: #2d6a4f !important; color: #d8f3dc !important; }',
     'tr[style*="background:#fffff0"] td { background: #fffff0 !important; }',
     'tr[style*="background:#fff5f5"] td { background: #fff5f5 !important; }',
-    '@media print { @page { size: A4 landscape; margin: 10mm; } }'
+    '@media print { @page { size: A4 landscape; margin: 6mm; } }'
   ].join('\n');
 
   var now = new Date();
@@ -786,6 +786,7 @@ function _mekExportTableExcel(tableId, title, subtitle) {
   var blob     = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8' });
   var url      = URL.createObjectURL(blob);
   var filename = (title||'export').replace(/[^a-zA-Z0-9_]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.xls';
+  var a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a);
