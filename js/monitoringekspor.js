@@ -3337,43 +3337,65 @@ function mekShowBySkuDetail() {
     return true;
   });
 
-  // Rekap per SKU
+  // Rekap per SKU — Termuat & Belum dihitung dalam satuan KARTON (krt),
+  // bukan jumlah truk/container.
+  // Pendekatan: tiap planning (noSo+sku+planTgl) punya daftar qty krt per
+  // container, urut sesuai urutan kemunculan baris realisasi-nya (1:1 dengan
+  // urutan truk yang di-assign backend). Baris ke-N dalam grup → qty krt ke-N.
   var skuMap = {};
-  var seenPlanKey = {};
+  var groupRowIdx  = {};   // pk → counter urutan baris realisasi dalam grup
+  var groupQtyArr  = {};   // pk → array qty krt per container [krt1, krt2, ...]
+  var groupQtyUsed = {};   // pk → total krt yang sudah ke-assign ke truk
+
+  filtered.forEach(function(r){
+    var pk = (r.noSo||r.sku||'') + '|' + (r.sku||'') + '|' + (r.planTgl||'');
+    if (groupQtyArr[pk] === undefined) {
+      var qtyStr = isEmailMode ? (r.qty||'') : '';
+      if (!isEmailMode) {
+        // mode planning: qty krt ada di field ket baris pertama
+        var mket = String(r.ket||'').match(/QTY_KRT:([^|]+)/);
+        qtyStr = mket ? mket[1] : '';
+      }
+      groupQtyArr[pk]  = qtyStr ? String(qtyStr).split(',').map(function(x){ return Number(String(x).trim())||0; }) : [];
+      groupQtyUsed[pk] = 0;
+      groupRowIdx[pk]  = 0;
+    }
+  });
+
   filtered.forEach(function(r){
     var key = r.sku || '—';
     if (!skuMap[key]) {
       skuMap[key] = { sku: r.sku||'—', nama: r.nama||'', planCont: 0, qtyKrt: 0, termuat: 0, belum: 0 };
     }
     var m = skuMap[key];
-
-    // Plan cont + qty karton dihitung sekali per planning (baris pertama)
     var pk = (r.noSo||r.sku||'') + '|' + (r.sku||'') + '|' + (r.planTgl||'');
-    if (r.isFirstRow && !seenPlanKey[pk]) {
-      seenPlanKey[pk] = true;
+
+    // Plan cont + total qty karton dihitung sekali per planning (baris pertama)
+    if (r.isFirstRow) {
       m.planCont += (r.jumlahCont || 0);
-      m.qtyKrt   += isEmailMode ? _mekSumQtyKrt(r.qty) : _mekExtractQtyKrt(r.ket);
+      m.qtyKrt   += (groupQtyArr[pk]||[]).reduce(function(a,b){ return a+b; }, 0);
     }
 
-    // Termuat = sudah ada di antrian (keluar/loading/daftar)
-    // Belum = baris status 'belum' (termasuk baris sisa sintetis di mode email)
-    // 'ditolak' tidak dihitung di kedua sisi
+    // Baris realisasi (truk sudah ada di antrian) → ambil krt sesuai urutan container
     if (r.status === 'keluar' || r.status === 'loading' || r.status === 'daftar') {
-      m.termuat += 1;
-    } else if (r.status === 'belum') {
-      m.belum += 1;
+      var idx = groupRowIdx[pk]++;
+      var krt = (groupQtyArr[pk]||[])[idx] || 0;
+      groupQtyUsed[pk] += krt;
+      m.termuat += krt;
     }
   });
 
-  // Mode 'all'/'wa'/'si': baris 'belum' di _mekCapData mewakili 1 planning yg
-  // belum punya realisasi sama sekali (bukan per sisa container), jadi belum
-  // dihitung ulang dari plan-sisa supaya konsisten dengan card "Belum" di dashboard
-  if (!isEmailMode) {
-    Object.keys(skuMap).forEach(function(k){
-      var m = skuMap[k];
-      m.belum = Math.max(0, m.planCont - m.termuat);
-    });
-  }
+  // Belum (krt) = total qty krt planning - krt yang sudah termuat, per grup
+  filtered.forEach(function(r){
+    var pk = (r.noSo||r.sku||'') + '|' + (r.sku||'') + '|' + (r.planTgl||'');
+    if (!r.isFirstRow) return;
+    var key = r.sku || '—';
+    var m = skuMap[key];
+    if (!m) return;
+    var totalKrt  = (groupQtyArr[pk]||[]).reduce(function(a,b){ return a+b; }, 0);
+    var sisaKrt   = Math.max(0, totalKrt - (groupQtyUsed[pk]||0));
+    m.belum += sisaKrt;
+  });
 
   var rows = Object.values(skuMap).sort(function(a,b){ return b.planCont - a.planCont; });
 
@@ -3385,8 +3407,8 @@ function mekShowBySkuDetail() {
     '<th style="padding:7px 10px;text-align:left;">NAMA</th>' +
     '<th style="padding:7px 10px;text-align:right;">PLAN CONT</th>' +
     '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
-    '<th style="padding:7px 10px;text-align:right;">TERMUAT</th>' +
-    '<th style="padding:7px 10px;text-align:right;">BELUM</th>' +
+    '<th style="padding:7px 10px;text-align:right;">TERMUAT (KRT)</th>' +
+    '<th style="padding:7px 10px;text-align:right;">BELUM (KRT)</th>' +
     '</tr>';
 
   if (!rows.length) {
@@ -3399,13 +3421,19 @@ function mekShowBySkuDetail() {
         '<td style="padding:7px 10px;max-width:200px;">'+_mekEsc(r.nama)+'</td>' +
         '<td style="padding:7px 10px;text-align:right;font-weight:600;">'+r.planCont+'</td>' +
         '<td style="padding:7px 10px;text-align:right;color:#744210;font-weight:600;">'+(r.qtyKrt ? r.qtyKrt.toLocaleString('id-ID') : '—')+'</td>' +
-        '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#276749;">'+r.termuat+'</td>' +
-        '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c53030;">'+r.belum+'</td>' +
+        '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#276749;">'+(r.termuat ? r.termuat.toLocaleString('id-ID') : '—')+'</td>' +
+        '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c53030;">'+(r.belum ? r.belum.toLocaleString('id-ID') : '—')+'</td>' +
         '</tr>';
     }).join('');
   }
 
-  if (count) count.textContent = rows.length + ' SKU';
+  if (count) {
+    count.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+        '<span>' + rows.length + ' SKU</span>' +
+        '<span style="font-size:10px;color:#a0aec0;font-style:italic;">*Container yang sudah daftar terhitung selesai (termuat)</span>' +
+      '</div>';
+  }
 
   overlay.classList.remove('show');
   overlay.style.display = 'flex';
