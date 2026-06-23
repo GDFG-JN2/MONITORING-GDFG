@@ -64,6 +64,7 @@
     'saveBinMovement':     function(a){ return a[0]||{}; },
     'getBinCurrent':       function(a){ return a[0]||{}; },
     'getBinMovement':      function(a){ return a[0]||{}; },
+    'getBinFifoAllocation':function(a){ return {sku:a[0], qty:a[1]}; },
   };
 
   var handler = {
