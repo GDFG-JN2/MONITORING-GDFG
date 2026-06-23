@@ -268,6 +268,10 @@ const API = (function () {
     run("getBinFifoAllocation", { sku, qty }, onSuccess, onFailure);
   }
 
+  function updateMekAntrianRow(payload, onSuccess, onFailure) {
+    run("updateMekAntrianRow", payload, onSuccess, onFailure);
+  }
+
   // ============================================================
   // Public API
   // ============================================================
@@ -301,7 +305,8 @@ const API = (function () {
     updateSrShiftCell, updateSrKirimCell,
     // bin loc
     getBinSkuList, getBinSkuStdList, saveBinMovement,
-    getBinCurrent, getBinMovement, getBinFifoAllocation
+    getBinCurrent, getBinMovement, getBinFifoAllocation,
+    updateMekAntrianRow
   };
 
 })();

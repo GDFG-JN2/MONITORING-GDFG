@@ -65,6 +65,7 @@
     'getBinCurrent':       function(a){ return a[0]||{}; },
     'getBinMovement':      function(a){ return a[0]||{}; },
     'getBinFifoAllocation':function(a){ return {sku:a[0], qty:a[1]}; },
+    'updateMekAntrianRow': function(a){ return a[0]||{}; },
   };
 
   var handler = {
