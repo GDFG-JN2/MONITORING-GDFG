@@ -264,6 +264,10 @@ const API = (function () {
     run("getBinMovement", filters || {}, onSuccess, onFailure);
   }
 
+  function getBinFifoAllocation(sku, qty, onSuccess, onFailure) {
+    run("getBinFifoAllocation", { sku, qty }, onSuccess, onFailure);
+  }
+
   // ============================================================
   // Public API
   // ============================================================
@@ -297,7 +301,7 @@ const API = (function () {
     updateSrShiftCell, updateSrKirimCell,
     // bin loc
     getBinSkuList, getBinSkuStdList, saveBinMovement,
-    getBinCurrent, getBinMovement
+    getBinCurrent, getBinMovement, getBinFifoAllocation
   };
 
 })();
