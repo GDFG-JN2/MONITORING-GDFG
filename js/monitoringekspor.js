@@ -2721,6 +2721,7 @@ function mekLoadCapaian() {
 }
 
 var _mekCapData   = [];
+var _mekBySkuLastState = null;
 var _mekCapFilter = 'all';  // 'all' | 'datang' | 'belum'
 var _mekCapMode   = 'all';  // 'all' | 'wa' | 'si'
 
@@ -3407,6 +3408,9 @@ function mekShowBySkuDetail() {
 
   var rows = Object.values(skuMap).sort(function(a,b){ return b.planCont - a.planCont; });
 
+  // Simpan state filter saat ini supaya tombol "Kembali" di popup FIFO bisa restore
+  _mekBySkuLastState = { rows: rows };
+
   title.textContent = 'Capaian By SKU';
   if (btnBar) btnBar.style.display = 'none';
 
@@ -3427,7 +3431,7 @@ function mekShowBySkuDetail() {
       var bg = i%2===0 ? '' : 'background:#f8fafc;';
       return '<tr style="'+bg+'">' +
         '<td style="padding:7px 10px;font-weight:700;color:#2b6cb0;">'+_mekEsc(r.sku)+'</td>' +
-        '<td style="padding:7px 10px;max-width:200px;">'+_mekEsc(r.nama)+'</td>' +
+        '<td style="padding:7px 10px;max-width:200px;color:#2b6cb0;text-decoration:underline;cursor:pointer;" onclick="mekShowBinFifoDetail('+JSON.stringify(r.sku)+','+JSON.stringify(r.nama)+','+(r.belum||0)+')" title="Lihat posisi rak (FIFO)">'+_mekEsc(r.nama)+'</td>' +
         '<td style="padding:7px 10px;text-align:right;font-weight:600;">'+r.planCont+'</td>' +
         '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c05621;">'+(r.sisaCont ? r.sisaCont.toLocaleString('id-ID') : '—')+'</td>' +
         '<td style="padding:7px 10px;text-align:right;color:#744210;font-weight:600;">'+(r.qtyKrt ? r.qtyKrt.toLocaleString('id-ID') : '—')+'</td>' +
@@ -3441,7 +3445,7 @@ function mekShowBySkuDetail() {
     count.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
         '<span>' + rows.length + ' SKU</span>' +
-        '<span style="font-size:10px;color:#a0aec0;font-style:italic;">*Container yang sudah daftar terhitung selesai (termuat)</span>' +
+        '<span style="font-size:10px;color:#a0aec0;font-style:italic;">*Container yang sudah daftar terhitung selesai (termuat). Klik nama barang untuk lihat posisi rak (FIFO).</span>' +
       '</div>';
   }
 
@@ -3449,6 +3453,125 @@ function mekShowBySkuDetail() {
   overlay.style.display = 'flex';
   void overlay.offsetWidth;
   overlay.classList.add('show');
+}
+
+// ════════════════════════════════════════════════════════════
+// BY SKU → klik nama barang → posisi rak BinLoc (FIFO)
+// ════════════════════════════════════════════════════════════
+function mekBackToBySkuDetail() {
+  // Render ulang konten By SKU dari state yang tersimpan (tanpa re-fetch)
+  if (!_mekBySkuLastState) { mekShowBySkuDetail(); return; }
+  var title  = document.getElementById('mekCardDetailTitle');
+  var thead  = document.getElementById('mekCardDetailThead');
+  var tbody  = document.getElementById('mekCardDetailTbody');
+  var count  = document.getElementById('mekCardDetailCount');
+  var btnBar = document.getElementById('mekCardDetailBtnBar');
+  var rows   = _mekBySkuLastState.rows;
+
+  title.textContent = 'Capaian By SKU';
+  if (btnBar) btnBar.style.display = 'none';
+
+  thead.innerHTML = '<tr>' +
+    '<th style="padding:7px 10px;text-align:left;">SKU</th>' +
+    '<th style="padding:7px 10px;text-align:left;">NAMA</th>' +
+    '<th style="padding:7px 10px;text-align:right;">PLAN CONT</th>' +
+    '<th style="padding:7px 10px;text-align:right;">SISA CONT</th>' +
+    '<th style="padding:7px 10px;text-align:right;">QTY KRT</th>' +
+    '<th style="padding:7px 10px;text-align:right;">TERMUAT (KRT)</th>' +
+    '<th style="padding:7px 10px;text-align:right;">BELUM (KRT)</th>' +
+    '</tr>';
+
+  tbody.innerHTML = rows.map(function(r, i){
+    var bg = i%2===0 ? '' : 'background:#f8fafc;';
+    return '<tr style="'+bg+'">' +
+      '<td style="padding:7px 10px;font-weight:700;color:#2b6cb0;">'+_mekEsc(r.sku)+'</td>' +
+      '<td style="padding:7px 10px;max-width:200px;color:#2b6cb0;text-decoration:underline;cursor:pointer;" onclick="mekShowBinFifoDetail('+JSON.stringify(r.sku)+','+JSON.stringify(r.nama)+','+(r.belum||0)+')" title="Lihat posisi rak (FIFO)">'+_mekEsc(r.nama)+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;font-weight:600;">'+r.planCont+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c05621;">'+(r.sisaCont ? r.sisaCont.toLocaleString('id-ID') : '—')+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;color:#744210;font-weight:600;">'+(r.qtyKrt ? r.qtyKrt.toLocaleString('id-ID') : '—')+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#276749;">'+(r.termuat ? r.termuat.toLocaleString('id-ID') : '—')+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#c53030;">'+(r.belum ? r.belum.toLocaleString('id-ID') : '—')+'</td>' +
+      '</tr>';
+  }).join('');
+
+  if (count) {
+    count.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+        '<span>' + rows.length + ' SKU</span>' +
+        '<span style="font-size:10px;color:#a0aec0;font-style:italic;">*Container yang sudah daftar terhitung selesai (termuat). Klik nama barang untuk lihat posisi rak (FIFO).</span>' +
+      '</div>';
+  }
+}
+
+function mekShowBinFifoDetail(sku, nama, qtyBelumKrt) {
+  var title  = document.getElementById('mekCardDetailTitle');
+  var thead  = document.getElementById('mekCardDetailThead');
+  var tbody  = document.getElementById('mekCardDetailTbody');
+  var count  = document.getElementById('mekCardDetailCount');
+  var btnBar = document.getElementById('mekCardDetailBtnBar');
+
+  title.textContent = 'Posisi Rak — ' + sku;
+
+  // Tombol kembali
+  if (btnBar) {
+    btnBar.style.display = 'block';
+    btnBar.innerHTML = '<button onclick="mekBackToBySkuDetail()" style="background:#edf2f7;border:1px solid #cbd5e0;color:#2d3748;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">' +
+      '<i class="fas fa-arrow-left"></i> Kembali ke By SKU</button>';
+  }
+
+  thead.innerHTML = '<tr>' +
+    '<th style="padding:7px 10px;text-align:left;">BIN</th>' +
+    '<th style="padding:7px 10px;text-align:left;">TIPE</th>' +
+    '<th style="padding:7px 10px;text-align:left;">PRODATE</th>' +
+    '<th style="padding:7px 10px;text-align:left;">QUOTATION</th>' +
+    '<th style="padding:7px 10px;text-align:right;">STOK (KRT)</th>' +
+    '<th style="padding:7px 10px;text-align:right;">DIAMBIL (KRT)</th>' +
+    '</tr>';
+
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#a0aec0;"><i class="fas fa-spinner fa-spin"></i> Memuat posisi rak...</td></tr>';
+  if (count) count.innerHTML = '';
+
+  if (!qtyBelumKrt || qtyBelumKrt <= 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#a0aec0;">Tidak ada qty sisa yang perlu dicari (Belum = 0)</td></tr>';
+    return;
+  }
+
+  API.getBinFifoAllocation(sku, qtyBelumKrt, function(res) {
+    if (!res || !res.success) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#c53030;">Gagal memuat data BinLoc'+(res&&res.message?': '+_mekEsc(res.message):'')+'</td></tr>';
+      return;
+    }
+    var allocs = res.allocations || [];
+    if (!allocs.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#a0aec0;">Stok tidak ditemukan di BinLoc untuk SKU ini</td></tr>';
+    } else {
+      tbody.innerHTML = allocs.map(function(a, i){
+        var bg = i%2===0 ? '' : 'background:#f8fafc;';
+        return '<tr style="'+bg+'">' +
+          '<td style="padding:7px 10px;font-weight:700;color:#2b6cb0;">'+_mekEsc(a.binLoc)+'</td>' +
+          '<td style="padding:7px 10px;">'+_mekEsc(a.tipe)+'</td>' +
+          '<td style="padding:7px 10px;">'+_mekEsc(a.prodate)+'</td>' +
+          '<td style="padding:7px 10px;color:#718096;">'+_mekEsc(a.quotation||'—')+'</td>' +
+          '<td style="padding:7px 10px;text-align:right;">'+a.stokKrt.toLocaleString('id-ID')+'</td>' +
+          '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#276749;">'+a.ambilKrt.toLocaleString('id-ID')+'</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    var footNote = res.fulfilled
+      ? '<span style="color:#276749;">✓ Kebutuhan '+qtyBelumKrt.toLocaleString('id-ID')+' krt terpenuhi dari '+allocs.length+' rak</span>'
+      : '<span style="color:#c53030;">⚠ Stok kurang '+res.kurang.toLocaleString('id-ID')+' krt dari kebutuhan '+qtyBelumKrt.toLocaleString('id-ID')+' krt</span>';
+
+    if (count) {
+      count.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+          '<span>'+footNote+'</span>' +
+          '<span style="font-size:10px;color:#a0aec0;font-style:italic;">Urutan FIFO — PRODATE paling tua diambil duluan</span>' +
+        '</div>';
+    }
+  }, function(err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#c53030;">Gagal memuat: '+_mekEsc(String(err))+'</td></tr>';
+  });
 }
 
 function mekCapSetFilter(f) {
