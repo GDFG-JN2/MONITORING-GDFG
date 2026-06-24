@@ -124,7 +124,7 @@ function _mekRefreshCardsOnly() {
     if (to   && r.planTgl > to)   return;
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return;
-    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return;
+    if (plantF && !_mekMatchPlant(r.plant, plantF)) return;
     var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!_ss[_key] && r.isFirstRow){
       _ss[_key]=true;
@@ -137,7 +137,7 @@ function _mekRefreshCardsOnly() {
     if (to   && r.planTgl > to)   return;
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return;
-    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return;
+    if (plantF && !_mekMatchPlant(r.plant, plantF)) return;
     var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if (!_capMap[_key] || _capMap[_key] <= 0) return;
     if(r.status==='keluar')  { _kc++; _capMap[_key]--; }
@@ -448,6 +448,16 @@ function _mekSavePlanningRow(rowIdx) {
 
 // ── Helper: hapus angka 0 di depan (untuk No. DOC) ───────────
 // "00123456" → "123456", "0001A" → "1A", "AB001" → "AB001" (tidak diubah jika non-numerik di depan)
+// Helper filter plant — support ALL, JAYANTI 2, __NON_JN2__
+function _mekMatchPlant(plant, plantF) {
+  if (!plantF) return true; // All
+  var p = (plant||'').toUpperCase();
+  if (plantF === '__NON_JN2__') {
+    return p.indexOf('JAYANTI 2') < 0 && p.indexOf('JN2') < 0 && p.indexOf('JAYANTI2') < 0;
+  }
+  return p.indexOf(plantF.toUpperCase()) >= 0;
+}
+
 function _mekStripLeadingZero(s) {
   var str = String(s || '').trim();
   // Hapus semua 0 di depan, tapi sisakan minimal 1 karakter
@@ -3066,7 +3076,7 @@ function mekShowCardDetail(type) {
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
     if (docF   && _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docF.toLowerCase())<0) return false;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
+    if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
     if (nopolF && (r.nopol||'').toLowerCase().indexOf(nopolF)<0) return false;
     // Filter by type
     if (type === 'keluar')  return r.status === 'keluar';
@@ -3085,7 +3095,7 @@ function mekShowCardDetail(type) {
       if (to   && r.planTgl > to)   return false;
       if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
       if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-      if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
+      if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
       return true;
     }).forEach(function(r){
       if (from && r.planTgl < from) return;
@@ -3136,21 +3146,6 @@ function mekShowCardDetail(type) {
   window._mekCardDetailType = type;
   window._mekCardDetailView = 'detail';
 
-  // Tampilkan filter plant — reset ke ALL setiap buka popup baru
-  _mekCardDetailPlant = 'all';
-  var plantBar = document.getElementById('mekCardDetailPlantBar');
-  if (plantBar) {
-    plantBar.style.display = 'flex';
-    ['All','Jn2','Non'].forEach(function(v){
-      var btn = document.getElementById('mekCDPlant'+v);
-      if (!btn) return;
-      var active = (v.toLowerCase() === 'all');
-      btn.style.background  = active ? 'rgba(255,255,255,.35)' : 'none';
-      btn.style.borderColor = active ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.3)';
-      btn.style.fontWeight  = active ? '900' : '700';
-    });
-  }
-
   // Show overlay dulu supaya popup muncul meski rows kosong
   overlay.classList.remove('show');
   overlay.style.display = 'flex';
@@ -3178,19 +3173,10 @@ function _mekCardDetailRender(rows, type, view) {
   var count   = document.getElementById('mekCardDetailCount');
   if (!thead || !tbody) return;
 
-  // Simpan view aktif
   window._mekCardDetailView = view;
 
-  // Apply filter plant
-  var pf = _mekCardDetailPlant || 'all';
-  var filtered = pf === 'all' ? rows : rows.filter(function(r){
-    var plant = (r.plant || r.stuffingPlant || '').toUpperCase();
-    if (pf === 'jn2') return plant.indexOf('JAYANTI 2') >= 0 || plant.indexOf('JN2') >= 0 || plant.indexOf('JAYANTI2') >= 0;
-    if (pf === 'non') return plant.indexOf('JAYANTI 2') < 0 && plant.indexOf('JN2') < 0 && plant.indexOf('JAYANTI2') < 0;
-    return true;
-  });
+  var filtered = rows; // filter plant sudah diterapkan di tabel utama
 
-  // Filter aktif dari tabel utama
   var skuF   = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
   var tujF   = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
   var plantF = ((document.getElementById('mekCapPlant') ||{}).value||'').trim().toUpperCase();
@@ -3209,13 +3195,7 @@ function _mekCardDetailRender(rows, type, view) {
       if (to2   && r.planTgl > to2)   return false;
       if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
       if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-      if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
-      // Apply filter plant popup
-      if (pf !== 'all') {
-        var rp = (r.plant||r.stuffingPlant||'').toUpperCase();
-        if (pf==='jn2' && rp.indexOf('JAYANTI 2')<0 && rp.indexOf('JN2')<0 && rp.indexOf('JAYANTI2')<0) return false;
-        if (pf==='non' && (rp.indexOf('JAYANTI 2')>=0 || rp.indexOf('JN2')>=0 || rp.indexOf('JAYANTI2')>=0)) return false;
-      }
+      if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
       return true;
     });
 
@@ -3441,32 +3421,13 @@ function mekCancelEditRow() {
   _mekEditActive = null;
 }
 
-var _mekCardDetailPlant = 'all'; // 'all' | 'jn2' | 'non'
-
-function mekCardDetailSetPlant(p) {
-  _mekCardDetailPlant = p;
-  // Update style tombol
-  ['all','jn2','non'].forEach(function(v){
-    var btn = document.getElementById('mekCDPlant'+v.charAt(0).toUpperCase()+v.slice(1));
-    if (!btn) return;
-    var active = (v === p);
-    btn.style.background   = active ? 'rgba(255,255,255,.35)' : 'none';
-    btn.style.borderColor  = active ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.3)';
-    btn.style.fontWeight   = active ? '900' : '700';
-  });
-  // Re-render dengan filter plant baru
-  var rows = window._mekCardDetailRows || [];
-  var type = window._mekCardDetailType || 'total';
-  var view = window._mekCardDetailView || 'detail';
-  _mekCardDetailRender(rows, type, view);
-}
-
 function mekCardDetailDownload(fmt) {
   var type  = window._mekCardDetailType || 'total';
   var view  = window._mekCardDetailView || 'detail';
-  var plant = _mekCardDetailPlant === 'jn2' ? ' — JN2' : _mekCardDetailPlant === 'non' ? ' — Selain JN2' : '';
   var TITLES = { total:'Total Planning', datang:'Total Kedatangan', keluar:'Sudah Keluar', proses:'Masih Proses', belum:'Belum Datang' };
-  var title  = (TITLES[type] || type) + plant;
+  var plantVal = ((document.getElementById('mekCapPlant')||{}).value||'');
+  var plantSuffix = plantVal === '__NON_JN2__' ? ' — Selain JN2' : plantVal ? ' — '+plantVal : '';
+  var title  = (TITLES[type] || type) + plantSuffix;
   var sub    = (view === 'tujuan' ? 'By Tujuan — ' : '') +
     ((document.getElementById('mekCapFrom')||{}).value||'') + ' s/d ' +
     ((document.getElementById('mekCapTo')||{}).value||'');
@@ -3625,7 +3586,7 @@ function mekShowBySkuDetail() {
     if (to   && r.planTgl > to)   return false;
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-    if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
+    if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
     return true;
   });
 
