@@ -124,7 +124,7 @@ function _mekRefreshCardsOnly() {
     if (to   && r.planTgl > to)   return;
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return;
-    if (plantF && !_mekMatchPlant(r.plant, plantF)) return;
+    if (plantF && !_mekMatchPlant(r.plant, plantF, r)) return;
     var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!_ss[_key] && r.isFirstRow){
       _ss[_key]=true;
@@ -137,7 +137,7 @@ function _mekRefreshCardsOnly() {
     if (to   && r.planTgl > to)   return;
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return;
-    if (plantF && !_mekMatchPlant(r.plant, plantF)) return;
+    if (plantF && !_mekMatchPlant(r.plant, plantF, r)) return;
     var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if (!_capMap[_key] || _capMap[_key] <= 0) return;
     if(r.status==='keluar')  { _kc++; _capMap[_key]--; }
@@ -448,13 +448,14 @@ function _mekSavePlanningRow(rowIdx) {
 
 // ── Helper: hapus angka 0 di depan (untuk No. DOC) ───────────
 // "00123456" → "123456", "0001A" → "1A", "AB001" → "AB001" (tidak diubah jika non-numerik di depan)
-// Helper filter plant — support ALL, JAYANTI 2, __NON_JN2__
-function _mekMatchPlant(plant, plantF) {
+// Helper filter plant — support ALL, JAYANTI 2, __NO_PLAN__ (tanpa planning)
+function _mekMatchPlant(plant, plantF, r) {
   if (!plantF) return true; // All
-  var p = (plant||'').toUpperCase();
-  if (plantF === '__NON_JN2__') {
-    return p.indexOf('JAYANTI 2') < 0 && p.indexOf('JN2') < 0 && p.indexOf('JAYANTI2') < 0;
+  if (plantF === '__NO_PLAN__') {
+    // Tampilkan hanya baris yang tidak ter-assign ke planning (sku kosong / isPendingan)
+    return !r || !(r.sku||'').trim() || r.isPendingan === true;
   }
+  var p = (plant||'').toUpperCase();
   return p.indexOf(plantF.toUpperCase()) >= 0;
 }
 
@@ -1583,7 +1584,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var skuOk   = !skuFilter   || (r.sku||'').toLowerCase().indexOf(skuFilter)>=0 || (r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
       var docOk   = !docFilter   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilter.toLowerCase())>=0;
       var tujOk   = !tujFilter   || (r.tujuan||'').toLowerCase().indexOf(tujFilter.toLowerCase())>=0;
-      var plantOk = !plantFilter || _mekMatchPlant(r.plant, plantFilter);
+      var plantOk = !plantFilter || _mekMatchPlant(r.plant, plantFilter, r);
       if (skuOk && docOk && tujOk && plantOk) validKey[k] = true;
     });
     filtered = data.filter(function(r){
@@ -2734,7 +2735,7 @@ function mekLoadCapaian() {
     var data = res.data || [];
 
     // Filter lokal teks
-    if (sku || doc || tujuan) {
+    if (sku || doc || tujuan || nopol || plant) {
       // Filter per grup planning (cek di baris pertama saja)
       var planKeys = {};
       data.forEach(function(r) {
@@ -2743,7 +2744,7 @@ function mekLoadCapaian() {
         var docOk  = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
         var tujOk  = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
         var nopolOk= !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
-        var plantOk= !plant  || _mekMatchPlant(r.stuffingPlant||r.plant, plant);
+        var plantOk= !plant  || _mekMatchPlant(r.stuffingPlant||r.plant, plant, r);
         if (skuOk && docOk && tujOk && nopolOk && plantOk) planKeys[r._planKey] = true;
         else planKeys[r._planKey] = planKeys[r._planKey] || false;
       });
@@ -2819,7 +2820,7 @@ function _mekRenderCapaianEmailAktual(data) {
       var docOk   = !docFilterA   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilterA.toLowerCase())>=0;
       var nopolOk = !nopolFilterA || (r.nopol||'').toLowerCase().indexOf(nopolFilterA)>=0;
       var tujOk   = !tujFilterA   || (r.tujuan||'').toLowerCase().indexOf(tujFilterA)>=0;
-      var plantOk = !plantFilterA || _mekMatchPlant(r.plant, plantFilterA);
+      var plantOk = !plantFilterA || _mekMatchPlant(r.plant, plantFilterA, r);
       return skuOk && docOk && nopolOk && tujOk && plantOk;
     });
   }
@@ -2931,7 +2932,7 @@ function _mekRenderCapaianEmailAktual(data) {
     if (_aktFrom && r.planTgl < _aktFrom) return;
     if (_aktTo   && r.planTgl > _aktTo)   return;
     if (tujFilterA   && (r.tujuan||'').toLowerCase().indexOf(tujFilterA)<0) return;
-    if (plantFilterA && !_mekMatchPlant(r.plant, plantFilterA)) return;
+    if (plantFilterA && !_mekMatchPlant(r.plant, plantFilterA, r)) return;
     if (skuFilterA   && (r.sku||'').toLowerCase().indexOf(skuFilterA)<0 && (r.nama||'').toLowerCase().indexOf(skuFilterA)<0) return;
     var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!seenSo3[_k3] && r.isFirstRow){
@@ -2947,7 +2948,7 @@ function _mekRenderCapaianEmailAktual(data) {
     if (_aktFrom && r.planTgl < _aktFrom) return;
     if (_aktTo   && r.planTgl > _aktTo)   return;
     if (tujFilterA   && (r.tujuan||'').toLowerCase().indexOf(tujFilterA)<0) return;
-    if (plantFilterA && !_mekMatchPlant(r.plant, plantFilterA)) return;
+    if (plantFilterA && !_mekMatchPlant(r.plant, plantFilterA, r)) return;
     if (skuFilterA   && (r.sku||'').toLowerCase().indexOf(skuFilterA)<0 && (r.nama||'').toLowerCase().indexOf(skuFilterA)<0) return;
     var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if (!_capMap3[_k3] || _capMap3[_k3] <= 0) return;
@@ -3076,7 +3077,7 @@ function mekShowCardDetail(type) {
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
     if (docF   && _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docF.toLowerCase())<0) return false;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-    if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
+    if (plantF && !_mekMatchPlant(r.plant, plantF, r)) return false;
     if (nopolF && (r.nopol||'').toLowerCase().indexOf(nopolF)<0) return false;
     // Filter by type
     if (type === 'keluar')  return r.status === 'keluar';
@@ -3095,7 +3096,7 @@ function mekShowCardDetail(type) {
       if (to   && r.planTgl > to)   return false;
       if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
       if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-      if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
+      if (plantF && !_mekMatchPlant(r.plant, plantF, r)) return false;
       return true;
     }).forEach(function(r){
       if (from && r.planTgl < from) return;
@@ -3195,7 +3196,7 @@ function _mekCardDetailRender(rows, type, view) {
       if (to2   && r.planTgl > to2)   return false;
       if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
       if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-      if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
+      if (plantF && !_mekMatchPlant(r.plant, plantF, r)) return false;
       return true;
     });
 
@@ -3426,7 +3427,7 @@ function mekCardDetailDownload(fmt) {
   var view  = window._mekCardDetailView || 'detail';
   var TITLES = { total:'Total Planning', datang:'Total Kedatangan', keluar:'Sudah Keluar', proses:'Masih Proses', belum:'Belum Datang' };
   var plantVal = ((document.getElementById('mekCapPlant')||{}).value||'');
-  var plantSuffix = plantVal === '__NON_JN2__' ? ' — Selain JN2' : plantVal ? ' — '+plantVal : '';
+  var plantSuffix = plantVal === '__NO_PLAN__' ? ' — Tanpa Planning' : plantVal ? ' — '+plantVal : '';
   var title  = (TITLES[type] || type) + plantSuffix;
   var sub    = (view === 'tujuan' ? 'By Tujuan — ' : '') +
     ((document.getElementById('mekCapFrom')||{}).value||'') + ' s/d ' +
@@ -3586,7 +3587,7 @@ function mekShowBySkuDetail() {
     if (to   && r.planTgl > to)   return false;
     if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
     if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
-    if (plantF && !_mekMatchPlant(r.plant, plantF)) return false;
+    if (plantF && !_mekMatchPlant(r.plant, plantF, r)) return false;
     return true;
   });
 
