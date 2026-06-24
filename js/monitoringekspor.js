@@ -1616,10 +1616,10 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var badge = _mekCapBadge(r.status, r.statusRaw);
       var ket = isPend ? '<span style="background:#f6d860;color:#744210;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Pendingan tgl '+_mekFmtTglDisplay(r.pendinganDari)+'</span>' : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
-      var noDocClean = _mekStripLeadingZero(r.noDoc||'');
-      var hasDoc = !!noDocClean && r.status !== 'belum';
+      var noSoClean  = _mekStripLeadingZero(r.noSo||'');
+      var hasDoc = !!noSoClean && !!(r.nopol||'').trim() && r.status !== 'belum';
       var editBtn = hasDoc
-        ? '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noDocClean)+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.noContainer||'')+'\',\''+_mekEsc(r.ekspedisi||'')+'\')" title="Edit No Pol / No Container / Ekspedisi" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>'
+        ? '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.tglDaftar||'')+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.noContainer||'')+'\',\''+_mekEsc(r.ekspedisi||'')+'\')" title="Edit No Pol / No Container / Ekspedisi" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>'
         : '';
       _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||'',items:r.items||[]});
       html+='<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
@@ -2857,10 +2857,10 @@ function _mekRenderCapaianEmailAktual(data) {
         : '';
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
 
-      var noDocCleanP = _mekStripLeadingZero(r.noDoc||'');
-      var hasDocP = !!noDocCleanP && r.status !== 'belum';
+      var noSoCleanP = _mekStripLeadingZero(r.noSo||'');
+      var hasDocP = !!noSoCleanP && !!(r.nopol||'').trim() && r.status !== 'belum';
       var editBtnP = hasDocP
-        ? '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noDocCleanP)+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.noContainer||'')+'\',\''+_mekEsc(r.ekspedisi||'')+'\')" title="Edit No Pol / No Container / Ekspedisi" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>'
+        ? '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noSoCleanP)+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.tglDaftar||'')+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.noContainer||'')+'\',\''+_mekEsc(r.ekspedisi||'')+'\')" title="Edit No Pol / No Container / Ekspedisi" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>'
         : '';
       _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||'',items:r.items||[]});
       html += '<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
@@ -3279,47 +3279,42 @@ function _mekCardDetailRender(rows, type, view) {
 // ════════════════════════════════════════════════════════════
 // INLINE EDIT — No Pol, No Container, Ekspedisi
 // ════════════════════════════════════════════════════════════
-var _mekEditActive = null; // { noDoc, tr, origHtmlMap }
+var _mekEditActive = null; // { noSo, nopolMatch, tglDaftar, tr, origMap }
 
-function mekStartEditRow(btn, noDoc, nopol, noContainer, ekspedisi) {
-  // Batalkan edit sebelumnya kalau ada
+function mekStartEditRow(btn, noSo, nopolMatch, tglDaftar, nopol, noContainer, ekspedisi) {
   if (_mekEditActive) mekCancelEditRow();
 
   var tr = btn.closest('tr');
   if (!tr) return;
 
-  // Simpan state asal: { cellIndex: originalHTML }
   var cells = tr.querySelectorAll('td');
   var origMap = {};
   cells.forEach(function(td, i){ origMap[i] = td.innerHTML; });
 
-  _mekEditActive = { noDoc: noDoc, tr: tr, origMap: origMap };
+  _mekEditActive = { noSo: noSo, nopolMatch: nopolMatch, tglDaftar: tglDaftar, tr: tr, origMap: origMap };
 
-  // Ubah tombol edit jadi Save/Cancel
   btn.parentElement.innerHTML =
     '<button onclick="mekSaveEditRow()" title="Simpan" style="background:#276749;border:none;color:#fff;border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:2px;">✓</button>' +
     '<button onclick="mekCancelEditRow()" title="Batal" style="background:#c53030;border:none;color:#fff;border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer;">✗</button>';
 
-  // Cari cell No Pol, No Container, Ekspedisi berdasarkan data-field attribute
   tr.querySelectorAll('td[data-field]').forEach(function(td){
     var field = td.getAttribute('data-field');
     var val = field==='nopol' ? nopol : field==='noContainer' ? noContainer : ekspedisi;
     td.innerHTML = '<input type="text" value="'+_mekEsc(val||'')+'" '+
       'style="width:100%;box-sizing:border-box;border:1px solid #4299e1;border-radius:4px;padding:2px 5px;font-size:11px;font-family:inherit;" '+
-      'onclick="event.stopPropagation()" '+
-      'data-field="'+field+'">';
+      'onclick="event.stopPropagation()" data-field="'+field+'">';
   });
 
-  // Stop propagasi click tr supaya tidak trigger mekShowRowDetail
   tr.onclick = null;
 }
 
 function mekSaveEditRow() {
   if (!_mekEditActive) return;
-  var tr      = _mekEditActive.tr;
-  var noDoc   = _mekEditActive.noDoc;
+  var tr         = _mekEditActive.tr;
+  var noSo       = _mekEditActive.noSo;
+  var nopolMatch = _mekEditActive.nopolMatch;
+  var tglDaftar  = _mekEditActive.tglDaftar;
 
-  // Ambil nilai dari input
   var nopol = '', noContainer = '', ekspedisi = '';
   tr.querySelectorAll('input[data-field]').forEach(function(inp){
     var f = inp.getAttribute('data-field');
@@ -3328,48 +3323,46 @@ function mekSaveEditRow() {
     if (f==='ekspedisi')   ekspedisi   = inp.value.trim();
   });
 
-  // Disable inputs saat saving
   tr.querySelectorAll('input').forEach(function(i){ i.disabled=true; });
-  var saveBtns = tr.querySelectorAll('button');
-  saveBtns.forEach(function(b){ b.disabled=true; });
+  tr.querySelectorAll('button').forEach(function(b){ b.disabled=true; });
 
   API.updateMekAntrianRow(
-    { noDoc: noDoc, nopol: nopol, noContainer: noContainer, ekspedisi: ekspedisi },
+    { noSo: noSo, nopolMatch: nopolMatch, tglDaftar: tglDaftar, nopol: nopol, noContainer: noContainer, ekspedisi: ekspedisi },
     function(res) {
       if (!res || !res.success) {
         showToast('Gagal simpan: '+(res&&res.message||'error'), 'error');
         mekCancelEditRow();
         return;
       }
-      // Update data in-memory supaya tidak perlu re-fetch
       function _upd(arr) {
         arr.forEach(function(r){
-          var rDoc = (r.noDoc||'').replace(/^0+(?=\S)/,'');
-          if (rDoc !== noDoc.replace(/^0+(?=\S)/,'')) return;
+          var rSo = _mekStripLeadingZero(r.noSo||'') || _mekStripLeadingZero(r.noDoc||'');
+          if (rSo !== noSo) return;
+          if ((r.nopol||'').trim() !== nopolMatch) return;
           if (nopol)       r.nopol       = nopol;
-          if (noContainer !== undefined) r.noContainer = noContainer;
+          r.noContainer = noContainer;
           if (ekspedisi)   r.ekspedisi   = ekspedisi;
         });
       }
-      _upd(_mekCapData       || []);
-      _upd(_mekCapEmailData  || []);
+      _upd(_mekCapData      || []);
+      _upd(_mekCapEmailData || []);
 
-      // Restore onclick dan update cell display
       tr.onclick = function(){ mekShowRowDetail(this); };
+      var nopolFinal = nopol || nopolMatch;
       _mekEditActive = null;
 
-      // Render ulang cell yang diedit dengan nilai baru
       tr.querySelectorAll('td[data-field]').forEach(function(td){
         var f = td.getAttribute('data-field');
-        var val = f==='nopol' ? nopol : f==='noContainer' ? noContainer : ekspedisi;
+        var val = f==='nopol' ? nopolFinal : f==='noContainer' ? noContainer : ekspedisi;
         td.innerHTML = _mekEsc(val||'—');
       });
-      // Restore tombol edit
       var editTd = tr.querySelector('td[data-edit-btn]');
       if (editTd) {
-        editTd.innerHTML = '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noDoc)+'\',\''+_mekEsc(nopol)+'\',\''+_mekEsc(noContainer)+'\',\''+_mekEsc(ekspedisi)+'\')" '+
-          'title="Edit No Pol / No Container / Ekspedisi" '+
-          'style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>';
+        var noSoE = _mekEsc(noSo), nopolE = _mekEsc(nopolFinal);
+        var ncE = _mekEsc(noContainer), ekspE = _mekEsc(ekspedisi||nopolMatch);
+        editTd.innerHTML = (editTd.innerHTML.match(/^\d+/) ? editTd.innerHTML.match(/^\d+/)[0]+'<br>' : '') +
+          '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+noSoE+'\',\''+nopolE+'\',\''+nopolE+'\',\''+ncE+'\',\''+ekspE+'\')" '+
+          'title="Edit" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>';
       }
       showToast('Berhasil disimpan', 'success');
     },
