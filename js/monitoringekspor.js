@@ -3134,6 +3134,22 @@ function mekShowCardDetail(type) {
   // Simpan rows dan type untuk dipakai saat switch view
   window._mekCardDetailRows = rows;
   window._mekCardDetailType = type;
+  window._mekCardDetailView = 'detail';
+
+  // Tampilkan filter plant — reset ke ALL setiap buka popup baru
+  _mekCardDetailPlant = 'all';
+  var plantBar = document.getElementById('mekCardDetailPlantBar');
+  if (plantBar) {
+    plantBar.style.display = 'flex';
+    ['All','Jn2','Non'].forEach(function(v){
+      var btn = document.getElementById('mekCDPlant'+v);
+      if (!btn) return;
+      var active = (v.toLowerCase() === 'all');
+      btn.style.background  = active ? 'rgba(255,255,255,.35)' : 'none';
+      btn.style.borderColor = active ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.3)';
+      btn.style.fontWeight  = active ? '900' : '700';
+    });
+  }
 
   // Show overlay dulu supaya popup muncul meski rows kosong
   overlay.classList.remove('show');
@@ -3161,11 +3177,23 @@ function _mekCardDetailRender(rows, type, view) {
   var tbody   = document.getElementById('mekCardDetailTbody');
   var count   = document.getElementById('mekCardDetailCount');
   if (!thead || !tbody) return;
-  // Filter aktif
+
+  // Simpan view aktif
+  window._mekCardDetailView = view;
+
+  // Apply filter plant
+  var pf = _mekCardDetailPlant || 'all';
+  var filtered = pf === 'all' ? rows : rows.filter(function(r){
+    var plant = (r.plant || r.stuffingPlant || '').toUpperCase();
+    if (pf === 'jn2') return plant.indexOf('JAYANTI 2') >= 0 || plant.indexOf('JN2') >= 0 || plant.indexOf('JAYANTI2') >= 0;
+    if (pf === 'non') return plant.indexOf('JAYANTI 2') < 0 && plant.indexOf('JN2') < 0 && plant.indexOf('JAYANTI2') < 0;
+    return true;
+  });
+
+  // Filter aktif dari tabel utama
   var skuF   = ((document.getElementById('mekCapSku')   ||{}).value||'').toLowerCase().trim();
   var tujF   = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
   var plantF = ((document.getElementById('mekCapPlant') ||{}).value||'').trim().toUpperCase();
-  // Source data
   var _srcData = (_mekCapMode === 'email') ? _mekCapEmailData : _mekCapData;
 
   if (view === 'tujuan') {
@@ -3182,6 +3210,12 @@ function _mekCardDetailRender(rows, type, view) {
       if (skuF   && (r.sku||'').toLowerCase().indexOf(skuF)<0 && (r.nama||'').toLowerCase().indexOf(skuF)<0) return false;
       if (tujF   && (r.tujuan||'').toLowerCase().indexOf(tujF)<0) return false;
       if (plantF && (r.plant||'').toUpperCase().indexOf(plantF)<0) return false;
+      // Apply filter plant popup
+      if (pf !== 'all') {
+        var rp = (r.plant||r.stuffingPlant||'').toUpperCase();
+        if (pf==='jn2' && rp.indexOf('JAYANTI 2')<0 && rp.indexOf('JN2')<0 && rp.indexOf('JAYANTI2')<0) return false;
+        if (pf==='non' && (rp.indexOf('JAYANTI 2')>=0 || rp.indexOf('JN2')>=0 || rp.indexOf('JAYANTI2')>=0)) return false;
+      }
       return true;
     });
 
@@ -3196,23 +3230,22 @@ function _mekCardDetailRender(rows, type, view) {
       }
     });
 
-    // Hitung val per tujuan dari rows (sudah difilter status)
-    rows.forEach(function(r) {
+    // Hitung val per tujuan dari filtered (sudah difilter status + plant)
+    filtered.forEach(function(r) {
       var tuj = r.tujuan || '—';
       if (!tujMap[tuj]) tujMap[tuj] = { tujuan: tuj, planCont: 0, val: 0 };
       if (type === 'belum') {
         tujMap[tuj].val += (r.sisa !== undefined ? r.sisa : (r.plan || 0));
       } else {
-        tujMap[tuj].val += 1;  // 1 baris = 1 truk
+        tujMap[tuj].val += 1;
       }
     });
 
     var tujRows = Object.values(tujMap).sort(function(a,b){ return b.planCont - a.planCont; });
 
-    // Kolom sesuai tipe
     var col2lbl = type==='belum'  ? 'SISA'   : type==='total'  ? 'TOTAL CONT' :
                   type==='keluar' ? 'KELUAR'  : type==='proses' ? 'PROSES'     : 'DATANG';
-    var showVal  = (type !== 'total');  // total: tampilkan planCont saja
+    var showVal  = (type !== 'total');
 
     thead.innerHTML = '<tr>' +
       '<th style="padding:7px 12px;text-align:left;">TUJUAN</th>' +
@@ -3250,7 +3283,7 @@ function _mekCardDetailRender(rows, type, view) {
       '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
       '<th style="padding:7px 10px;text-align:left;">STUFFING</th>' +
       '</tr>';
-    tbody.innerHTML = rows.sort(function(a,b){ return a.planTgl < b.planTgl ? -1 : 1; })
+    tbody.innerHTML = filtered.slice().sort(function(a,b){ return a.planTgl < b.planTgl ? -1 : 1; })
       .map(function(r,i){
         var bg = i%2===0?'':'background:#f8fafc;';
         return '<tr style="'+bg+'">' +
@@ -3276,7 +3309,7 @@ function _mekCardDetailRender(rows, type, view) {
       '<th style="padding:7px 10px;text-align:left;">TUJUAN</th>' +
       '<th style="padding:7px 10px;text-align:left;">STATUS</th>' +
       '</tr>';
-    tbody.innerHTML = rows.sort(function(a,b){ return a.planTgl < b.planTgl ? -1 : 1; })
+    tbody.innerHTML = filtered.slice().sort(function(a,b){ return a.planTgl < b.planTgl ? -1 : 1; })
       .map(function(r,i){
         var bg = i%2===0?'':'background:#f8fafc;';
         return '<tr style="'+bg+'">' +
@@ -3292,7 +3325,7 @@ function _mekCardDetailRender(rows, type, view) {
       }).join('');
   }
 
-  count.textContent = rows.length + ' baris';
+  count.textContent = filtered.length + ' baris';
   overlay.classList.remove('show');
   overlay.style.display = 'flex';
   void overlay.offsetWidth;
@@ -3406,6 +3439,122 @@ function mekCancelEditRow() {
   });
   tr.onclick = function(){ mekShowRowDetail(this); };
   _mekEditActive = null;
+}
+
+var _mekCardDetailPlant = 'all'; // 'all' | 'jn2' | 'non'
+
+function mekCardDetailSetPlant(p) {
+  _mekCardDetailPlant = p;
+  // Update style tombol
+  ['all','jn2','non'].forEach(function(v){
+    var btn = document.getElementById('mekCDPlant'+v.charAt(0).toUpperCase()+v.slice(1));
+    if (!btn) return;
+    var active = (v === p);
+    btn.style.background   = active ? 'rgba(255,255,255,.35)' : 'none';
+    btn.style.borderColor  = active ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.3)';
+    btn.style.fontWeight   = active ? '900' : '700';
+  });
+  // Re-render dengan filter plant baru
+  var rows = window._mekCardDetailRows || [];
+  var type = window._mekCardDetailType || 'total';
+  var view = window._mekCardDetailView || 'detail';
+  _mekCardDetailRender(rows, type, view);
+}
+
+function mekCardDetailDownload(fmt) {
+  var type  = window._mekCardDetailType || 'total';
+  var view  = window._mekCardDetailView || 'detail';
+  var plant = _mekCardDetailPlant === 'jn2' ? ' — JN2' : _mekCardDetailPlant === 'non' ? ' — Selain JN2' : '';
+  var TITLES = { total:'Total Planning', datang:'Total Kedatangan', keluar:'Sudah Keluar', proses:'Masih Proses', belum:'Belum Datang' };
+  var title  = (TITLES[type] || type) + plant;
+  var sub    = (view === 'tujuan' ? 'By Tujuan — ' : '') +
+    ((document.getElementById('mekCapFrom')||{}).value||'') + ' s/d ' +
+    ((document.getElementById('mekCapTo')||{}).value||'');
+
+  if (fmt === 'pdf') {
+    _mekPrintCardDetail(title, sub);
+  } else {
+    _mekExportCardDetailExcel(title, sub);
+  }
+}
+
+function _mekPrintCardDetail(title, subtitle) {
+  var tbl = document.getElementById('mekCardDetailTable');
+  if (!tbl) return;
+  var css = [
+    '* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }',
+    'body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 8px; }',
+    'h2 { font-size: 13px; margin: 0 0 2px; color: #1a3a5c; }',
+    'p  { font-size: 10px; margin: 0 0 6px; color: #718096; }',
+    'table { width: 100%; table-layout: auto; border-collapse: collapse; }',
+    'th { background: #2d4a6a !important; color: #fff !important; padding: 4px 6px; font-size: 9px; text-align: left; border: 1px solid #2d4a6a; white-space: normal; word-break: break-word; }',
+    'td { padding: 3px 6px; font-size: 9px; border: 1px solid #e2e8f0; vertical-align: middle; white-space: normal !important; word-break: break-word; }',
+    'tr:nth-child(even) td { background: #f7fafc !important; }',
+    '@media print { @page { size: A4 landscape; margin: 6mm; } }'
+  ].join('\n');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' + css + '</style></head><body>' +
+    '<h2>' + title + '</h2>' +
+    (subtitle ? '<p>' + subtitle + '</p>' : '') +
+    tbl.outerHTML +
+    '</body></html>';
+
+  var w = window.open('','_blank','width=900,height=600');
+  if (!w) { showToast('Pop-up diblokir browser, izinkan pop-up dulu.', 'warning'); return; }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); w.close(); }, 400);
+}
+
+function _mekExportCardDetailExcel(title, subtitle) {
+  var tbl = document.getElementById('mekCardDetailTable');
+  if (!tbl) return;
+  var clone = tbl.cloneNode(true);
+  var srcCells = tbl.querySelectorAll('th,td');
+  var dstCells = clone.querySelectorAll('th,td');
+  srcCells.forEach(function(src, i){
+    var cs  = window.getComputedStyle(src);
+    var dst = dstCells[i];
+    if (!dst) return;
+    dst.style.backgroundColor = cs.backgroundColor;
+    dst.style.color            = cs.color;
+    dst.style.fontWeight       = cs.fontWeight;
+    dst.style.textAlign        = cs.textAlign;
+    dst.style.fontSize         = '9pt';
+    dst.style.padding          = '3px 6px';
+    dst.style.border           = '1px solid #d0d0d0';
+    dst.style.whiteSpace       = 'nowrap';
+    dst.querySelectorAll('button,input').forEach(function(el){ el.remove(); });
+  });
+  clone.style.borderCollapse = 'collapse';
+  clone.style.width          = '100%';
+  clone.style.fontFamily     = 'Calibri, Arial, sans-serif';
+
+  var html =
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+           'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+           'xmlns="http://www.w3.org/TR/REC-html40">' +
+    '<head><meta charset="UTF-8">' +
+    '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>' +
+    '<x:ExcelWorksheet><x:Name>Data</x:Name>' +
+    '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>' +
+    '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
+    '</head><body>' +
+    '<h3 style="font-family:Calibri,Arial;font-size:13pt;margin:0 0 2px;">' + title + '</h3>' +
+    (subtitle ? '<p style="font-family:Calibri,Arial;font-size:9pt;color:#718096;margin:0 0 8px;">' + subtitle + '</p>' : '') +
+    clone.outerHTML +
+    '</body></html>';
+
+  var blob     = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  var url      = URL.createObjectURL(blob);
+  var filename = title.replace(/[^a-zA-Z0-9_]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.xls';
+  var a        = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  showToast('File Excel berhasil diunduh.', 'success');
 }
 
 function mekCloseCardDetail() {
