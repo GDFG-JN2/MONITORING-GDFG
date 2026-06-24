@@ -764,135 +764,52 @@ function _mekExportTableExcel(tableId, title, subtitle) {
   var rows = tbl.querySelectorAll('tr');
   if (!rows.length) { showToast('Tidak ada data.', 'warning'); return; }
 
-  // ── Helper: ambil computed style warna ──────────────────────
-  function getRgb(el, prop) {
-    var v = window.getComputedStyle(el)[prop] || '';
-    var m = v.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (!m) return null;
-    var r = parseInt(m[1]).toString(16).padStart(2,'0');
-    var g = parseInt(m[2]).toString(16).padStart(2,'0');
-    var b = parseInt(m[3]).toString(16).padStart(2,'0');
-    return (r+g+b).toUpperCase();
-  }
+  // Kumpulkan CSS computed style semua cell supaya format ikut
+  // Pendekatan: clone tabel, inline semua style, wrap dalam HTML lengkap
+  var clone = tbl.cloneNode(true);
 
-  function xmlEsc(s) {
-    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // ── Kumpulkan semua cell style unik → buat Style registry ───
-  var styles  = {};   // key → styleId
-  var styleDefs = []; // array XML style strings
-  var styleIdx = 0;
-
-  function getStyleId(el, isHeader) {
-    var bg    = getRgb(el,'backgroundColor') || (isHeader ? '1A3A5C' : 'FFFFFF');
-    var color = getRgb(el,'color')           || (isHeader ? 'FFFFFF' : '000000');
-    var fw    = window.getComputedStyle(el).fontWeight;
-    var bold  = (fw === 'bold' || parseInt(fw) >= 700) ? '1' : '0';
-    var align = window.getComputedStyle(el).textAlign || 'left';
-    if (align === 'start') align = 'left';
-    if (align === 'end')   align = 'right';
-    var wrap  = isHeader ? '1' : '0';
-    var key   = bg+'|'+color+'|'+bold+'|'+align+'|'+wrap;
-    if (styles[key] !== undefined) return styles[key];
-    var id = 's' + (++styleIdx);
-    styles[key] = id;
-    styleDefs.push(
-      '<Style ss:ID="'+id+'">' +
-        '<Alignment ss:Horizontal="'+align+'" ss:Vertical="Center"'+(wrap?' ss:WrapText="1"':'')+'/>' +
-        '<Borders>'+
-          '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D0D0"/>'+
-          '<Border ss:Position="Right"  ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D0D0"/>'+
-        '</Borders>'+
-        '<Font ss:Color="#'+color+'" ss:Bold="'+bold+'" ss:Size="'+(isHeader?9:9)+'"/>'+
-        '<Interior ss:Color="#'+bg+'" ss:Pattern="Solid"/>'+
-      '</Style>'
-    );
-    return id;
-  }
-
-  // ── Build rows XML ───────────────────────────────────────────
-  // Deteksi colspan/rowspan dari DOM (mekCapTbl punya merge)
-  var xmlRows = [];
-
-  // Baris judul
-  xmlRows.push(
-    '<Row ss:Height="16">'+
-      '<Cell ss:StyleID="sTitle"><Data ss:Type="String">'+xmlEsc(title)+'</Data></Cell>'+
-    '</Row>'
-  );
-  if (subtitle) {
-    xmlRows.push(
-      '<Row ss:Height="13">'+
-        '<Cell ss:StyleID="sSub"><Data ss:Type="String">'+xmlEsc(subtitle)+'</Data></Cell>'+
-      '</Row>'
-    );
-  }
-  xmlRows.push('<Row ss:Height="6"/>'); // spacer
-
-  rows.forEach(function(tr) {
-    var cells = tr.querySelectorAll('th, td');
-    if (!cells.length) return;
-    var isHeader = tr.querySelector('th') !== null;
-    var h = isHeader ? 22 : 18;
-    var xmlCells = [];
-
-    cells.forEach(function(cell) {
-      var sid   = getStyleId(cell, isHeader);
-      var txt   = (cell.innerText || cell.textContent || '').replace(/[\r\n\t]+/g,' ').trim();
-      // Deteksi angka (tanpa strip ribuan karena bisa ada titik/koma IDR)
-      var num   = txt.replace(/[.,]/g,'');
-      var isNum = !isNaN(num) && num !== '' && !/[A-Za-z]/.test(txt);
-      var colspan = cell.colSpan > 1 ? ' ss:MergeAcross="'+(cell.colSpan-1)+'"' : '';
-      var rowspan = cell.rowSpan > 1 ? ' ss:MergeDown="'+(cell.rowSpan-1)+'"'   : '';
-      var dataType = isNum ? 'Number' : 'String';
-      var dataVal  = isNum ? num : xmlEsc(txt);
-      xmlCells.push(
-        '<Cell ss:StyleID="'+sid+'"'+colspan+rowspan+'>'+
-          '<Data ss:Type="'+dataType+'">'+dataVal+'</Data>'+
-        '</Cell>'
-      );
-    });
-
-    xmlRows.push('<Row ss:Height="'+h+'">'+xmlCells.join('')+'</Row>');
+  // Inline style dari computed style per cell
+  var srcCells = tbl.querySelectorAll('th,td');
+  var dstCells = clone.querySelectorAll('th,td');
+  srcCells.forEach(function(src, i) {
+    var cs  = window.getComputedStyle(src);
+    var dst = dstCells[i];
+    if (!dst) return;
+    dst.style.backgroundColor = cs.backgroundColor;
+    dst.style.color            = cs.color;
+    dst.style.fontWeight       = cs.fontWeight;
+    dst.style.textAlign        = cs.textAlign;
+    dst.style.fontSize         = '9pt';
+    dst.style.padding          = '3px 6px';
+    dst.style.border           = '1px solid #d0d0d0';
+    dst.style.whiteSpace       = 'nowrap';
+    // Hapus elemen interaktif (button, input) dari clone
+    dst.querySelectorAll('button,input').forEach(function(el){ el.remove(); });
   });
 
-  // ── Hitung lebar kolom dari header ───────────────────────────
-  var colWidths = '';
-  var headerRow = tbl.querySelector('tr');
-  if (headerRow) {
-    headerRow.querySelectorAll('th,td').forEach(function(cell) {
-      var w = Math.max(60, Math.min(200, cell.offsetWidth || 80));
-      colWidths += '<Column ss:Width="'+w+'"/>';
-    });
-  }
+  clone.style.borderCollapse = 'collapse';
+  clone.style.width          = '100%';
+  clone.style.fontFamily     = 'Calibri, Arial, sans-serif';
 
-  // ── Assemble XML ─────────────────────────────────────────────
-  var xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<?mso-application progid="Excel.Sheet"?>\n' +
-    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n' +
-    ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"\n' +
-    ' xmlns:x="urn:schemas-microsoft-com:office:excel">\n' +
-    '<Styles>\n' +
-    '<Style ss:ID="Default"><Alignment ss:Vertical="Center"/><Font ss:Size="9"/></Style>\n' +
-    '<Style ss:ID="sTitle"><Font ss:Bold="1" ss:Size="12"/></Style>\n' +
-    '<Style ss:ID="sSub"><Font ss:Color="#718096" ss:Size="9"/></Style>\n' +
-    styleDefs.join('\n') +
-    '\n</Styles>\n' +
-    '<Worksheet ss:Name="Data">\n' +
-    '<Table>\n' +
-    colWidths + '\n' +
-    xmlRows.join('\n') +
-    '\n</Table>\n' +
-    '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">\n' +
-    '<FreezePanes/><FrozenNoSplit/><SplitHorizontal>4</SplitHorizontal><TopRowBottomPane>4</TopRowBottomPane>\n' +
-    '</WorksheetOptions>\n' +
-    '</Worksheet>\n</Workbook>';
+  var html =
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+           'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+           'xmlns="http://www.w3.org/TR/REC-html40">' +
+    '<head><meta charset="UTF-8">' +
+    '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>' +
+    '<x:ExcelWorksheet><x:Name>Data</x:Name>' +
+    '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>' +
+    '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
+    '</head><body>' +
+    '<h3 style="font-family:Calibri,Arial;font-size:13pt;margin:0 0 2px;">' + title + '</h3>' +
+    (subtitle ? '<p style="font-family:Calibri,Arial;font-size:9pt;color:#718096;margin:0 0 8px;">' + subtitle + '</p>' : '') +
+    clone.outerHTML +
+    '</body></html>';
 
-  var blob     = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  var blob     = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
   var url      = URL.createObjectURL(blob);
   var filename = (title||'export').replace(/[^a-zA-Z0-9_]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.xls';
-  var a = document.createElement('a');
+  var a        = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a);
