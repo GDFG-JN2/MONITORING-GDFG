@@ -1583,7 +1583,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var skuOk   = !skuFilter   || (r.sku||'').toLowerCase().indexOf(skuFilter)>=0 || (r.nama||'').toLowerCase().indexOf(skuFilter)>=0;
       var docOk   = !docFilter   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilter.toLowerCase())>=0;
       var tujOk   = !tujFilter   || (r.tujuan||'').toLowerCase().indexOf(tujFilter.toLowerCase())>=0;
-      var plantOk = !plantFilter || (r.plant||'').toUpperCase().indexOf(plantFilter)>=0;
+      var plantOk = !plantFilter || _mekMatchPlant(r.plant, plantFilter);
       if (skuOk && docOk && tujOk && plantOk) validKey[k] = true;
     });
     filtered = data.filter(function(r){
@@ -2743,7 +2743,7 @@ function mekLoadCapaian() {
         var docOk  = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
         var tujOk  = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
         var nopolOk= !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
-        var plantOk= !plant  || (r.stuffingPlant||r.plant||'').toUpperCase().indexOf(plant)>=0;
+        var plantOk= !plant  || _mekMatchPlant(r.stuffingPlant||r.plant, plant);
         if (skuOk && docOk && tujOk && nopolOk && plantOk) planKeys[r._planKey] = true;
         else planKeys[r._planKey] = planKeys[r._planKey] || false;
       });
@@ -2819,7 +2819,7 @@ function _mekRenderCapaianEmailAktual(data) {
       var docOk   = !docFilterA   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilterA.toLowerCase())>=0;
       var nopolOk = !nopolFilterA || (r.nopol||'').toLowerCase().indexOf(nopolFilterA)>=0;
       var tujOk   = !tujFilterA   || (r.tujuan||'').toLowerCase().indexOf(tujFilterA)>=0;
-      var plantOk = !plantFilterA || (r.plant||'').toUpperCase().indexOf(plantFilterA)>=0;
+      var plantOk = !plantFilterA || _mekMatchPlant(r.plant, plantFilterA);
       return skuOk && docOk && nopolOk && tujOk && plantOk;
     });
   }
@@ -2931,7 +2931,7 @@ function _mekRenderCapaianEmailAktual(data) {
     if (_aktFrom && r.planTgl < _aktFrom) return;
     if (_aktTo   && r.planTgl > _aktTo)   return;
     if (tujFilterA   && (r.tujuan||'').toLowerCase().indexOf(tujFilterA)<0) return;
-    if (plantFilterA && (r.plant||'').toUpperCase().indexOf(plantFilterA)<0) return;
+    if (plantFilterA && !_mekMatchPlant(r.plant, plantFilterA)) return;
     if (skuFilterA   && (r.sku||'').toLowerCase().indexOf(skuFilterA)<0 && (r.nama||'').toLowerCase().indexOf(skuFilterA)<0) return;
     var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if(!seenSo3[_k3] && r.isFirstRow){
@@ -2947,7 +2947,7 @@ function _mekRenderCapaianEmailAktual(data) {
     if (_aktFrom && r.planTgl < _aktFrom) return;
     if (_aktTo   && r.planTgl > _aktTo)   return;
     if (tujFilterA   && (r.tujuan||'').toLowerCase().indexOf(tujFilterA)<0) return;
-    if (plantFilterA && (r.plant||'').toUpperCase().indexOf(plantFilterA)<0) return;
+    if (plantFilterA && !_mekMatchPlant(r.plant, plantFilterA)) return;
     if (skuFilterA   && (r.sku||'').toLowerCase().indexOf(skuFilterA)<0 && (r.nama||'').toLowerCase().indexOf(skuFilterA)<0) return;
     var _k3 = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if (!_capMap3[_k3] || _capMap3[_k3] <= 0) return;
