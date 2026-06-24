@@ -452,8 +452,9 @@ function _mekSavePlanningRow(rowIdx) {
 function _mekMatchPlant(plant, plantF, r) {
   if (!plantF) return true; // All
   if (plantF === '__NO_PLAN__') {
-    // Tampilkan hanya baris yang tidak ter-assign ke planning (sku kosong / isPendingan)
-    return !r || !(r.sku||'').trim() || r.isPendingan === true;
+    // Tanpa planning = baris yang tidak ter-assign ke SO/planning manapun (SKU kosong)
+    // isPendingan tidak cukup karena pendingan tgl masih punya planning
+    return !r || !(r.sku||'').trim();
   }
   var p = (plant||'').toUpperCase();
   return p.indexOf(plantF.toUpperCase()) >= 0;
