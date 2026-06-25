@@ -3575,9 +3575,10 @@ function mekGetStatusFilter(sfx) {
 var _mekStatusChanging = false;
 
 function mekStatusFilterChange(sfx) {
-  if (_mekStatusChanging) return;
+  if (_mekStatusChanging) { console.log('[STATUS] blocked by flag'); return; }
   sfx = sfx || '';
   var checked = mekGetStatusFilter(sfx);
+  console.log('[STATUS] sfx='+sfx+' checked='+JSON.stringify(checked)+' _mekCapMode='+_mekCapMode+' _mekCapData.length='+(_mekCapData||[]).length);
   var allCb   = document.getElementById('mekCapStatusAll' + sfx);
   var label   = document.getElementById('mekCapStatusLabel' + sfx);
   var allStatuses = ['keluar','loading','daftar','belum'];
