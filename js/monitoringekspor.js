@@ -2734,22 +2734,27 @@ function mekLoadCapaian() {
       return;
     }
     var data = res.data || [];
+    var sfx  = (document.getElementById('mekCapFilterWeek') && document.getElementById('mekCapFilterWeek').style.display !== 'none') ? 'W' : '';
+    var statusF = mekGetStatusFilter(sfx);
 
-    // Filter lokal teks
-    if (sku || doc || tujuan || nopol || plant) {
-      // Filter per grup planning (cek di baris pertama saja)
+    // Filter lokal teks + status
+    if (sku || doc || tujuan || nopol || plant || statusF.length) {
       var planKeys = {};
       data.forEach(function(r) {
         if (!r.isFirstRow) return;
-        var skuOk  = !sku    || (r.sku||'').toLowerCase().indexOf(sku)>=0 || (r.nama||'').toLowerCase().indexOf(sku)>=0;
-        var docOk  = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
-        var tujOk  = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
-        var nopolOk= !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
-        var plantOk= !plant  || _mekMatchPlant(r.stuffingPlant||r.plant, plant, r);
+        var skuOk    = !sku    || (r.sku||'').toLowerCase().indexOf(sku)>=0 || (r.nama||'').toLowerCase().indexOf(sku)>=0;
+        var docOk    = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
+        var tujOk    = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
+        var nopolOk  = !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
+        var plantOk  = !plant  || _mekMatchPlant(r.stuffingPlant||r.plant, plant, r);
         if (skuOk && docOk && tujOk && nopolOk && plantOk) planKeys[r._planKey] = true;
         else planKeys[r._planKey] = planKeys[r._planKey] || false;
       });
-      data = data.filter(function(r){ return planKeys[r._planKey]; });
+      data = data.filter(function(r){
+        if (!planKeys[r._planKey]) return false;
+        if (statusF.length) return _mekMatchStatus(r.status, statusF);
+        return true;
+      });
     }
 
     _mekCapData = data;
@@ -2813,16 +2818,18 @@ function _mekRenderCapaianEmailAktual(data) {
   var nopolFilterA = ((document.getElementById('mekCapNopol') ||{}).value||'').toLowerCase().trim();
   var tujFilterA   = ((document.getElementById('mekCapTujuan')||{}).value||'').toLowerCase().trim();
   var plantFilterA = ((document.getElementById('mekCapPlant') ||{}).value||'').trim().toUpperCase();
+  var statusFilterA = mekGetStatusFilter('');
 
   // Filter data sebelum render
-  if (skuFilterA || docFilterA || nopolFilterA || tujFilterA || plantFilterA) {
+  if (skuFilterA || docFilterA || nopolFilterA || tujFilterA || plantFilterA || statusFilterA.length) {
     data = data.filter(function(r){
-      var skuOk   = !skuFilterA   || (r.sku||'').toLowerCase().indexOf(skuFilterA)>=0  || (r.nama||'').toLowerCase().indexOf(skuFilterA)>=0;
-      var docOk   = !docFilterA   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilterA.toLowerCase())>=0;
-      var nopolOk = !nopolFilterA || (r.nopol||'').toLowerCase().indexOf(nopolFilterA)>=0;
-      var tujOk   = !tujFilterA   || (r.tujuan||'').toLowerCase().indexOf(tujFilterA)>=0;
-      var plantOk = !plantFilterA || _mekMatchPlant(r.plant, plantFilterA, r);
-      return skuOk && docOk && nopolOk && tujOk && plantOk;
+      var skuOk    = !skuFilterA   || (r.sku||'').toLowerCase().indexOf(skuFilterA)>=0  || (r.nama||'').toLowerCase().indexOf(skuFilterA)>=0;
+      var docOk    = !docFilterA   || _mekStripLeadingZero(r.noSo||'').toLowerCase().indexOf(docFilterA.toLowerCase())>=0;
+      var nopolOk  = !nopolFilterA || (r.nopol||'').toLowerCase().indexOf(nopolFilterA)>=0;
+      var tujOk    = !tujFilterA   || (r.tujuan||'').toLowerCase().indexOf(tujFilterA)>=0;
+      var plantOk  = !plantFilterA || _mekMatchPlant(r.plant, plantFilterA, r);
+      var statusOk = _mekMatchStatus(r.status, statusFilterA);
+      return skuOk && docOk && nopolOk && tujOk && plantOk && statusOk;
     });
   }
 
@@ -3528,7 +3535,95 @@ function mekCloseCardDetail() {
 }
 
 // ════════════════════════════════════════════════════════════
-// BY SKU — rekap planning vs termuat vs belum per SKU
+// STATUS FILTER DROPDOWN (multi-select)
+// ════════════════════════════════════════════════════════════
+function mekToggleStatusDropdown(sfx) {
+  sfx = sfx || '';
+  var menu = document.getElementById('mekCapStatusMenu' + sfx);
+  if (!menu) return;
+  var isOpen = menu.style.display !== 'none';
+  // Tutup semua dropdown status dulu
+  ['','W'].forEach(function(s){
+    var m = document.getElementById('mekCapStatusMenu'+s);
+    if (m) m.style.display = 'none';
+  });
+  if (!isOpen) menu.style.display = 'block';
+}
+
+// Tutup dropdown kalau klik di luar
+document.addEventListener('click', function(e) {
+  ['','W'].forEach(function(sfx){
+    var wrap = document.getElementById('mekCapStatusWrap'+sfx);
+    var menu = document.getElementById('mekCapStatusMenu'+sfx);
+    if (wrap && menu && !wrap.contains(e.target)) menu.style.display = 'none';
+  });
+});
+
+function mekGetStatusFilter(sfx) {
+  sfx = sfx || '';
+  var menuId = 'mekCapStatusMenu' + sfx;
+  var menu = document.getElementById(menuId);
+  if (!menu) return [];
+  var checked = [];
+  menu.querySelectorAll('input[type="checkbox"][value]').forEach(function(cb){
+    if (cb.checked) checked.push(cb.value);
+  });
+  return checked; // kosong = all
+}
+
+function mekStatusFilterChange(sfx) {
+  sfx = sfx || '';
+  var checked = mekGetStatusFilter(sfx);
+  var allCb   = document.getElementById('mekCapStatusAll' + sfx);
+  var label   = document.getElementById('mekCapStatusLabel' + sfx);
+  var allStatuses = ['keluar','loading','daftar','belum'];
+
+  // Sinkron checkbox "Semua"
+  if (allCb) allCb.checked = (checked.length === 0 || checked.length === allStatuses.length);
+
+  // Update label tombol
+  if (label) {
+    if (!checked.length || checked.length === allStatuses.length) {
+      label.textContent = 'All';
+    } else {
+      label.textContent = checked.map(function(v){
+        return v === 'daftar' ? 'Daftar' : v.charAt(0).toUpperCase() + v.slice(1);
+      }).join(', ');
+    }
+  }
+}
+
+function mekStatusAllChange(sfx) {
+  sfx = sfx || '';
+  var allCb = document.getElementById('mekCapStatusAll' + sfx);
+  var menu  = document.getElementById('mekCapStatusMenu' + sfx);
+  if (!menu || !allCb) return;
+  // Kalau "Semua" di-check → uncheck semua individual (= all)
+  // Kalau "Semua" di-uncheck → biarkan (tidak ada yang terpilih = all juga)
+  menu.querySelectorAll('input[type="checkbox"][value]').forEach(function(cb){
+    cb.checked = false;
+  });
+  var label = document.getElementById('mekCapStatusLabel' + sfx);
+  if (label) label.textContent = 'All';
+}
+
+// Helper: cek apakah row lolos filter status
+function _mekMatchStatus(rowStatus, statusFilter) {
+  if (!statusFilter || !statusFilter.length) return true; // all
+  return statusFilter.indexOf(rowStatus || 'belum') >= 0;
+}
+
+// Reset status filter ke All
+function _mekResetStatusFilter(sfx) {
+  sfx = sfx || '';
+  var menu = document.getElementById('mekCapStatusMenu' + sfx);
+  if (!menu) return;
+  menu.querySelectorAll('input[type="checkbox"][value]').forEach(function(cb){ cb.checked = false; });
+  var allCb = document.getElementById('mekCapStatusAll' + sfx);
+  if (allCb) allCb.checked = true;
+  var label = document.getElementById('mekCapStatusLabel' + sfx);
+  if (label) label.textContent = 'All';
+}
 // ════════════════════════════════════════════════════════════
 function _mekSumQtyKrt(v) {
   // v bisa berupa "1154", "1154,1078" (multi container), atau angka
@@ -3884,6 +3979,9 @@ function mekResetCapaian() {
   var ef=document.getElementById('mekCapFrom'); if(ef) ef.value=mon2.getFullYear()+'-'+String(mon2.getMonth()+1).padStart(2,'0')+'-'+String(mon2.getDate()).padStart(2,'0');
   var et=document.getElementById('mekCapTo');   if(et) et.value=sun2.getFullYear()+'-'+String(sun2.getMonth()+1).padStart(2,'0')+'-'+String(sun2.getDate()).padStart(2,'0');
   var info=document.getElementById('mekCapWeekInfo'); if(info) info.style.display='none';
+  // Reset status filter
+  _mekResetStatusFilter('');
+  _mekResetStatusFilter('W');
 }
 
 function _mekRenderCapaian(data, statusFilter) {
