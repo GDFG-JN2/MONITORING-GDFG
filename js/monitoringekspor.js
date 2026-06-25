@@ -2750,15 +2750,11 @@ function mekLoadCapaian() {
         if (skuOk && docOk && tujOk && nopolOk && plantOk) planKeys[r._planKey] = true;
         else planKeys[r._planKey] = planKeys[r._planKey] || false;
       });
-      // Filter status: tampilkan grup planning kalau ada minimal 1 baris yang statusnya match
+      // Filter status per baris langsung
       if (statusF.length) {
-        var statusKeys = {};
-        data.forEach(function(r){
-          if (!planKeys[r._planKey]) return;
-          if (_mekMatchStatus(r.status, statusF)) statusKeys[r._planKey] = true;
-        });
         data = data.filter(function(r){
-          return planKeys[r._planKey] && statusKeys[r._planKey];
+          if (!planKeys[r._planKey]) return false;
+          return _mekMatchStatus(r.status, statusF);
         });
       } else {
         data = data.filter(function(r){ return planKeys[r._planKey]; });
