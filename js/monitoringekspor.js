@@ -2737,28 +2737,25 @@ function mekLoadCapaian() {
     var sfx  = (document.getElementById('mekCapFilterWeek') && document.getElementById('mekCapFilterWeek').style.display !== 'none') ? 'W' : '';
     var statusF = mekGetStatusFilter(sfx);
 
-    // Filter lokal teks + status
-    if (sku || doc || tujuan || nopol || plant || statusF.length) {
+    // Filter teks per grup planning (cek di isFirstRow)
+    if (sku || doc || tujuan || nopol || plant) {
       var planKeys = {};
       data.forEach(function(r) {
         if (!r.isFirstRow) return;
-        var skuOk    = !sku    || (r.sku||'').toLowerCase().indexOf(sku)>=0 || (r.nama||'').toLowerCase().indexOf(sku)>=0;
-        var docOk    = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
-        var tujOk    = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
-        var nopolOk  = !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
-        var plantOk  = !plant  || _mekMatchPlant(r.stuffingPlant||r.plant, plant, r);
+        var skuOk   = !sku    || (r.sku||'').toLowerCase().indexOf(sku)>=0 || (r.nama||'').toLowerCase().indexOf(sku)>=0;
+        var docOk   = !doc    || _mekStripLeadingZero(r.noDoc||'').indexOf(doc)>=0;
+        var tujOk   = !tujuan || (r.tujuan||'').toLowerCase().indexOf(tujuan)>=0;
+        var nopolOk = !nopol  || (r.nopol||'').toLowerCase().indexOf(nopol)>=0;
+        var plantOk = !plant  || _mekMatchPlant(r.stuffingPlant||r.plant, plant, r);
         if (skuOk && docOk && tujOk && nopolOk && plantOk) planKeys[r._planKey] = true;
         else planKeys[r._planKey] = planKeys[r._planKey] || false;
       });
-      // Filter status per baris langsung
-      if (statusF.length) {
-        data = data.filter(function(r){
-          if (!planKeys[r._planKey]) return false;
-          return _mekMatchStatus(r.status, statusF);
-        });
-      } else {
-        data = data.filter(function(r){ return planKeys[r._planKey]; });
-      }
+      data = data.filter(function(r){ return planKeys[r._planKey]; });
+    }
+
+    // Filter status per baris (terpisah dari filter teks)
+    if (statusF.length) {
+      data = data.filter(function(r){ return _mekMatchStatus(r.status, statusF); });
     }
 
     _mekCapData = data;
