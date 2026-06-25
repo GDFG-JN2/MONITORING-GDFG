@@ -3592,6 +3592,26 @@ function mekStatusFilterChange(sfx) {
       }).join(', ');
     }
   }
+
+  // Re-render langsung dari data yang sudah ada (tanpa re-fetch)
+  if (_mekCapMode !== 'email') {
+    // By Planning — filter dari _mekCapData
+    var data = _mekCapData || [];
+    if (checked.length) {
+      data = data.filter(function(r){ return _mekMatchStatus(r.status, checked); });
+    }
+    _mekRenderCapaian(data, _mekCapFilter);
+  } else {
+    // By Aktual — trigger re-render
+    if (_mekCapEmailView === 'aktual') {
+      _mekRenderCapaianEmailAktual(_mekCapEmailData);
+    } else {
+      var skuF = ((document.getElementById('mekCapSku')||{}).value||'').trim().toLowerCase();
+      var docF = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
+      var tujF = ((document.getElementById('mekCapTujuan')||{}).value||'').trim().toLowerCase();
+      _mekRenderCapaianEmail(_mekCapEmailData, skuF, docF, tujF);
+    }
+  }
 }
 
 function mekStatusAllChange(sfx) {
