@@ -3572,15 +3572,20 @@ function mekGetStatusFilter(sfx) {
   return checked; // kosong = all
 }
 
+var _mekStatusChanging = false;
+
 function mekStatusFilterChange(sfx) {
+  if (_mekStatusChanging) return;
   sfx = sfx || '';
   var checked = mekGetStatusFilter(sfx);
   var allCb   = document.getElementById('mekCapStatusAll' + sfx);
   var label   = document.getElementById('mekCapStatusLabel' + sfx);
   var allStatuses = ['keluar','loading','daftar','belum'];
 
-  // Sinkron checkbox "Semua"
+  // Sinkron checkbox "Semua" tanpa trigger onchange-nya
+  _mekStatusChanging = true;
   if (allCb) allCb.checked = (checked.length === 0 || checked.length === allStatuses.length);
+  _mekStatusChanging = false;
 
   // Update label tombol
   if (label) {
@@ -3595,14 +3600,12 @@ function mekStatusFilterChange(sfx) {
 
   // Re-render langsung dari data yang sudah ada (tanpa re-fetch)
   if (_mekCapMode !== 'email') {
-    // By Planning — filter dari _mekCapData
-    var data = _mekCapData || [];
-    if (checked.length) {
+    var data = (_mekCapData || []).slice();
+    if (checked.length && checked.length < allStatuses.length) {
       data = data.filter(function(r){ return _mekMatchStatus(r.status, checked); });
     }
     _mekRenderCapaian(data, _mekCapFilter);
   } else {
-    // By Aktual — trigger re-render
     if (_mekCapEmailView === 'aktual') {
       _mekRenderCapaianEmailAktual(_mekCapEmailData);
     } else {
@@ -3615,17 +3618,32 @@ function mekStatusFilterChange(sfx) {
 }
 
 function mekStatusAllChange(sfx) {
+  if (_mekStatusChanging) return;
   sfx = sfx || '';
-  var allCb = document.getElementById('mekCapStatusAll' + sfx);
-  var menu  = document.getElementById('mekCapStatusMenu' + sfx);
-  if (!menu || !allCb) return;
-  // Kalau "Semua" di-check → uncheck semua individual (= all)
-  // Kalau "Semua" di-uncheck → biarkan (tidak ada yang terpilih = all juga)
-  menu.querySelectorAll('input[type="checkbox"][value]').forEach(function(cb){
-    cb.checked = false;
-  });
+  _mekStatusChanging = true;
+  var menu = document.getElementById('mekCapStatusMenu' + sfx);
+  if (menu) {
+    menu.querySelectorAll('input[type="checkbox"][value]').forEach(function(cb){
+      cb.checked = false;
+    });
+  }
+  _mekStatusChanging = false;
   var label = document.getElementById('mekCapStatusLabel' + sfx);
   if (label) label.textContent = 'All';
+
+  // Re-render dengan semua status (reset ke all)
+  if (_mekCapMode !== 'email') {
+    _mekRenderCapaian((_mekCapData || []).slice(), _mekCapFilter);
+  } else {
+    if (_mekCapEmailView === 'aktual') {
+      _mekRenderCapaianEmailAktual(_mekCapEmailData);
+    } else {
+      var skuF = ((document.getElementById('mekCapSku')||{}).value||'').trim().toLowerCase();
+      var docF = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
+      var tujF = ((document.getElementById('mekCapTujuan')||{}).value||'').trim().toLowerCase();
+      _mekRenderCapaianEmail(_mekCapEmailData, skuF, docF, tujF);
+    }
+  }
 }
 
 // Helper: cek apakah row lolos filter status
