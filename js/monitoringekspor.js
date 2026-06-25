@@ -1575,7 +1575,8 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   docFilter = _mekStripLeadingZero(docFilter||'');
   tujFilter = (tujFilter||'').toLowerCase();
 
-  var plantFilter = ((document.getElementById('mekCapPlant')||{}).value||'').trim().toUpperCase();
+  var plantFilter  = ((document.getElementById('mekCapPlant')||{}).value||'').trim().toUpperCase();
+  var statusFilter = mekGetStatusFilter('');
 
   var filtered = data;
   if (skuFilter || docFilter || tujFilter || plantFilter) {
@@ -1592,6 +1593,11 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       var k = (r.noSo && r.noSo !== 'undefined' ? r.noSo : 'sku:'+r.sku)+'|'+r.planTgl;
       return validKey[k];
     });
+  }
+
+  // Filter status per baris
+  if (statusFilter.length && statusFilter.length < 4) {
+    filtered = filtered.filter(function(r){ return _mekMatchStatus(r.status, statusFilter); });
   }
 
   _mekCapEmailRowData = [];
@@ -3575,10 +3581,9 @@ function mekGetStatusFilter(sfx) {
 var _mekStatusChanging = false;
 
 function mekStatusFilterChange(sfx) {
-  if (_mekStatusChanging) { console.log('[STATUS] blocked by flag'); return; }
+  if (_mekStatusChanging) return;
   sfx = sfx || '';
   var checked = mekGetStatusFilter(sfx);
-  console.log('[STATUS] sfx='+sfx+' checked='+JSON.stringify(checked)+' _mekCapMode='+_mekCapMode+' _mekCapData.length='+(_mekCapData||[]).length);
   var allCb   = document.getElementById('mekCapStatusAll' + sfx);
   var label   = document.getElementById('mekCapStatusLabel' + sfx);
   var allStatuses = ['keluar','loading','daftar','belum'];
@@ -3601,20 +3606,25 @@ function mekStatusFilterChange(sfx) {
 
   // Re-render langsung dari data yang sudah ada (tanpa re-fetch)
   if (_mekCapMode !== 'email') {
+    // Mode all/wa/si (By Planning non-email)
     var data = (_mekCapData || []).slice();
     if (checked.length && checked.length < allStatuses.length) {
       data = data.filter(function(r){ return _mekMatchStatus(r.status, checked); });
     }
     _mekRenderCapaian(data, _mekCapFilter);
-  } else {
-    if (_mekCapEmailView === 'aktual') {
-      _mekRenderCapaianEmailAktual(_mekCapEmailData);
-    } else {
-      var skuF = ((document.getElementById('mekCapSku')||{}).value||'').trim().toLowerCase();
-      var docF = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
-      var tujF = ((document.getElementById('mekCapTujuan')||{}).value||'').trim().toLowerCase();
-      _mekRenderCapaianEmail(_mekCapEmailData, skuF, docF, tujF);
+  } else if (_mekCapEmailView === 'plan') {
+    // Mode email By Planning — filter dari _mekCapEmailData
+    var data2 = (_mekCapEmailData || []).slice();
+    if (checked.length && checked.length < allStatuses.length) {
+      data2 = data2.filter(function(r){ return _mekMatchStatus(r.status, checked); });
     }
+    var skuF2 = ((document.getElementById('mekCapSku')||{}).value||'').trim().toLowerCase();
+    var docF2 = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
+    var tujF2 = ((document.getElementById('mekCapTujuan')||{}).value||'').trim().toLowerCase();
+    _mekRenderCapaianEmail(data2, skuF2, docF2, tujF2);
+  } else {
+    // Mode email By Aktual
+    _mekRenderCapaianEmailAktual(_mekCapEmailData);
   }
 }
 
@@ -3635,15 +3645,13 @@ function mekStatusAllChange(sfx) {
   // Re-render dengan semua status (reset ke all)
   if (_mekCapMode !== 'email') {
     _mekRenderCapaian((_mekCapData || []).slice(), _mekCapFilter);
+  } else if (_mekCapEmailView === 'plan') {
+    var skuF = ((document.getElementById('mekCapSku')||{}).value||'').trim().toLowerCase();
+    var docF = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
+    var tujF = ((document.getElementById('mekCapTujuan')||{}).value||'').trim().toLowerCase();
+    _mekRenderCapaianEmail((_mekCapEmailData||[]).slice(), skuF, docF, tujF);
   } else {
-    if (_mekCapEmailView === 'aktual') {
-      _mekRenderCapaianEmailAktual(_mekCapEmailData);
-    } else {
-      var skuF = ((document.getElementById('mekCapSku')||{}).value||'').trim().toLowerCase();
-      var docF = _mekStripLeadingZero(((document.getElementById('mekCapDoc')||{}).value||'').trim());
-      var tujF = ((document.getElementById('mekCapTujuan')||{}).value||'').trim().toLowerCase();
-      _mekRenderCapaianEmail(_mekCapEmailData, skuF, docF, tujF);
-    }
+    _mekRenderCapaianEmailAktual(_mekCapEmailData);
   }
 }
 
