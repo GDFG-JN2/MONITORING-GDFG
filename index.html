@@ -4929,6 +4929,31 @@
               <option value="JAYANTI 2" selected>JAYANTI 2</option>
               <option value="__NO_PLAN__">TANPA PLANNING</option>
             </select>
+            <label>Status</label>
+            <div style="position:relative;display:inline-block;" id="mekCapStatusWrap">
+              <button type="button" onclick="mekToggleStatusDropdown()" id="mekCapStatusBtn"
+                style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;min-width:90px;">
+                <span id="mekCapStatusLabel">All</span> <i class="fas fa-chevron-down" style="font-size:10px;color:#a0aec0;"></i>
+              </button>
+              <div id="mekCapStatusMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;min-width:150px;padding:6px 0;">
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="keluar" onchange="mekStatusFilterChange()" style="cursor:pointer;"> Keluar
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="loading" onchange="mekStatusFilterChange()" style="cursor:pointer;"> Loading
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="daftar" onchange="mekStatusFilterChange()" style="cursor:pointer;"> Daftar/Antrian
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="belum" onchange="mekStatusFilterChange()" style="cursor:pointer;"> Belum
+                </label>
+                <hr style="margin:4px 0;border:none;border-top:1px solid #e2e8f0;">
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:12px;color:#718096;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" id="mekCapStatusAll" onchange="mekStatusAllChange()" checked style="cursor:pointer;"> Semua
+                </label>
+              </div>
+            </div>
             <button class="btn-filter" onclick="mekLoadCapaian()"><i class="fas fa-search"></i> Tampilkan</button>
             <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
           </div>
@@ -4963,6 +4988,31 @@
               <option value="JAYANTI 2" selected>JAYANTI 2</option>
               <option value="__NO_PLAN__">TANPA PLANNING</option>
             </select>
+            <label>Status</label>
+            <div style="position:relative;display:inline-block;" id="mekCapStatusWrapW">
+              <button type="button" onclick="mekToggleStatusDropdown('W')" id="mekCapStatusBtnW"
+                style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;min-width:90px;">
+                <span id="mekCapStatusLabelW">All</span> <i class="fas fa-chevron-down" style="font-size:10px;color:#a0aec0;"></i>
+              </button>
+              <div id="mekCapStatusMenuW" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;min-width:150px;padding:6px 0;">
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="keluar" onchange="mekStatusFilterChange('W')" style="cursor:pointer;"> Keluar
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="loading" onchange="mekStatusFilterChange('W')" style="cursor:pointer;"> Loading
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="daftar" onchange="mekStatusFilterChange('W')" style="cursor:pointer;"> Daftar/Antrian
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" value="belum" onchange="mekStatusFilterChange('W')" style="cursor:pointer;"> Belum
+                </label>
+                <hr style="margin:4px 0;border:none;border-top:1px solid #e2e8f0;">
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:12px;color:#718096;font-weight:400;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background=''">
+                  <input type="checkbox" id="mekCapStatusAllW" onchange="mekStatusAllChange('W')" checked style="cursor:pointer;"> Semua
+                </label>
+              </div>
+            </div>
             <button class="btn-filter" onclick="mekCapApplyWeek()"><i class="fas fa-search"></i> Tampilkan</button>
             <button class="btn-filter secondary" onclick="mekResetCapaian()"><i class="fas fa-times"></i> Reset</button>
           </div>
