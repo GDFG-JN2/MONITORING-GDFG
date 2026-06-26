@@ -273,6 +273,17 @@ const API = (function () {
   }
 
   // ============================================================
+  // STOCK JALUR LOG
+  // ============================================================
+  function saveInputJalurLog(rows, onSuccess, onFailure) {
+    run("saveInputJalurLog", { rows }, onSuccess, onFailure);
+  }
+
+  function saveOutputJalurLog(rows, onSuccess, onFailure) {
+    run("saveOutputJalurLog", { rows }, onSuccess, onFailure);
+  }
+
+  // ============================================================
   // Public API
   // ============================================================
   return {
@@ -306,7 +317,9 @@ const API = (function () {
     // bin loc
     getBinSkuList, getBinSkuStdList, saveBinMovement,
     getBinCurrent, getBinMovement, getBinFifoAllocation,
-    updateMekAntrianRow
+    updateMekAntrianRow,
+    // stock jalur log
+    saveInputJalurLog, saveOutputJalurLog
   };
 
 })();

@@ -66,6 +66,9 @@
     'getBinMovement':      function(a){ return a[0]||{}; },
     'getBinFifoAllocation':function(a){ return {sku:a[0], qty:a[1]}; },
     'updateMekAntrianRow': function(a){ return a[0]||{}; },
+    // Stock Jalur Log
+    'saveInputJalurLog':  function(a){ return {rows: a[0]||[]}; },
+    'saveOutputJalurLog': function(a){ return {rows: a[0]||[]}; },
   };
 
   var handler = {

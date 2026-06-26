@@ -181,7 +181,34 @@ function sjInitPage(){
   }
   function sjZoom(d){_sjZoom=Math.min(150,Math.max(60,_sjZoom+d));var t=document.getElementById('sjTbl');if(t)t.style.fontSize=(_sjZoom/100*12)+'px';var l=document.getElementById('sjZoomLabel');if(l)l.textContent=_sjZoom+'%';}
   function sjZoomReset(){_sjZoom=100;var t=document.getElementById('sjTbl');if(t)t.style.fontSize='';var l=document.getElementById('sjZoomLabel');if(l)l.textContent='100%';}
-  function sjClearTable(){if(!confirm('Yakin clear data input?'))return;sjInitRows(30);showToast('Tabel Input berhasil di-clear','');}
+  function sjClearTable(){
+    if(!confirm('Yakin clear data input?')) return;
+    // Collect semua baris yang ada datanya
+    var rows = [];
+    document.querySelectorAll('#sjTbody tr').forEach(function(tr){
+      var sku     = _sjRawText(tr.querySelector('[data-col="sku"]'));
+      var prodate = _sjRawText(tr.querySelector('[data-col="prodate"]'));
+      if(!sku && !prodate) return;
+      var statusEl = tr.querySelector('[data-col="status"]');
+      var status   = statusEl ? statusEl.textContent.trim() : '';
+      rows.push({
+        prodate : prodate,
+        sku     : sku,
+        nama    : _sjRawText(tr.querySelector('[data-col="nama"]')),
+        qty     : _sjRawText(tr.querySelector('[data-col="qty"]')),
+        shift   : _sjRawText(tr.querySelector('[data-col="shift"]')),
+        plant   : _sjRawText(tr.querySelector('[data-col="plant"]')),
+        catatan : _sjRawText(tr.querySelector('[data-col="catatan"]')),
+        status  : status
+      });
+    });
+    if(!rows.length){ sjInitRows(30); showToast('Tabel Input berhasil di-clear',''); return; }
+    // Log dulu ke INPUT_JALUR, baru clear
+    API.run('saveInputJalurLog', {rows: rows},
+      function(){ sjInitRows(30); showToast('Tabel Input berhasil di-clear',''); },
+      function(){ sjInitRows(30); showToast('Tabel Input berhasil di-clear',''); }
+    );
+  }
   function _sjCollect(){
     var data=[];
     document.querySelectorAll('#sjTbody tr').forEach(function(r){
@@ -410,7 +437,35 @@ function sjInitPage(){
   }
   function soZoom(d){_soZoom=Math.min(150,Math.max(60,_soZoom+d));var t=document.getElementById('soTbl');if(t)t.style.fontSize=(_soZoom/100*12)+'px';var l=document.getElementById('soZoomLabel');if(l)l.textContent=_soZoom+'%';}
   function soZoomReset(){_soZoom=100;var t=document.getElementById('soTbl');if(t)t.style.fontSize='';var l=document.getElementById('soZoomLabel');if(l)l.textContent='100%';}
-  function soClearTable(){if(!confirm('Yakin clear data output?'))return;soInitRows(30);showToast('Tabel Output berhasil di-clear','');}
+  function soClearTable(){
+    if(!confirm('Yakin clear data output?')) return;
+    var rows = [];
+    document.querySelectorAll('#soTbody tr').forEach(function(tr){
+      var sku     = _sjRawText(tr.querySelector('[data-col="sku"]'));
+      var prodate = _sjRawText(tr.querySelector('[data-col="prodate"]'));
+      if(!sku && !prodate) return;
+      var statusEl = tr.querySelector('[data-col="status"]');
+      var status   = statusEl ? statusEl.textContent.trim() : '';
+      rows.push({
+        prodate   : prodate,
+        sku       : sku,
+        qty       : _sjRawText(tr.querySelector('[data-col="qty"]')),
+        tglkeluar : _sjRawText(tr.querySelector('[data-col="tglkeluar"]')),
+        nomobil   : _sjRawText(tr.querySelector('[data-col="nomobil"]')),
+        nodo      : _sjRawText(tr.querySelector('[data-col="nodo"]')),
+        tujuan    : _sjRawText(tr.querySelector('[data-col="tujuan"]')),
+        plant     : _sjRawText(tr.querySelector('[data-col="plant"]')),
+        catatan   : _sjRawText(tr.querySelector('[data-col="catatan"]')),
+        status    : status
+      });
+    });
+    if(!rows.length){ soInitRows(30); showToast('Tabel Output berhasil di-clear',''); return; }
+    // Log dulu ke OUTPUT_JALUR, baru clear
+    API.run('saveOutputJalurLog', {rows: rows},
+      function(){ soInitRows(30); showToast('Tabel Output berhasil di-clear',''); },
+      function(){ soInitRows(30); showToast('Tabel Output berhasil di-clear',''); }
+    );
+  }
   function _soCollect(){
     var data=[];
     document.querySelectorAll('#soTbody tr').forEach(function(r){
