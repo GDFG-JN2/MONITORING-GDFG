@@ -433,24 +433,62 @@ function sjInitPage(){
     if(_soSaving){showToast('\u23f3 Sedang memproses...','');return;}
     var data=_soCollect();
     if(!data||!data.length){showToast('\u26a0\ufe0f Tidak ada data baru (semua sudah DONE atau tidak valid).','error');return;}
-    var payload=data.map(function(d){return {prodate:d.prodate,sku:d.sku,qty:d.qty,tglkeluar:d.tglkeluar,nomobil:d.nomobil,nodo:d.nodo,tujuan:d.tujuan,plant:d.plant,catatan:d.catatan||''};});
     var btn=document.getElementById('btnSoSave');
     if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Memproses...';}
     _soSaving=true;
-    showToast('\u23f3 Memproses '+payload.length+' baris...','');
-    google.script.run
-      .withSuccessHandler(function(res){
+    var total=data.length, doneCount=0, errCount=0, idx=0;
+    showToast('\u23f3 Memproses baris 1 dari '+total+'...','');
+
+    function processNext(){
+      if(idx>=total){
         _soSaving=false;
         if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-truck"></i> Simpan & Kirim';}
-        if(res&&res.success){showToast('\u2705 Selesai! '+res.done+' berhasil.','success');_soMarkResult(data,res.results||[]);_soUpdateTotals();}
-        else showToast('\u274c Gagal: '+(res&&res.message?res.message:'Unknown error'),'error');
-      })
-      .withFailureHandler(function(err){
-        _soSaving=false;
-        if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-truck"></i> Simpan & Kirim';}
-        showToast('\u274c Error: '+(err&&err.message?err.message:String(err)),'error');
-      })
-      .rekapOutputJalur(payload);
+        _soUpdateTotals();
+        var msg='\u2705 Selesai! '+doneCount+' berhasil'+(errCount?' | \u274c '+errCount+' error':'')+'.'
+        showToast(msg, errCount?'error':'success');
+        return;
+      }
+      var d=data[idx];
+      var payload=[{prodate:d.prodate,sku:d.sku,qty:d.qty,tglkeluar:d.tglkeluar,nomobil:d.nomobil,nodo:d.nodo,tujuan:d.tujuan,plant:d.plant,catatan:d.catatan||''}];
+
+      if(btn) btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> '+(idx+1)+'/'+total+'...';
+
+      var statusTd=d._row?d._row.querySelector('[data-col="status"]'):null;
+      if(statusTd) statusTd.innerHTML='<span style="color:#718096;font-size:11px;"><i class="fas fa-spinner fa-spin"></i></span>';
+
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(statusTd){
+            statusTd.innerHTML='';
+            var resStatus=res&&res.results&&res.results[0]?res.results[0].status:'';
+            var isDone=resStatus.indexOf('DONE')===0;
+            var isErr=resStatus.indexOf('Error')>=0||resStatus.indexOf('Warning')>=0;
+            var cls=isDone?'so-status-done':isErr?'so-status-error':'so-status-warn';
+            var s=document.createElement('span');s.className=cls;s.textContent=resStatus||'DONE';
+            statusTd.appendChild(s);
+            if(isDone){d._row.style.background='#f0fff4';doneCount++;}
+            else if(isErr){d._row.style.background='#fff5f5';errCount++;}
+            else{d._row.style.background='#fffbeb';doneCount++;}
+          }
+          idx++;
+          if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
+          processNext();
+        })
+        .withFailureHandler(function(err){
+          if(statusTd){
+            statusTd.innerHTML='';
+            var s=document.createElement('span');s.className='so-status-error';
+            s.textContent='Error';statusTd.appendChild(s);
+            if(d._row) d._row.style.background='#fff5f5';
+          }
+          errCount++;
+          idx++;
+          if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
+          processNext();
+        })
+        .rekapOutputJalur(payload);
+    }
+    processNext();
   }
   function _soMarkResult(dataWithRows,results){
     dataWithRows.forEach(function(d,i){
