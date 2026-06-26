@@ -203,24 +203,74 @@ function sjInitPage(){
     if(_sjSaving){showToast('\u23f3 Sedang memproses...','');return;}
     var data=_sjCollect();
     if(!data||!data.length){showToast('\u26a0\ufe0f Tidak ada data baru (semua sudah DONE atau tidak valid).','error');return;}
-    var payload=data.map(function(d){return {prodate:d.prodate,sku:d.sku,nama:d.nama||'',qty:d.qty,shift:d.shift,plant:d.plant,catatan:d.catatan||''};});
     var btn=document.getElementById('btnSjSave');
-    if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Menyimpan...';}
+    if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Memproses...';}
     _sjSaving=true;
-    showToast('\u23f3 Menyimpan '+payload.length+' baris...','');
-    google.script.run
-      .withSuccessHandler(function(res){
+    var total=data.length, doneCount=0, errCount=0, idx=0;
+    showToast('\u23f3 Memproses baris 1 dari '+total+'...','');
+
+    function processNext(){
+      if(idx>=total){
+        // Semua selesai
         _sjSaving=false;
         if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan & Rekap';}
-        if(res&&res.success){showToast('\u2705 Berhasil merekap '+payload.length+' baris!','success');_sjMarkDone(data,res.done||[],res.errors||[]);}
-        else showToast('\u274c Gagal: '+(res&&res.message?res.message:'Unknown error'),'error');
-      })
-      .withFailureHandler(function(err){
-        _sjSaving=false;
-        if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Simpan & Rekap';}
-        showToast('\u274c Error: '+(err&&err.message?err.message:String(err)),'error');
-      })
-      .rekapStockJalur(payload);
+        var msg='\u2705 Selesai! '+doneCount+' berhasil'+(errCount?' | \u274c '+errCount+' error':'')+'.'
+        showToast(msg, errCount?'error':'success');
+        return;
+      }
+      var d=data[idx];
+      var payload=[{prodate:d.prodate,sku:d.sku,nama:d.nama||'',qty:d.qty,shift:d.shift,plant:d.plant,catatan:d.catatan||''}];
+
+      // Update tombol progress
+      if(btn) btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> '+(idx+1)+'/'+total+'...';
+
+      // Tandai baris sedang diproses
+      var statusTd=d._row?d._row.querySelector('[data-col="status"]'):null;
+      if(statusTd){statusTd.innerHTML='<span style="color:#718096;font-size:11px;"><i class="fas fa-spinner fa-spin"></i></span>';}
+
+      google.script.run
+        .withSuccessHandler(function(res){
+          // Tandai status baris ini
+          if(statusTd){
+            statusTd.innerHTML='';
+            var key=d.sku+'_'+d.shift;
+            var isDone=res&&res.success&&res.done&&res.done.indexOf(key)>=0;
+            var isErr =res&&(!res.success||(res.errors&&res.errors.indexOf(d.sku)>=0));
+            if(isDone){
+              var s=document.createElement('span');s.className='sj-status-done';s.textContent='DONE';
+              statusTd.appendChild(s);if(d._row)d._row.style.background='#f0fff4';
+              doneCount++;
+            } else if(isErr){
+              var s=document.createElement('span');s.className='sj-status-error';
+              s.textContent='Error'+(res&&res.message?' ('+res.message+')':'');
+              statusTd.appendChild(s);if(d._row)d._row.style.background='#fff5f5';
+              errCount++;
+            } else {
+              // Success tapi tidak ada di done[] — mungkin format key beda
+              var s=document.createElement('span');s.className='sj-status-done';s.textContent='DONE';
+              statusTd.appendChild(s);if(d._row)d._row.style.background='#f0fff4';
+              doneCount++;
+            }
+          }
+          idx++;
+          if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
+          processNext();
+        })
+        .withFailureHandler(function(err){
+          if(statusTd){
+            statusTd.innerHTML='';
+            var s=document.createElement('span');s.className='sj-status-error';
+            s.textContent='Error';statusTd.appendChild(s);
+            if(d._row)d._row.style.background='#fff5f5';
+          }
+          errCount++;
+          idx++;
+          if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
+          processNext();
+        })
+        .rekapStockJalur(payload);
+    }
+    processNext();
   }
   function _sjMarkDone(dataWithRows,done,errors){
     dataWithRows.forEach(function(d){
