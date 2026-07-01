@@ -255,57 +255,46 @@ function sjInitPage(){
       var statusTd=d._row?d._row.querySelector('[data-col="status"]'):null;
       if(statusTd){statusTd.innerHTML='<span style="color:#718096;font-size:11px;"><i class="fas fa-spinner fa-spin"></i></span>';}
 
-      d._retry = d._retry || 0;
-      function onSjSuccess(res){
-        d._retry=0;
-        if(statusTd){
-          statusTd.innerHTML='';
-          var key=d.sku+'_'+d.shift;
-          var isDone=res&&res.success&&res.done&&res.done.indexOf(key)>=0;
-          var isErr =res&&(!res.success||(res.errors&&res.errors.indexOf(d.sku)>=0));
-          if(isDone){
-            var s=document.createElement('span');s.className='sj-status-done';s.textContent='DONE';
-            statusTd.appendChild(s);if(d._row)d._row.style.background='#f0fff4';doneCount++;
-          } else if(isErr){
-            var s=document.createElement('span');s.className='sj-status-error';
-            s.textContent='Error'+(res&&res.message?' ('+res.message+')':'');
-            statusTd.appendChild(s);if(d._row)d._row.style.background='#fff5f5';errCount++;
-          } else {
-            var s=document.createElement('span');s.className='sj-status-done';s.textContent='DONE';
-            statusTd.appendChild(s);if(d._row)d._row.style.background='#f0fff4';doneCount++;
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(statusTd){
+            statusTd.innerHTML='';
+            var key=d.sku+'_'+d.shift;
+            var isDone=res&&res.success&&res.done&&res.done.indexOf(key)>=0;
+            var isErr =res&&(!res.success||(res.errors&&res.errors.indexOf(d.sku)>=0));
+            if(isDone){
+              var s=document.createElement('span');s.className='sj-status-done';s.textContent='DONE';
+              statusTd.appendChild(s);if(d._row)d._row.style.background='#f0fff4';
+              doneCount++;
+            } else if(isErr){
+              var s=document.createElement('span');s.className='sj-status-error';
+              s.textContent='Error'+(res&&res.message?' ('+res.message+')':'');
+              statusTd.appendChild(s);if(d._row)d._row.style.background='#fff5f5';
+              errCount++;
+            } else {
+              var s=document.createElement('span');s.className='sj-status-done';s.textContent='DONE';
+              statusTd.appendChild(s);if(d._row)d._row.style.background='#f0fff4';
+              doneCount++;
+            }
           }
-        }
-        idx++;
-        if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
-        processNext();
-      }
-      function onSjFailure(err){
-        var MAX_RETRY=2, RETRY_DELAY=2000;
-        if(d._retry < MAX_RETRY){
-          d._retry++;
-          if(statusTd) statusTd.innerHTML='<span style="color:#d69e2e;font-size:11px;"><i class="fas fa-redo fa-spin"></i> Retry '+d._retry+'...</span>';
-          setTimeout(function(){
-            google.script.run
-              .withSuccessHandler(onSjSuccess)
-              .withFailureHandler(onSjFailure)
-              .rekapStockJalur(payload);
-          }, RETRY_DELAY);
-        } else {
-          d._retry=0;
+          idx++;
+          if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
+          processNext();
+        })
+        .withFailureHandler(function(err){
           if(statusTd){
             statusTd.innerHTML='';
             var s=document.createElement('span');s.className='sj-status-error';
-            s.textContent='Error';statusTd.appendChild(s);
+            // Peringatan jangan langsung retry — data mungkin sudah terinput
+            s.textContent='Network Error \u2014 cek spreadsheet dulu sebelum submit ulang!';
+            statusTd.appendChild(s);
             if(d._row)d._row.style.background='#fff5f5';
           }
-          errCount++;idx++;
+          errCount++;
+          idx++;
           if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
           processNext();
-        }
-      }
-      google.script.run
-        .withSuccessHandler(onSjSuccess)
-        .withFailureHandler(onSjFailure)
+        })
         .rekapStockJalur(payload);
     }
     processNext();
@@ -522,52 +511,37 @@ function sjInitPage(){
       var statusTd=d._row?d._row.querySelector('[data-col="status"]'):null;
       if(statusTd) statusTd.innerHTML='<span style="color:#718096;font-size:11px;"><i class="fas fa-spinner fa-spin"></i></span>';
 
-      d._retry = d._retry || 0;
-      function onSoSuccess(res){
-        d._retry=0;
-        if(statusTd){
-          statusTd.innerHTML='';
-          var resStatus=res&&res.results&&res.results[0]?res.results[0].status:'';
-          var isDone=resStatus.indexOf('DONE')===0;
-          var isErr=resStatus.indexOf('Error')>=0||resStatus.indexOf('Warning')>=0;
-          var cls=isDone?'so-status-done':isErr?'so-status-error':'so-status-warn';
-          var s=document.createElement('span');s.className=cls;s.textContent=resStatus||'DONE';
-          statusTd.appendChild(s);
-          if(isDone){d._row.style.background='#f0fff4';doneCount++;}
-          else if(isErr){d._row.style.background='#fff5f5';errCount++;}
-          else{d._row.style.background='#fffbeb';doneCount++;}
-        }
-        idx++;
-        if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
-        processNext();
-      }
-      function onSoFailure(err){
-        var MAX_RETRY=2, RETRY_DELAY=2000;
-        if(d._retry < MAX_RETRY){
-          d._retry++;
-          if(statusTd) statusTd.innerHTML='<span style="color:#d69e2e;font-size:11px;"><i class="fas fa-redo fa-spin"></i> Retry '+d._retry+'...</span>';
-          setTimeout(function(){
-            google.script.run
-              .withSuccessHandler(onSoSuccess)
-              .withFailureHandler(onSoFailure)
-              .rekapOutputJalur(payload);
-          }, RETRY_DELAY);
-        } else {
-          d._retry=0;
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(statusTd){
+            statusTd.innerHTML='';
+            var resStatus=res&&res.results&&res.results[0]?res.results[0].status:'';
+            var isDone=resStatus.indexOf('DONE')===0;
+            var isErr=resStatus.indexOf('Error')>=0||resStatus.indexOf('Warning')>=0;
+            var cls=isDone?'so-status-done':isErr?'so-status-error':'so-status-warn';
+            var s=document.createElement('span');s.className=cls;s.textContent=resStatus||'DONE';
+            statusTd.appendChild(s);
+            if(isDone){d._row.style.background='#f0fff4';doneCount++;}
+            else if(isErr){d._row.style.background='#fff5f5';errCount++;}
+            else{d._row.style.background='#fffbeb';doneCount++;}
+          }
+          idx++;
+          if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
+          processNext();
+        })
+        .withFailureHandler(function(err){
           if(statusTd){
             statusTd.innerHTML='';
             var s=document.createElement('span');s.className='so-status-error';
-            s.textContent='Error';statusTd.appendChild(s);
+            s.textContent='Network Error \u2014 cek spreadsheet dulu sebelum submit ulang!';
+            statusTd.appendChild(s);
             if(d._row) d._row.style.background='#fff5f5';
           }
-          errCount++;idx++;
+          errCount++;
+          idx++;
           if(idx<total) showToast('\u23f3 Memproses baris '+(idx+1)+' dari '+total+'...','');
           processNext();
-        }
-      }
-      google.script.run
-        .withSuccessHandler(onSoSuccess)
-        .withFailureHandler(onSoFailure)
+        })
         .rekapOutputJalur(payload);
     }
     processNext();
