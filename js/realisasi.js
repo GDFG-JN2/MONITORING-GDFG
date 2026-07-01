@@ -264,11 +264,24 @@ function initRealForm(){
       document.getElementById('realSummaryBody').innerHTML = "<div class='spinner' style='margin:20px auto;'></div>";
       google.script.run
         .withSuccessHandler(function(res){
+          if(!res || !res.success){
+            document.getElementById('realSummaryBody').innerHTML =
+              "<p style='text-align:center;color:#e53e3e;padding:20px;font-size:13px;'>"
+              +"<i class='fas fa-exclamation-circle' style='font-size:24px;display:block;margin-bottom:8px;'></i>"
+              +"Gagal memuat data. "
+              +"<button onclick='loadSummaryReal()' style='margin-left:8px;padding:4px 12px;border-radius:4px;border:1px solid #e53e3e;background:#fff;color:#e53e3e;cursor:pointer;'>Coba Lagi</button>"
+              +"<br><small style='color:#a0aec0;margin-top:4px;display:block;'>"+(res&&res.message||'')+"</small></p>";
+            return;
+          }
           window.realSummaryData = res.data || [];
           renderSummaryReal(window.realSummaryData);
         })
         .withFailureHandler(function(){
-          document.getElementById('realSummaryBody').innerHTML = "<p style='text-align:center;color:#e53e3e;padding:20px'>Gagal memuat data.</p>";
+          document.getElementById('realSummaryBody').innerHTML =
+            "<p style='text-align:center;color:#e53e3e;padding:20px;font-size:13px;'>"
+            +"<i class='fas fa-exclamation-circle' style='font-size:24px;display:block;margin-bottom:8px;'></i>"
+            +"Gagal memuat data. "
+            +"<button onclick='loadSummaryReal()' style='margin-left:8px;padding:4px 12px;border-radius:4px;border:1px solid #e53e3e;background:#fff;color:#e53e3e;cursor:pointer;'>Coba Lagi</button></p>";
         })
         .getRealisasiData(from, to);
     }
@@ -2777,6 +2790,15 @@ function initRealForm(){
         .withSuccessHandler(function(fdosRes){
           google.script.run
             .withSuccessHandler(function(realRes){
+              if(!realRes || !realRes.success){
+                showToast('❌ Gagal load data Realisasi — coba lagi','error');
+                document.getElementById('realSummaryBody').innerHTML =
+                  "<p style='text-align:center;color:#e53e3e;padding:20px;font-size:13px;'>"
+                  +"<i class='fas fa-exclamation-circle' style='font-size:24px;display:block;margin-bottom:8px;'></i>"
+                  +"Gagal memuat data. "
+                  +"<button onclick='loadDirectSimple()' style='margin-left:8px;padding:4px 12px;border-radius:4px;border:1px solid #e53e3e;background:#fff;color:#e53e3e;cursor:pointer;'>Coba Lagi</button></p>";
+                return;
+              }
               renderDirectSimple(from, to, fdosRes, realRes);
             })
             .withFailureHandler(function(){ showToast('❌ Gagal load data Realisasi','error'); })
