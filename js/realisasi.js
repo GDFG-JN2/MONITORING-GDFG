@@ -264,24 +264,11 @@ function initRealForm(){
       document.getElementById('realSummaryBody').innerHTML = "<div class='spinner' style='margin:20px auto;'></div>";
       google.script.run
         .withSuccessHandler(function(res){
-          if(!res || !res.success){
-            document.getElementById('realSummaryBody').innerHTML =
-              "<p style='text-align:center;color:#e53e3e;padding:20px;font-size:13px;'>"
-              +"<i class='fas fa-exclamation-circle' style='font-size:24px;display:block;margin-bottom:8px;'></i>"
-              +"Gagal memuat data. "
-              +"<button onclick='loadSummaryReal()' style='margin-left:8px;padding:4px 12px;border-radius:4px;border:1px solid #e53e3e;background:#fff;color:#e53e3e;cursor:pointer;'>Coba Lagi</button>"
-              +"<br><small style='color:#a0aec0;margin-top:4px;display:block;'>"+(res&&res.message||'')+"</small></p>";
-            return;
-          }
           window.realSummaryData = res.data || [];
           renderSummaryReal(window.realSummaryData);
         })
         .withFailureHandler(function(){
-          document.getElementById('realSummaryBody').innerHTML =
-            "<p style='text-align:center;color:#e53e3e;padding:20px;font-size:13px;'>"
-            +"<i class='fas fa-exclamation-circle' style='font-size:24px;display:block;margin-bottom:8px;'></i>"
-            +"Gagal memuat data. "
-            +"<button onclick='loadSummaryReal()' style='margin-left:8px;padding:4px 12px;border-radius:4px;border:1px solid #e53e3e;background:#fff;color:#e53e3e;cursor:pointer;'>Coba Lagi</button></p>";
+          document.getElementById('realSummaryBody').innerHTML = "<p style='text-align:center;color:#e53e3e;padding:20px'>Gagal memuat data.</p>";
         })
         .getRealisasiData(from, to);
     }
@@ -2790,15 +2777,6 @@ function initRealForm(){
         .withSuccessHandler(function(fdosRes){
           google.script.run
             .withSuccessHandler(function(realRes){
-              if(!realRes || !realRes.success){
-                showToast('❌ Gagal load data Realisasi — coba lagi','error');
-                document.getElementById('realSummaryBody').innerHTML =
-                  "<p style='text-align:center;color:#e53e3e;padding:20px;font-size:13px;'>"
-                  +"<i class='fas fa-exclamation-circle' style='font-size:24px;display:block;margin-bottom:8px;'></i>"
-                  +"Gagal memuat data. "
-                  +"<button onclick='loadDirectSimple()' style='margin-left:8px;padding:4px 12px;border-radius:4px;border:1px solid #e53e3e;background:#fff;color:#e53e3e;cursor:pointer;'>Coba Lagi</button></p>";
-                return;
-              }
               renderDirectSimple(from, to, fdosRes, realRes);
             })
             .withFailureHandler(function(){ showToast('❌ Gagal load data Realisasi','error'); })
@@ -3170,7 +3148,7 @@ function initRealForm(){
           if(pendingan === 0){
             html += '<span class="direct-day-val">—</span>';
           } else {
-            html += '<span class="direct-pendgn-badge '+pendClass+'">'+pendSign+fmtN(pendingan)+' DO</span>';
+            html += '<span class="direct-pendgn-badge '+pendClass+'">'+pendSign+fmtN(pendingan)+' mobil</span>';
           }
           html += '</div>';
 
@@ -3238,7 +3216,7 @@ function initRealForm(){
           +'<span class="direct-sisa-val" style="color:'+(grandSisaPlan>0?'#f6e05e':'#68d391')+';">'+fmtN(grandSisaPlan)+' ©</span></div>';
         html += '<div style="display:flex;justify-content:space-between;width:100%;align-items:center;">'
           +'<span class="direct-sisa-label">Pendingan SPE/DO'+_lastDateLabel+'</span>'
-          +'<span class="direct-sisa-val" style="color:'+pMobilColor+';">'+( grandPendMobil===0 ? '—' : pMobilSign+fmtN(grandPendMobil)+' DO')+'</span></div>';
+          +'<span class="direct-sisa-val" style="color:'+pMobilColor+';">'+( grandPendMobil===0 ? '—' : pMobilSign+fmtN(grandPendMobil)+' mobil')+'</span></div>';
         html += '</div>';
       }
 
@@ -3581,7 +3559,7 @@ function initRealForm(){
             if(val===null) return '<span class="direct-day-val">\u2014</span>';
             var cls = val>=0?'ok':'over';
             var sign = val>0?'+':'';
-            return '<span class="direct-pendgn-badge '+cls+'">'+sign+fmtN(val)+' DO</span>';
+            return '<span class="direct-pendgn-badge '+cls+'">'+sign+fmtN(val)+' mobil</span>';
           }
 
           html += '<div class="direct-day-card">';
@@ -3652,7 +3630,7 @@ function initRealForm(){
           +(gtCancel>0?'<div><span style="font-size:11px;opacity:.6;">Total Planning (Real + Cancel)</span>'
             +'<div style="font-size:16px;font-weight:800;color:#f6e05e;">'+fmtN(gtTotalPlanning)+' mobil</div></div>':'')
           +(gtPlan>0?'<div><span style="font-size:11px;opacity:.6;">Pendingan DO ('+formatTglDisplay(lastDateWithData)+')</span>'
-            +'<div style="font-size:16px;font-weight:800;color:'+gtPendColor+';">'+gtPendSign+fmtN(gtPend)+' DO</div></div>':'')
+            +'<div style="font-size:16px;font-weight:800;color:'+gtPendColor+';">'+gtPendSign+fmtN(gtPend)+' mobil</div></div>':'')
           +'</div>';
       }
       body.innerHTML = "<div style='animation:fadeIn .25s ease both'>"+html+"</div>";
@@ -3678,14 +3656,14 @@ function initRealForm(){
       document.getElementById('ssfPeekKrt').innerText    = fmtN(data.realisasiKrt)+' ©';
       document.getElementById('ssfPeekPct').innerText    = data.pctReal+'%';
       document.getElementById('ssfPeekSisa').innerText   = fmtN(data.totalPlan||data.sisaPlan)+' ©';
-      document.getElementById('ssfPeekPend').innerText   = data.pendMobil===0?'—':(data.pendMobil>0?'+':'')+fmtN(data.pendMobil)+' DO';
+      document.getElementById('ssfPeekPend').innerText   = data.pendMobil===0?'—':(data.pendMobil>0?'+':'')+fmtN(data.pendMobil)+' mobil';
 
       // Detail
       document.getElementById('ssfDetailKrt').innerText  = fmtN(data.realisasiKrt)+' © ('+data.pctReal+'%)';
       document.getElementById('ssfDetailSisa').innerText = fmtN(data.totalPlan||data.sisaPlan)+' © (sisa: '+fmtN(data.sisaPlan)+' ©)';
       var pendColor = data.pendMobil>0?'#68d391':data.pendMobil<0?'#fc8181':'#a0aec0';
       var pendEl = document.getElementById('ssfDetailPend');
-      pendEl.innerText = data.pendMobil===0?'—':(data.pendMobil>0?'+':'')+fmtN(data.pendMobil)+' DO';
+      pendEl.innerText = data.pendMobil===0?'—':(data.pendMobil>0?'+':'')+fmtN(data.pendMobil)+' mobil';
       pendEl.style.color = pendColor;
       document.getElementById('ssfDetailPeriode').innerText = (data.weekLabel?data.weekLabel+' · ':'')+data.periodeLabel;
 
