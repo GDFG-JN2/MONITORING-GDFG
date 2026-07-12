@@ -1523,6 +1523,7 @@ function _mekCollectManualRows() {
 // ======================================================
 var _mekCapEmailData    = [];
 var _mekCapEmailRowData = [];  // data per baris untuk popup detail
+var _mekDitolakData     = {};  // rowidx → [{nopol,noContainer,waktuDaftar,waktuDitolak}] — untuk popup ditolak
 var _mekCapEmailSummary = {};
 var _mekCapEmailView    = 'plan';
 var _mekCapEmailLastFrom = '';
@@ -1663,9 +1664,14 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
         ? '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.tglDaftar||'')+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.noContainer||'')+'\',\''+_mekEsc(r.ekspedisi||'')+'\')" title="Edit No Pol / No Container / Ekspedisi" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>'
         : '';
       _mekCapEmailRowData.push({sku:r.sku,nama:r.nama,qty:r.qty||'',qt:r.qt||'',keterangan:r.keterangan||'',note:r.note||'',items:r.items||[]});
+      var ditolakBadge = '';
+      if (r.isFirstRow && r.ditolakList && r.ditolakList.length) {
+        _mekDitolakData[_mekCapEmailRowData.length-1] = r.ditolakList;
+        ditolakBadge = '<span onclick="event.stopPropagation();mekShowDitolakPopup('+(_mekCapEmailRowData.length-1)+')" title="Ada container ditolak, klik untuk detail" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e53e3e;margin-left:5px;cursor:pointer;vertical-align:middle;"></span>';
+      }
       html+='<tr style="'+bg+';cursor:pointer;" data-rowidx="'+(_mekCapEmailRowData.length-1)+'" onclick="mekShowRowDetail(this)">' +
         '<td style="'+CS+'text-align:center;color:#a0aec0;" data-edit-btn>'+( r.isFirstRow ? rowNum+'<br>'+editBtn : editBtn)+'</td>' +
-        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?_mekEsc(r.noSo||'—'):'')+  '</td>' +
+        '<td style="'+CS+'font-weight:600;color:#2b6cb0;">'+(r.isFirstRow?(_mekEsc(r.noSo||'—')+ditolakBadge):'')+  '</td>' +
         '<td style="'+CS+'font-weight:700;">'+_mekEsc(r.sku||'')+'</td>' +
         '<td style="'+CS+'">'+_mekEsc(r.nama||'')+'</td>' +
         '<td style="'+CS+'text-align:right;font-weight:700;">'+(r.isFirstRow&&r.planCont?r.planCont:'')+'</td>' +
@@ -3039,6 +3045,53 @@ function mekShowRowDetail(trEl) {
   void overlay.offsetWidth;
   overlay.classList.add('show');
 }
+
+// ── Popup info truk DITOLAK per SO ──────────────────────────────
+function mekShowDitolakPopup(rowidx) {
+  var list = _mekDitolakData[rowidx] || [];
+  if (!list.length) return;
+
+  var rows = list.map(function(d, i) {
+    return '<tr style="' + (i % 2 === 0 ? '' : 'background:#f8fafc;') + '">' +
+      '<td style="padding:8px 10px;border-bottom:1px solid #fed7d7;font-weight:600;">' + _mekEsc(d.nopol || '\u2014') + '</td>' +
+      '<td style="padding:8px 10px;border-bottom:1px solid #fed7d7;">' + _mekEsc(d.noContainer || '\u2014') + '</td>' +
+      '<td style="padding:8px 10px;border-bottom:1px solid #fed7d7;">' + _mekEsc(d.waktuDaftar || '\u2014') + '</td>' +
+      '<td style="padding:8px 10px;border-bottom:1px solid #fed7d7;color:#e53e3e;font-weight:600;">' + _mekEsc(d.waktuDitolak || '\u2014') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  var html =
+    '<div id="mekDitolakOverlay" onclick="if(event.target===this) mekCloseDitolakPopup()" ' +
+    'style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;">' +
+      '<div style="background:#fff;border-radius:12px;max-width:600px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">' +
+        '<div style="background:#e53e3e;color:#fff;padding:14px 18px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">' +
+          '<div style="font-weight:700;font-size:14px;"><i class="fas fa-ban" style="margin-right:8px;"></i>Container Ditolak (' + list.length + ')</div>' +
+          '<button onclick="mekCloseDitolakPopup()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;">&times;</button>' +
+        '</div>' +
+        '<div style="padding:0 18px 18px;">' +
+          '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:14px;">' +
+            '<thead><tr style="background:#fff5f5;">' +
+              '<th style="padding:8px 10px;text-align:left;color:#9b2c2c;">No Pol</th>' +
+              '<th style="padding:8px 10px;text-align:left;color:#9b2c2c;">No Container</th>' +
+              '<th style="padding:8px 10px;text-align:left;color:#9b2c2c;">Jam Masuk</th>' +
+              '<th style="padding:8px 10px;text-align:left;color:#9b2c2c;">Jam Ditolak</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  var existing = document.getElementById('mekDitolakOverlay');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function mekCloseDitolakPopup() {
+  var el = document.getElementById('mekDitolakOverlay');
+  if (el) el.remove();
+}
+
 
 function mekShowCardDetail(type) {
   var overlay = document.getElementById('mekCardDetailOverlay');
