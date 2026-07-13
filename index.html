@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *{ box-sizing:border-box; }
     html{ height:100%; min-height:100%; background:#f7fafc; }
@@ -4425,6 +4426,9 @@
             <span style="font-size:13px;font-weight:800;"><i class="fas fa-table" style="margin-right:6px;"></i>Data Monitoring RDC</span>
             <div style="display:flex;align-items:center;gap:8px;">
               <span id="rdcSumRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 DATA</span>
+              <button onclick="rdcDownloadExcel()" id="rdcBtnExcel" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
+                <i class="fas fa-file-excel"></i> Download Excel
+              </button>
               <button onclick="rdcDownloadPdf()" id="rdcBtnPdf" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
                 <i class="fas fa-file-pdf"></i> Download PDF
               </button>
@@ -5382,19 +5386,6 @@
           <div class="app-portal-name">Sistem Antrian GDFG</div>
           <div class="app-portal-desc">Manajemen antrian truk, dock, loading & notifikasi TTS / alarm</div>
           <span class="app-portal-badge app-portal-badge-orange">PWA</span>
-        </div>
-        <div class="app-portal-arrow"><i class="fa-solid fa-arrow-up-right-from-square" style="color:#718096;font-size:16px;"></i></div>
-      </div>
-
-      <!-- Card: GDRM -->
-      <div class="app-portal-card" onclick="_openApp('https://gdrm-mobile.vercel.app/')">
-        <div class="app-portal-icon" style="background:#fff;border:1px solid #e2e8f0;">
-          <img src="icons/gdrm-icon.jpeg" alt="GDRM JN2" style="width:64px;height:64px;border-radius:14px;object-fit:cover;">
-        </div>
-        <div class="app-portal-info">
-          <div class="app-portal-name">GDRM JN2</div>
-          <div class="app-portal-desc">Aplikasi mobile GDRM Mayora</div>
-          <span class="app-portal-badge app-portal-badge-blue">Web App</span>
         </div>
         <div class="app-portal-arrow"><i class="fa-solid fa-arrow-up-right-from-square" style="color:#718096;font-size:16px;"></i></div>
       </div>
