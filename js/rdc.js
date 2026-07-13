@@ -626,7 +626,8 @@ function rdcInitPage(){
     google.script.run
       .withSuccessHandler(function(res){
         resetBtn();
-        _rdcData = (res && res.success) ? (res.data || []) : [];
+        var raw = (res && res.success) ? (res.data || []) : [];
+        _rdcData = _rdcDedupData(raw);
         _rdcRenderSummary(fP, fST, fd, ft);
       })
       .withFailureHandler(function(){
@@ -635,6 +636,41 @@ function rdcInitPage(){
         _rdcRenderSummary(fP, fST, fd, ft);
       })
       .getRdcData('', ''); // kirim kosong → ambil semua, filter di frontend
+  }
+
+  // ── Dedup: DocNo + NoPol + TANGGAL Waktu Muat (kolom K "SCH WAKTU MUAT") sama = duplikat
+  // (kemungkinan akibat retry jaringan). Tanggal saja (tanpa jam) supaya lebih ketat —
+  // dua baris dengan DocNo+NoPol sama tapi beda hari tetap dianggap truk/kunjungan berbeda.
+  // Kalau ketemu duplikat, ambil yang datanya PALING LENGKAP (skor tertinggi:
+  // hitung berapa field datetime kunci yang terisi — IN, Start Loading, Finish Loading, OUT)
+  function _rdcDedupData(rows){
+    function completeness(r){
+      var score = 0;
+      if (r.in_dt)  score++;
+      if (r.sl_dt)  score++;
+      if (r.fl_dt)  score++;
+      if (r.out_dt) score++; // OUT paling berat — data paling lengkap
+      return score;
+    }
+    var map = {};
+    var order = [];
+    rows.forEach(function(r){
+      var tglMuat = _rdcExtractDate(r.sch_muat); // hanya tanggal, jam diabaikan
+      var key = String(r.docno||'').trim() + '|' + String(r.no_pol||'').trim() + '|' + tglMuat;
+      // Kalau salah satu kunci kosong (docno/no_pol/tglMuat), jangan dedup — biarkan lolos apa adanya
+      if (!r.docno || !r.no_pol || !tglMuat) { order.push(r); return; }
+      if (!map[key]) {
+        map[key] = r;
+        order.push(r);
+      } else {
+        if (completeness(r) > completeness(map[key])) {
+          var idx = order.indexOf(map[key]);
+          if (idx >= 0) order[idx] = r;
+          map[key] = r;
+        }
+      }
+    });
+    return order;
   }
 
   function _rdcRenderSummary(fP, fST, fd, ft){
@@ -1083,7 +1119,6 @@ function rdcInitPage(){
     var btn=document.getElementById('rdcBtnExcel');
     if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Membuat...'; }
 
-    // Filter + sort sama persis dengan rdcDownloadPdf / _rdcRenderSummary
     var fP =document.getElementById('rdcFilterPlant').value;
     var fST=document.getElementById('rdcFilterShipTo').value;
     var fd =document.getElementById('rdcFilterFrom').value||'';
@@ -1107,7 +1142,6 @@ function rdcInitPage(){
       return s;
     }
 
-    // ── Header 2 baris — sama persis dengan tabel di web ────────────
     var header1=['#','Ship to Name','EKSPEDISI','NO POL','JENIS MOBIL','ROUTE',
       'SCHEDULE','','STD DURASI (mnt)','LOADING','','','',
       'DELAY','DURASI LOADING (mnt)','SELISIH DURASI (mnt)','DURASI TOTAL IN/OUT',
@@ -1155,45 +1189,40 @@ function rdcInitPage(){
 
     var ws=XLSX.utils.aoa_to_sheet(aoa);
 
-    // ── Merge cells header — sama seperti rowspan/colspan di web ────
     ws['!merges']=[
-      {s:{r:0,c:0},e:{r:1,c:0}},   // #
-      {s:{r:0,c:1},e:{r:1,c:1}},   // Ship to Name
-      {s:{r:0,c:2},e:{r:1,c:2}},   // EKSPEDISI
-      {s:{r:0,c:3},e:{r:1,c:3}},   // NO POL
-      {s:{r:0,c:4},e:{r:1,c:4}},   // JENIS MOBIL
-      {s:{r:0,c:5},e:{r:1,c:5}},   // ROUTE
-      {s:{r:0,c:6},e:{r:0,c:7}},   // SCHEDULE
-      {s:{r:0,c:8},e:{r:1,c:8}},   // STD DURASI
-      {s:{r:0,c:9},e:{r:0,c:12}},  // LOADING
-      {s:{r:0,c:13},e:{r:1,c:13}}, // DELAY
-      {s:{r:0,c:14},e:{r:1,c:14}}, // DURASI LOADING
-      {s:{r:0,c:15},e:{r:1,c:15}}, // SELISIH DURASI
-      {s:{r:0,c:16},e:{r:1,c:16}}, // DURASI TOTAL
-      {s:{r:0,c:17},e:{r:0,c:19}}  // KETERANGAN
+      {s:{r:0,c:0},e:{r:1,c:0}},
+      {s:{r:0,c:1},e:{r:1,c:1}},
+      {s:{r:0,c:2},e:{r:1,c:2}},
+      {s:{r:0,c:3},e:{r:1,c:3}},
+      {s:{r:0,c:4},e:{r:1,c:4}},
+      {s:{r:0,c:5},e:{r:1,c:5}},
+      {s:{r:0,c:6},e:{r:0,c:7}},
+      {s:{r:0,c:8},e:{r:1,c:8}},
+      {s:{r:0,c:9},e:{r:0,c:12}},
+      {s:{r:0,c:13},e:{r:1,c:13}},
+      {s:{r:0,c:14},e:{r:1,c:14}},
+      {s:{r:0,c:15},e:{r:1,c:15}},
+      {s:{r:0,c:16},e:{r:1,c:16}},
+      {s:{r:0,c:17},e:{r:0,c:19}}
     ];
 
     // ── Lebar kolom — AUTO-FIT berdasarkan panjang karakter isi terpanjang per kolom ──
     var numCols = header1.length;
     var colWidths = new Array(numCols).fill(0);
-    // Cek panjang di kedua baris header
     [header1, header2].forEach(function(hr){
       hr.forEach(function(v,ci){ colWidths[ci]=Math.max(colWidths[ci], String(v||'').length); });
     });
-    // Cek panjang tiap baris data (mulai baris ke-3 di aoa)
     for(var ai=2; ai<aoa.length; ai++){
       aoa[ai].forEach(function(v,ci){
         colWidths[ci]=Math.max(colWidths[ci], String(v===null||v===undefined?'':v).length);
       });
     }
-    // Tambah padding kecil, batas minimum & maksimum supaya tidak terlalu sempit/lebar
     ws['!cols']=colWidths.map(function(len){
       var w=Math.max(6, Math.min(28, len+2));
       return {wch:w};
     });
     ws['!rows']=[{hpt:20},{hpt:20}];
 
-    // ── Styling header (fill + bold + center) — style hanya dibaca Excel asli, bukan browser viewer ──
     var range=XLSX.utils.decode_range(ws['!ref']);
     for(var R=0;R<=1;R++){
       for(var C=range.s.c;C<=range.e.c;C++){
@@ -1208,7 +1237,6 @@ function rdcInitPage(){
         };
       }
     }
-    // Style data rows: border tipis + zebra stripe
     for(var R2=2;R2<aoa.length;R2++){
       for(var C2=range.s.c;C2<=range.e.c;C2++){
         var addr2=XLSX.utils.encode_cell({r:R2,c:C2});
@@ -1357,11 +1385,10 @@ function rdcInitPage(){
         if(len>pdfCharLen[ci]) pdfCharLen[ci]=len;
       });
     });
-    // Konversi jumlah karakter → mm (perkiraan ~1.5mm per karakter di font 6px), lalu normalisasi ke total ~380mm
     var mmPerChar=1.55, minMm=8;
     var rawMm=pdfCharLen.map(function(len){ return Math.max(minMm, len*mmPerChar+3); });
     var totalRaw=rawMm.reduce(function(a,b){return a+b;},0);
-    var targetTotal=380; // usable width A3 landscape
+    var targetTotal=380;
     var scale=targetTotal/totalRaw;
     var pdfColMm=rawMm.map(function(w){ return Math.round(w*scale*10)/10; });
 
@@ -1385,7 +1412,6 @@ function rdcInitPage(){
       '<div class="ttl">Monitoring RDC</div>'+
       '<div class="sub">'+judulFilter+'</div>'+
       '<table>'+
-        // colgroup — lebar dihitung otomatis dari panjang karakter terpanjang tiap kolom
         '<colgroup>'+
           pdfColMm.map(function(w){ return '<col style="width:'+w+'mm">'; }).join('')+
         '</colgroup>'+
