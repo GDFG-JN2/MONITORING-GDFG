@@ -1077,7 +1077,155 @@ function rdcInitPage(){
     });
   }
 
-    function rdcDownloadPdf(){
+    function rdcDownloadExcel(){
+    if(!_rdcData||!_rdcData.length){ showToast('\u26a0 Belum ada data \u2014 klik Tampilkan dulu',''); return; }
+    if(typeof XLSX==='undefined'){ showToast('\u26a0 Library Excel belum termuat, coba refresh halaman','err'); return; }
+    var btn=document.getElementById('rdcBtnExcel');
+    if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Membuat...'; }
+
+    // Filter + sort sama persis dengan rdcDownloadPdf / _rdcRenderSummary
+    var fP =document.getElementById('rdcFilterPlant').value;
+    var fST=document.getElementById('rdcFilterShipTo').value;
+    var fd =document.getElementById('rdcFilterFrom').value||'';
+    var ft =document.getElementById('rdcFilterTo').value||'';
+    var d  =_rdcData.filter(function(r){
+      if(fP&&r.plant!==fP) return false;
+      if(fST){ var isR=_rdcIsRdc(r.ship_to); if(fST==='RDC'&&!isR) return false; if(fST==='SELAIN_RDC'&&isR) return false; }
+      if(fd&&ft&&r.sl_dt){ var sn=_rdcExtractDate(r.sl_dt); if(sn&&sn<fd) return false; if(sn&&sn>ft) return false; }
+      return true;
+    });
+    d.sort(function(a,b){
+      var da=a.in_dt?_rdcParseDT(a.in_dt):null, db=b.in_dt?_rdcParseDT(b.in_dt):null;
+      if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1;
+      return da.getTime()-db.getTime();
+    });
+    if(!d.length){ showToast('\u26a0 Tidak ada data untuk didownload',''); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-file-excel"></i> Download Excel';} return; }
+
+    function fmtDtShortXl(s){
+      if(!s||s==='&#8212;'||s==='-') return '-';
+      var m=s.match(/(\d{1,2}-[A-Za-z]{3})(?:-\d{2,4})?\s+(\d{2}:\d{2})/);
+      if(m) return m[1]+' '+m[2];
+      return s.replace(/:\d{2}$/, '').replace(/-\d{2,4}\s/,' ');
+    }
+
+    // ── Header 2 baris — sama persis dengan tabel di web ────────────
+    var header1=['#','Ship to Name','EKSPEDISI','NO POL','JENIS MOBIL','ROUTE',
+      'SCHEDULE','','STD DURASI (mnt)','LOADING','','','',
+      'DELAY','DURASI LOADING (mnt)','SELISIH DURASI (mnt)','DURASI TOTAL IN/OUT',
+      'KETERANGAN','',''];
+    var header2=['','','','','','',
+      'Waktu Muat','Waktu Selesai','','IN','Start Loading','Finish Loading','Out',
+      '','','','',
+      'SCHEDULE','WAKTU STAY','WAKTU LOADING'];
+
+    var aoa=[header1, header2];
+
+    d.forEach(function(r,i){
+      var delayMin   =_rdcDtDiffSigned(r.sch_muat,r.sl_dt);
+      var durMin     =_rdcDtDiffSigned(r.in_dt,r.out_dt);
+      var durLoadMin =_rdcDtDiffSigned(r.sl_dt,r.fl_dt);
+      var stdMnt     =r.std_durasi?parseInt(r.std_durasi):null;
+      var selisihMin =(durLoadMin!==null&&stdMnt!==null&&!isNaN(stdMnt))?(durLoadMin-stdMnt):null;
+      var sch        =_rdcKetSchedule(r);
+      var stay       =_rdcKetWaktuStay(r);
+      var loadOk     =(durLoadMin!==null&&stdMnt!==null&&!isNaN(stdMnt))?(durLoadMin<=stdMnt):null;
+
+      aoa.push([
+        i+1,
+        r.ship_to||'-',
+        r.ekspedisi||'-',
+        r.no_pol||'-',
+        r.jenis_mob||'-',
+        r.route||'-',
+        fmtDtShortXl(r.sch_muat),
+        fmtDtShortXl(r.sch_selesai),
+        r.std_durasi||'-',
+        fmtDtShortXl(r.in_dt),
+        fmtDtShortXl(r.sl_dt),
+        fmtDtShortXl(r.fl_dt),
+        fmtDtShortXl(r.out_dt),
+        delayMin===null?'-':delayMin>0?_rdcFmtDur(delayMin):delayMin<0?'- '+_rdcFmtDur(Math.abs(delayMin)):'0',
+        durLoadMin===null?'-':durLoadMin+' mnt',
+        selisihMin===null?'-':selisihMin>0?'+'+selisihMin+' mnt':selisihMin+' mnt',
+        durMin===null?'-':_rdcFmtDur(durMin),
+        sch.label,
+        stay.label,
+        loadOk===null?'-':loadOk?'OK':'NOT OK'
+      ]);
+    });
+
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+
+    // ── Merge cells header — sama seperti rowspan/colspan di web ────
+    ws['!merges']=[
+      {s:{r:0,c:0},e:{r:1,c:0}},   // #
+      {s:{r:0,c:1},e:{r:1,c:1}},   // Ship to Name
+      {s:{r:0,c:2},e:{r:1,c:2}},   // EKSPEDISI
+      {s:{r:0,c:3},e:{r:1,c:3}},   // NO POL
+      {s:{r:0,c:4},e:{r:1,c:4}},   // JENIS MOBIL
+      {s:{r:0,c:5},e:{r:1,c:5}},   // ROUTE
+      {s:{r:0,c:6},e:{r:0,c:7}},   // SCHEDULE
+      {s:{r:0,c:8},e:{r:1,c:8}},   // STD DURASI
+      {s:{r:0,c:9},e:{r:0,c:12}},  // LOADING
+      {s:{r:0,c:13},e:{r:1,c:13}}, // DELAY
+      {s:{r:0,c:14},e:{r:1,c:14}}, // DURASI LOADING
+      {s:{r:0,c:15},e:{r:1,c:15}}, // SELISIH DURASI
+      {s:{r:0,c:16},e:{r:1,c:16}}, // DURASI TOTAL
+      {s:{r:0,c:17},e:{r:0,c:19}}  // KETERANGAN
+    ];
+
+    // ── Lebar kolom — sesuaikan dengan proporsi tabel web ───────────
+    ws['!cols']=[
+      {wch:5},{wch:22},{wch:16},{wch:12},{wch:12},{wch:12},
+      {wch:16},{wch:16},{wch:10},
+      {wch:16},{wch:16},{wch:16},{wch:16},
+      {wch:10},{wch:12},{wch:12},{wch:14},
+      {wch:12},{wch:12},{wch:14}
+    ];
+    ws['!rows']=[{hpt:20},{hpt:20}];
+
+    // ── Styling header (fill + bold + center) — style hanya dibaca Excel asli, bukan browser viewer ──
+    var range=XLSX.utils.decode_range(ws['!ref']);
+    for(var R=0;R<=1;R++){
+      for(var C=range.s.c;C<=range.e.c;C++){
+        var addr=XLSX.utils.encode_cell({r:R,c:C});
+        if(!ws[addr]) ws[addr]={t:'s',v:''};
+        var isKet=C>=17;
+        ws[addr].s={
+          font:{bold:true,color:{rgb:isKet?'FFFFFF':'2D3748'}},
+          fill:{fgColor:{rgb:isKet?'1A3A5C':'F0F4F8'}},
+          alignment:{horizontal:'center',vertical:'center',wrapText:true},
+          border:{top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}}
+        };
+      }
+    }
+    // Style data rows: border tipis + zebra stripe
+    for(var R2=2;R2<aoa.length;R2++){
+      for(var C2=range.s.c;C2<=range.e.c;C2++){
+        var addr2=XLSX.utils.encode_cell({r:R2,c:C2});
+        if(!ws[addr2]) continue;
+        ws[addr2].s={
+          font:{sz:10},
+          alignment:{horizontal:(C2===1?'left':'center'),vertical:'center'},
+          fill: (R2%2===0) ? {fgColor:{rgb:'F7FAFC'}} : undefined,
+          border:{top:{style:'thin',color:{rgb:'E2E8F0'}},bottom:{style:'thin',color:{rgb:'E2E8F0'}},
+                  left:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}}
+        };
+      }
+    }
+
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Monitoring RDC');
+
+    var ts=new Date();
+    var tsStr=('0'+ts.getDate()).slice(-2)+('0'+(ts.getMonth()+1)).slice(-2)+ts.getFullYear()+
+              '_'+('0'+ts.getHours()).slice(-2)+('0'+ts.getMinutes()).slice(-2);
+    XLSX.writeFile(wb, 'Monitoring_RDC_'+tsStr+'.xlsx');
+
+    if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-file-excel"></i> Download Excel'; }
+  }
+
+  function rdcDownloadPdf(){
     if(!_rdcData||!_rdcData.length){ showToast('\u26a0 Belum ada data \u2014 klik Tampilkan dulu',''); return; }
     var btn=document.getElementById('rdcBtnPdf');
     if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Membuat...'; }
