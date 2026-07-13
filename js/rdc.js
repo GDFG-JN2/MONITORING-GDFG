@@ -1101,11 +1101,10 @@ function rdcInitPage(){
     });
     if(!d.length){ showToast('\u26a0 Tidak ada data untuk didownload',''); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-file-excel"></i> Download Excel';} return; }
 
-    function fmtDtShortXl(s){
+    // Excel pakai nilai MENTAH persis seperti di web (dd-MMM-yy HH:mm:ss), tidak dipendekkan
+    function fmtDtRawXl(s){
       if(!s||s==='&#8212;'||s==='-') return '-';
-      var m=s.match(/(\d{1,2}-[A-Za-z]{3})(?:-\d{2,4})?\s+(\d{2}:\d{2})/);
-      if(m) return m[1]+' '+m[2];
-      return s.replace(/:\d{2}$/, '').replace(/-\d{2,4}\s/,' ');
+      return s;
     }
 
     // ── Header 2 baris — sama persis dengan tabel di web ────────────
@@ -1137,13 +1136,13 @@ function rdcInitPage(){
         r.no_pol||'-',
         r.jenis_mob||'-',
         r.route||'-',
-        fmtDtShortXl(r.sch_muat),
-        fmtDtShortXl(r.sch_selesai),
+        fmtDtRawXl(r.sch_muat),
+        fmtDtRawXl(r.sch_selesai),
         r.std_durasi||'-',
-        fmtDtShortXl(r.in_dt),
-        fmtDtShortXl(r.sl_dt),
-        fmtDtShortXl(r.fl_dt),
-        fmtDtShortXl(r.out_dt),
+        fmtDtRawXl(r.in_dt),
+        fmtDtRawXl(r.sl_dt),
+        fmtDtRawXl(r.fl_dt),
+        fmtDtRawXl(r.out_dt),
         delayMin===null?'-':delayMin>0?_rdcFmtDur(delayMin):delayMin<0?'- '+_rdcFmtDur(Math.abs(delayMin)):'0',
         durLoadMin===null?'-':durLoadMin+' mnt',
         selisihMin===null?'-':selisihMin>0?'+'+selisihMin+' mnt':selisihMin+' mnt',
