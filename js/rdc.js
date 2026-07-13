@@ -673,7 +673,14 @@ function rdcInitPage(){
     return order;
   }
 
-  function _rdcRenderSummary(fP, fST, fd, ft){
+  // ── Filter + dedup BERSAMA — dipakai oleh tabel web, Download PDF, dan Download Excel ──
+  // supaya ketiganya SELALU menghasilkan dataset yang identik, tidak ada lagi selisih angka.
+  function _rdcScore(r){
+    var fields=['ship_to','ekspedisi','no_pol','route','jenis_mob',
+      'sch_muat','sch_selesai','std_durasi','in_dt','sl_dt','fl_dt','out_dt','catatan'];
+    return fields.reduce(function(s,f){ return s+(r[f]?1:0); },0);
+  }
+  function _rdcGetFilteredDeduped(fP, fST, fd, ft){
     var d=_rdcData.filter(function(r){
       if(fP&&r.plant!==fP) return false;
       if(fST){
@@ -693,18 +700,17 @@ function rdcInitPage(){
     });
 
     // Deduplikasi: no_pol + sch_muat yang sama → ambil yg paling lengkap datanya
-    function _rdcScore(r){
-      var fields=['ship_to','ekspedisi','no_pol','route','jenis_mob',
-        'sch_muat','sch_selesai','std_durasi','in_dt','sl_dt','fl_dt','out_dt','catatan'];
-      return fields.reduce(function(s,f){ return s+(r[f]?1:0); },0);
-    }
     var _dupMap={};
     d.forEach(function(r){
       // Key: no_pol + sch_muat (identitas unik 1 trip pengiriman)
       var key=(r.no_pol||'')+'|'+(r.sch_muat||'');
       if(!_dupMap[key]||_rdcScore(r)>_rdcScore(_dupMap[key])) _dupMap[key]=r;
     });
-    d=Object.keys(_dupMap).map(function(k){ return _dupMap[k]; });
+    return Object.keys(_dupMap).map(function(k){ return _dupMap[k]; });
+  }
+
+  function _rdcRenderSummary(fP, fST, fd, ft){
+    var d=_rdcGetFilteredDeduped(fP, fST, fd, ft);
 
     var total=d.length;
     document.getElementById('rdcSumRowCount').textContent=total+' DATA';
@@ -868,10 +874,11 @@ function rdcInitPage(){
     }
 
     var total=d.length;
-    // Hitung OK/NOT OK per kategori
-    var schOk=0,schNotOk=[],schNull=0;
-    var stayOk=0,stayNotOk=[],stayNull=0;
-    var loadOk=0,loadNotOk=[],loadNull=0;
+    // Kumpulkan OK/NOT OK per kategori — SEMUA jadi array (bukan cuma NOT OK) supaya
+    // bisa di-dedup dengan cara yang sama persis dan dipakai ulang oleh popup (tidak hitung ulang).
+    var schOk=[],schNotOk=[],schNull=0;
+    var stayOk=[],stayNotOk=[],stayNull=0;
+    var loadOk=[],loadNotOk=[],loadNull=0;
 
     d.forEach(function(r){
       var sch=_rdcKetSchedule(r);
@@ -880,27 +887,37 @@ function rdcInitPage(){
       var stdMnt=r.std_durasi?parseInt(r.std_durasi):null;
       var loadingOk=(durLoadMin!==null&&stdMnt!==null&&!isNaN(stdMnt))?(durLoadMin<=stdMnt):null;
       var delayMin=_rdcDtDiffSigned(r.sch_muat,r.sl_dt);
+      var durStayMin=_rdcDtDiffSigned(r.in_dt,r.out_dt);
+
+      // Satu object gabungan per baris — dipakai bersama oleh sch/stay/load (field yang tidak
+      // relevan untuk suatu kategori tinggal diabaikan di popup, tidak perlu object terpisah)
+      var rowObj={
+        no_pol:r.no_pol, ship_to:r.ship_to,
+        sch_muat:r.sch_muat, sl_dt:r.sl_dt, fl_dt:r.fl_dt, in_dt:r.in_dt, out_dt:r.out_dt,
+        std:r.std_durasi, delay:delayMin, durLoad:durLoadMin,
+        selisih:(durLoadMin!==null&&stdMnt!==null&&!isNaN(stdMnt))?(durLoadMin-stdMnt):null,
+        durStay:durStayMin,
+        catatan:r.catatan||''
+      };
 
       // SCHEDULE
-      if(sch.ok===true) schOk++;
-      else if(sch.ok===false) schNotOk.push({no_pol:r.no_pol,ship_to:r.ship_to,sch_muat:r.sch_muat,sl_dt:r.sl_dt,delayMin:delayMin});
+      if(sch.ok===true) schOk.push(rowObj);
+      else if(sch.ok===false) schNotOk.push(rowObj);
       else schNull++;
 
       // WAKTU STAY
-      if(stay.ok===true) stayOk++;
-      else if(stay.ok===false) stayNotOk.push({no_pol:r.no_pol,ship_to:r.ship_to,in_dt:r.in_dt,out_dt:r.out_dt,durMin:_rdcDtDiffSigned(r.in_dt,r.out_dt)});
+      if(stay.ok===true) stayOk.push(rowObj);
+      else if(stay.ok===false) stayNotOk.push(rowObj);
       else stayNull++;
 
       // WAKTU LOADING
-      if(loadingOk===true) loadOk++;
-      else if(loadingOk===false) loadNotOk.push({no_pol:r.no_pol,ship_to:r.ship_to,std_durasi:r.std_durasi,sl_dt:r.sl_dt,fl_dt:r.fl_dt,durLoadMin:durLoadMin,selisih:durLoadMin!==null&&stdMnt!==null?durLoadMin-stdMnt:null});
+      if(loadingOk===true) loadOk.push(rowObj);
+      else if(loadingOk===false) loadNotOk.push(rowObj);
       else loadNull++;
     });
 
-    // ── Dedup tambahan khusus di level popup rekap (No Pol + jam-jam kunci) ──
-    // Ini pengaman terakhir: kalau ada duplikat "identik secara visual" (No Pol, IN, OUT,
-    // atau jam schedule/loading sama persis) yang lolos dari dedup utama di _rdcDedupData
-    // (misalnya karena DocNo beda tapi truk & jamnya sama), tetap tersaring di sini.
+    // ── Dedup — kunci sesuai kategori (No Pol + jam-jam kunci kategori itu) ──
+    // Berlaku untuk OK maupun NOT OK, supaya total kartu & isi popup SELALU sama persis.
     function _rdcDedupList(list, keyFn){
       var seen={}, out=[];
       list.forEach(function(item){
@@ -909,11 +926,25 @@ function rdcInitPage(){
       });
       return out;
     }
-    schNotOk  = _rdcDedupList(schNotOk,  function(x){ return (x.no_pol||'')+'|'+(x.sch_muat||'')+'|'+(x.sl_dt||''); });
-    stayNotOk = _rdcDedupList(stayNotOk, function(x){ return (x.no_pol||'')+'|'+(x.in_dt||'')+'|'+(x.out_dt||''); });
-    loadNotOk = _rdcDedupList(loadNotOk, function(x){ return (x.no_pol||'')+'|'+(x.sl_dt||'')+'|'+(x.fl_dt||''); });
+    var schKey  = function(x){ return (x.no_pol||'')+'|'+(x.sch_muat||'')+'|'+(x.sl_dt||''); };
+    var stayKey = function(x){ return (x.no_pol||'')+'|'+(x.in_dt||'')+'|'+(x.out_dt||''); };
+    var loadKey = function(x){ return (x.no_pol||'')+'|'+(x.sl_dt||'')+'|'+(x.fl_dt||''); };
+    schOk     = _rdcDedupList(schOk,     schKey);
+    schNotOk  = _rdcDedupList(schNotOk,  schKey);
+    stayOk    = _rdcDedupList(stayOk,    stayKey);
+    stayNotOk = _rdcDedupList(stayNotOk, stayKey);
+    loadOk    = _rdcDedupList(loadOk,    loadKey);
+    loadNotOk = _rdcDedupList(loadNotOk, loadKey);
 
-    function rekapCard(title,icon,ok,notOk,nullCount,onClickNotOk,onClickOk){
+    // Simpan supaya popup baca dari sini langsung — TIDAK hitung ulang dari _rdcFilteredData
+    window._rdcRekapAll = {
+      sch:  {ok:schOk,  notok:schNotOk},
+      stay: {ok:stayOk, notok:stayNotOk},
+      load: {ok:loadOk, notok:loadNotOk}
+    };
+
+    function rekapCard(title,icon,okList,notOk,nullCount,onClickNotOk,onClickOk){
+      var ok=okList.length;
       var total2=ok+notOk.length+(nullCount||0);
       var notOkCount=notOk.length;
       var pctOk=total2>0?Math.round(ok/total2*100):0;
@@ -949,9 +980,6 @@ function rdcInitPage(){
         +'</div>'
         +'</div>';
     }
-
-    // Serialize data untuk onclick (pakai index di _rdcFilteredData)
-    window._rdcRekapNotOk = {sch:schNotOk, stay:stayNotOk, load:loadNotOk};
 
     var html='<div style="margin-bottom:12px;"><span style="font-size:13px;font-weight:700;color:#4a5568;">Total Mobil: </span><span style="font-size:15px;font-weight:800;color:#2c5364;">'+total+'</span></div>';
     html+='<div style="display:flex;flex-wrap:wrap;gap:12px;">';
@@ -1020,43 +1048,29 @@ function rdcInitPage(){
   }
 
   function rdcShowRekapPopup(type, status){
-    var items=window._rdcRekapNotOk;
-    if(!items) return;
+    // Baca LANGSUNG dari array yang sudah dihitung + dedup di rdcRenderRekap — tidak hitung ulang.
+    // Ini yang menjamin angka di kartu dan isi popup SELALU sama persis.
+    var all=window._rdcRekapAll;
+    if(!all || !all[type]) return;
+    var srcList = all[type][status] || []; // status: 'ok' | 'notok'
     var list=[];
     var title='', cols=[];
 
     if(type==='sch'){
-      // Filter dari _rdcFilteredData berdasarkan status
-      list = _rdcFilteredData.filter(function(r){
-        var sch=_rdcKetSchedule(r);
-        return status==='notok'?(sch.ok===false):(sch.ok===true);
-      }).map(function(r){
-        var delayMin=_rdcDtDiffSigned(r.sch_muat,r.sl_dt);
-        return {no_pol:r.no_pol,ship_to:r.ship_to,sch_muat:r.sch_muat,sl_dt:r.sl_dt,delay:delayMin,catatan:r.catatan||''};
+      list = srcList.map(function(r){
+        return {no_pol:r.no_pol,ship_to:r.ship_to,sch_muat:r.sch_muat,sl_dt:r.sl_dt,delay:r.delay,catatan:r.catatan||''};
       });
       title='Schedule '+(status==='notok'?'NOT OK':'OK');
       cols=['No Pol','Ship To','Waktu Muat (SCH)','Start Loading','Delay',''];
     } else if(type==='load'){
-      list = _rdcFilteredData.filter(function(r){
-        var durLoadMin=_rdcDtDiffSigned(r.sl_dt,r.fl_dt);
-        var stdMnt=r.std_durasi?parseInt(r.std_durasi):null;
-        var ok=(durLoadMin!==null&&stdMnt!==null&&!isNaN(stdMnt))?(durLoadMin<=stdMnt):null;
-        return status==='notok'?(ok===false):(ok===true);
-      }).map(function(r){
-        var durLoadMin=_rdcDtDiffSigned(r.sl_dt,r.fl_dt);
-        var stdMnt=r.std_durasi?parseInt(r.std_durasi):null;
-        var selisih=(durLoadMin!==null&&stdMnt!==null)?durLoadMin-stdMnt:null;
-        return {no_pol:r.no_pol,ship_to:r.ship_to,std:r.std_durasi,sl_dt:r.sl_dt,fl_dt:r.fl_dt,dur:durLoadMin,selisih:selisih,catatan:r.catatan||''};
+      list = srcList.map(function(r){
+        return {no_pol:r.no_pol,ship_to:r.ship_to,std:r.std,sl_dt:r.sl_dt,fl_dt:r.fl_dt,dur:r.durLoad,selisih:r.selisih,catatan:r.catatan||''};
       });
       title='Waktu Loading '+(status==='notok'?'NOT OK':'OK');
       cols=['No Pol','Ship To','STD Durasi','Start Loading','Finish Loading','Durasi (mnt)','Selisih (mnt)',''];
     } else {
-      list = _rdcFilteredData.filter(function(r){
-        var stay=_rdcKetWaktuStay(r);
-        return status==='notok'?(stay.ok===false):(stay.ok===true);
-      }).map(function(r){
-        var durMin=_rdcDtDiffSigned(r.in_dt,r.out_dt);
-        return {no_pol:r.no_pol,ship_to:r.ship_to,in_dt:r.in_dt,out_dt:r.out_dt,dur:durMin,catatan:r.catatan||''};
+      list = srcList.map(function(r){
+        return {no_pol:r.no_pol,ship_to:r.ship_to,in_dt:r.in_dt,out_dt:r.out_dt,dur:r.durStay,catatan:r.catatan||''};
       });
       title='Waktu Stay '+(status==='notok'?'NOT OK':'OK');
       cols=['No Pol','Ship To','IN Loading','OUT Loading','Durasi IN/OUT',''];
@@ -1139,12 +1153,8 @@ function rdcInitPage(){
     var fST=document.getElementById('rdcFilterShipTo').value;
     var fd =document.getElementById('rdcFilterFrom').value||'';
     var ft =document.getElementById('rdcFilterTo').value||'';
-    var d  =_rdcData.filter(function(r){
-      if(fP&&r.plant!==fP) return false;
-      if(fST){ var isR=_rdcIsRdc(r.ship_to); if(fST==='RDC'&&!isR) return false; if(fST==='SELAIN_RDC'&&isR) return false; }
-      if(fd&&ft&&r.sl_dt){ var sn=_rdcExtractDate(r.sl_dt); if(sn&&sn<fd) return false; if(sn&&sn>ft) return false; }
-      return true;
-    });
+    // Pakai fungsi bersama — supaya jumlah SELALU sama persis dengan tabel & kartu ringkasan di web
+    var d = _rdcGetFilteredDeduped(fP, fST, fd, ft);
     d.sort(function(a,b){
       var da=a.in_dt?_rdcParseDT(a.in_dt):null, db=b.in_dt?_rdcParseDT(b.in_dt):null;
       if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1;
@@ -1283,17 +1293,12 @@ function rdcInitPage(){
     var btn=document.getElementById('rdcBtnPdf');
     if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Membuat...'; }
 
-    // Filter + sort sama persis dengan _rdcRenderSummary
+    // Filter + dedup — pakai fungsi bersama supaya sama persis dengan tabel & kartu ringkasan di web
     var fP =document.getElementById('rdcFilterPlant').value;
     var fST=document.getElementById('rdcFilterShipTo').value;
     var fd =document.getElementById('rdcFilterFrom').value||'';
     var ft =document.getElementById('rdcFilterTo').value||'';
-    var d  =_rdcData.filter(function(r){
-      if(fP&&r.plant!==fP) return false;
-      if(fST){ var isR=_rdcIsRdc(r.ship_to); if(fST==='RDC'&&!isR) return false; if(fST==='SELAIN_RDC'&&isR) return false; }
-      if(fd&&ft&&r.sl_dt){ var sn=_rdcExtractDate(r.sl_dt); if(sn&&sn<fd) return false; if(sn&&sn>ft) return false; }
-      return true;
-    });
+    var d = _rdcGetFilteredDeduped(fP, fST, fd, ft);
     d.sort(function(a,b){
       var da=a.in_dt?_rdcParseDT(a.in_dt):null, db=b.in_dt?_rdcParseDT(b.in_dt):null;
       if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1;
