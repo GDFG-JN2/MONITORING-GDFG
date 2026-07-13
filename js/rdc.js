@@ -897,6 +897,22 @@ function rdcInitPage(){
       else loadNull++;
     });
 
+    // ── Dedup tambahan khusus di level popup rekap (No Pol + jam-jam kunci) ──
+    // Ini pengaman terakhir: kalau ada duplikat "identik secara visual" (No Pol, IN, OUT,
+    // atau jam schedule/loading sama persis) yang lolos dari dedup utama di _rdcDedupData
+    // (misalnya karena DocNo beda tapi truk & jamnya sama), tetap tersaring di sini.
+    function _rdcDedupList(list, keyFn){
+      var seen={}, out=[];
+      list.forEach(function(item){
+        var k=keyFn(item);
+        if(!seen[k]){ seen[k]=true; out.push(item); }
+      });
+      return out;
+    }
+    schNotOk  = _rdcDedupList(schNotOk,  function(x){ return (x.no_pol||'')+'|'+(x.sch_muat||'')+'|'+(x.sl_dt||''); });
+    stayNotOk = _rdcDedupList(stayNotOk, function(x){ return (x.no_pol||'')+'|'+(x.in_dt||'')+'|'+(x.out_dt||''); });
+    loadNotOk = _rdcDedupList(loadNotOk, function(x){ return (x.no_pol||'')+'|'+(x.sl_dt||'')+'|'+(x.fl_dt||''); });
+
     function rekapCard(title,icon,ok,notOk,nullCount,onClickNotOk,onClickOk){
       var total2=ok+notOk.length+(nullCount||0);
       var notOkCount=notOk.length;
