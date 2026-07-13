@@ -699,11 +699,15 @@ function rdcInitPage(){
       return true;
     });
 
-    // Deduplikasi: no_pol + sch_muat yang sama → ambil yg paling lengkap datanya
+    // Deduplikasi — kunci utama: No Pol + IN + OUT (jam fisik aktual, paling jarang beda
+    // antar percobaan retry). Fallback ke No Pol + Waktu Muat + Start Loading kalau IN/OUT
+    // belum terisi (truk belum keluar). Dipakai SEKALI SAJA di sini — supaya total selalu
+    // sama persis di semua tempat (tabel, kartu rekap, PDF, Excel), tidak dedup ulang di manapun.
     var _dupMap={};
     d.forEach(function(r){
-      // Key: no_pol + sch_muat (identitas unik 1 trip pengiriman)
-      var key=(r.no_pol||'')+'|'+(r.sch_muat||'');
+      var key = (r.in_dt && r.out_dt)
+        ? (r.no_pol||'')+'|'+r.in_dt+'|'+r.out_dt
+        : (r.no_pol||'')+'|sch:'+(r.sch_muat||'')+'|sl:'+(r.sl_dt||'');
       if(!_dupMap[key]||_rdcScore(r)>_rdcScore(_dupMap[key])) _dupMap[key]=r;
     });
     return Object.keys(_dupMap).map(function(k){ return _dupMap[k]; });
@@ -873,9 +877,12 @@ function rdcInitPage(){
       return;
     }
 
+    // d sudah bersih (dedup sudah dilakukan SEKALI di _rdcGetFilteredDeduped, sebelum sampai
+    // ke sini via _rdcFilteredData). Tidak dedup lagi di sini — supaya total (header) SELALU
+    // sama dengan jumlah OK+NOTOK+N/A tiap kartu (partisi lurus dari 1 dataset yang sama).
     var total=d.length;
-    // Kumpulkan OK/NOT OK per kategori — SEMUA jadi array (bukan cuma NOT OK) supaya
-    // bisa di-dedup dengan cara yang sama persis dan dipakai ulang oleh popup (tidak hitung ulang).
+    // Kumpulkan OK/NOT OK per kategori — partisi SATU dataset yang sama (d), jadi
+    // OK+NOTOK+N/A per kartu otomatis selalu = total, tidak mungkin beda lagi.
     var schOk=[],schNotOk=[],schNull=0;
     var stayOk=[],stayNotOk=[],stayNull=0;
     var loadOk=[],loadNotOk=[],loadNull=0;
@@ -915,26 +922,6 @@ function rdcInitPage(){
       else if(loadingOk===false) loadNotOk.push(rowObj);
       else loadNull++;
     });
-
-    // ── Dedup — kunci sesuai kategori (No Pol + jam-jam kunci kategori itu) ──
-    // Berlaku untuk OK maupun NOT OK, supaya total kartu & isi popup SELALU sama persis.
-    function _rdcDedupList(list, keyFn){
-      var seen={}, out=[];
-      list.forEach(function(item){
-        var k=keyFn(item);
-        if(!seen[k]){ seen[k]=true; out.push(item); }
-      });
-      return out;
-    }
-    var schKey  = function(x){ return (x.no_pol||'')+'|'+(x.sch_muat||'')+'|'+(x.sl_dt||''); };
-    var stayKey = function(x){ return (x.no_pol||'')+'|'+(x.in_dt||'')+'|'+(x.out_dt||''); };
-    var loadKey = function(x){ return (x.no_pol||'')+'|'+(x.sl_dt||'')+'|'+(x.fl_dt||''); };
-    schOk     = _rdcDedupList(schOk,     schKey);
-    schNotOk  = _rdcDedupList(schNotOk,  schKey);
-    stayOk    = _rdcDedupList(stayOk,    stayKey);
-    stayNotOk = _rdcDedupList(stayNotOk, stayKey);
-    loadOk    = _rdcDedupList(loadOk,    loadKey);
-    loadNotOk = _rdcDedupList(loadNotOk, loadKey);
 
     // Simpan supaya popup baca dari sini langsung — TIDAK hitung ulang dari _rdcFilteredData
     window._rdcRekapAll = {
