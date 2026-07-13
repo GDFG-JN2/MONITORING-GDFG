@@ -1174,14 +1174,24 @@ function rdcInitPage(){
       {s:{r:0,c:17},e:{r:0,c:19}}  // KETERANGAN
     ];
 
-    // ── Lebar kolom — sesuaikan dengan proporsi tabel web ───────────
-    ws['!cols']=[
-      {wch:5},{wch:22},{wch:16},{wch:12},{wch:12},{wch:12},
-      {wch:16},{wch:16},{wch:10},
-      {wch:16},{wch:16},{wch:16},{wch:16},
-      {wch:10},{wch:12},{wch:12},{wch:14},
-      {wch:12},{wch:12},{wch:14}
-    ];
+    // ── Lebar kolom — AUTO-FIT berdasarkan panjang karakter isi terpanjang per kolom ──
+    var numCols = header1.length;
+    var colWidths = new Array(numCols).fill(0);
+    // Cek panjang di kedua baris header
+    [header1, header2].forEach(function(hr){
+      hr.forEach(function(v,ci){ colWidths[ci]=Math.max(colWidths[ci], String(v||'').length); });
+    });
+    // Cek panjang tiap baris data (mulai baris ke-3 di aoa)
+    for(var ai=2; ai<aoa.length; ai++){
+      aoa[ai].forEach(function(v,ci){
+        colWidths[ci]=Math.max(colWidths[ci], String(v===null||v===undefined?'':v).length);
+      });
+    }
+    // Tambah padding kecil, batas minimum & maksimum supaya tidak terlalu sempit/lebar
+    ws['!cols']=colWidths.map(function(len){
+      var w=Math.max(6, Math.min(28, len+2));
+      return {wch:w};
+    });
     ws['!rows']=[{hpt:20},{hpt:20}];
 
     // ── Styling header (fill + bold + center) — style hanya dibaca Excel asli, bukan browser viewer ──
@@ -1307,6 +1317,55 @@ function rdcInitPage(){
       return s.replace(/:\d{2}$/, '').replace(/-\d{2,4}\s/,' ');
     }
 
+    // ── Hitung lebar kolom PDF secara dinamis berdasarkan panjang konten terpanjang ──
+    var pdfColLabels=['#','Ship to Name','Ekspedisi','No Pol','Route','Jenis Mobil',
+      'Waktu Muat','Waktu Selesai','STD Dur','IN','Start Loading','Finish Loading','Out',
+      'Delay','Dur Load','Selisih','Dur Total','Schedule','Waktu Stay','Waktu Loading'];
+    var pdfColGetters=[
+      function(r,i){return String(i+1);},
+      function(r){return r.ship_to||'';},
+      function(r){return r.ekspedisi||'';},
+      function(r){return r.no_pol||'';},
+      function(r){return r.route||'-';},
+      function(r){return r.jenis_mob||'-';},
+      function(r){return fmtDtShort(r.sch_muat);},
+      function(r){return fmtDtShort(r.sch_selesai);},
+      function(r){return String(r.std_durasi||'-');},
+      function(r){return fmtDtShort(r.in_dt);},
+      function(r){return fmtDtShort(r.sl_dt);},
+      function(r){return fmtDtShort(r.fl_dt);},
+      function(r){return fmtDtShort(r.out_dt);},
+      function(r){var v=_rdcDtDiffSigned(r.sch_muat,r.sl_dt);return v===null?'-':v>0?_rdcFmtDur(v):v<0?'- '+_rdcFmtDur(Math.abs(v)):'0';},
+      function(r){var v=_rdcDtDiffSigned(r.sl_dt,r.fl_dt);return v===null?'-':v+' mnt';},
+      function(r){
+        var dl=_rdcDtDiffSigned(r.sl_dt,r.fl_dt), sd=r.std_durasi?parseInt(r.std_durasi):null;
+        var v=(dl!==null&&sd!==null&&!isNaN(sd))?(dl-sd):null;
+        return v===null?'-':v>0?'+'+v+' mnt':v+' mnt';
+      },
+      function(r){var v=_rdcDtDiffSigned(r.in_dt,r.out_dt);return v===null?'-':_rdcFmtDur(v);},
+      function(r){return _rdcKetSchedule(r).label;},
+      function(r){return _rdcKetWaktuStay(r).label;},
+      function(r){
+        var dl=_rdcDtDiffSigned(r.sl_dt,r.fl_dt), sd=r.std_durasi?parseInt(r.std_durasi):null;
+        var ok=(dl!==null&&sd!==null&&!isNaN(sd))?(dl<=sd):null;
+        return ok===null?'-':ok?'OK':'NOT OK';
+      }
+    ];
+    var pdfCharLen=pdfColLabels.map(function(lbl){ return lbl.length; });
+    d.forEach(function(r,i){
+      pdfColGetters.forEach(function(fn,ci){
+        var len=String(fn(r,i)||'').length;
+        if(len>pdfCharLen[ci]) pdfCharLen[ci]=len;
+      });
+    });
+    // Konversi jumlah karakter → mm (perkiraan ~1.5mm per karakter di font 6px), lalu normalisasi ke total ~380mm
+    var mmPerChar=1.55, minMm=8;
+    var rawMm=pdfCharLen.map(function(len){ return Math.max(minMm, len*mmPerChar+3); });
+    var totalRaw=rawMm.reduce(function(a,b){return a+b;},0);
+    var targetTotal=380; // usable width A3 landscape
+    var scale=targetTotal/totalRaw;
+    var pdfColMm=rawMm.map(function(w){ return Math.round(w*scale*10)/10; });
+
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Monitoring RDC</title>'+
       '<style>'+
         '@page{size:A3 landscape;margin:5mm 7mm;}'+
@@ -1327,28 +1386,9 @@ function rdcInitPage(){
       '<div class="ttl">Monitoring RDC</div>'+
       '<div class="sub">'+judulFilter+'</div>'+
       '<table>'+
-        // colgroup — total A3 landscape usable ~400mm
+        // colgroup — lebar dihitung otomatis dari panjang karakter terpanjang tiap kolom
         '<colgroup>'+
-          '<col style="width:8mm">'+    /* # */
-          '<col style="width:30mm">'+   /* Ship to Name */
-          '<col style="width:18mm">'+   /* Ekspedisi */
-          '<col style="width:15mm">'+   /* No Pol */
-          '<col style="width:14mm">'+   /* Route */
-          '<col style="width:13mm">'+   /* Jenis Mobil */
-          '<col style="width:20mm">'+   /* SCH Muat */
-          '<col style="width:20mm">'+   /* SCH Selesai */
-          '<col style="width:10mm">'+   /* STD Durasi */
-          '<col style="width:20mm">'+   /* IN */
-          '<col style="width:20mm">'+   /* Start Loading */
-          '<col style="width:20mm">'+   /* Finish Loading */
-          '<col style="width:20mm">'+   /* Out */
-          '<col style="width:16mm">'+   /* Delay */
-          '<col style="width:12mm">'+   /* Dur Loading */
-          '<col style="width:12mm">'+   /* Selisih */
-          '<col style="width:16mm">'+   /* Durasi Total */
-          '<col style="width:14mm">'+   /* KET Schedule */
-          '<col style="width:14mm">'+   /* KET Stay */
-          '<col style="width:14mm">'+   /* KET Loading */
+          pdfColMm.map(function(w){ return '<col style="width:'+w+'mm">'; }).join('')+
         '</colgroup>'+
         '<thead>'+
           '<tr>'+
