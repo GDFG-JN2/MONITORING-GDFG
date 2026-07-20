@@ -222,7 +222,7 @@ function showPage(page) {
   if (page !== 'opnamePage')   _opClearSel();
   if (page !== 'inputPage')    _inResetSel();
 
-  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage'];
+  var pages = ['dashboard','inputPage','realisasiPage','opnamePage','rdcPage','stockJalurPage','binLocPage','appsPage','monitoringEksporPage','kpiPage'];
   pages.forEach(function (p) {
     var el = document.getElementById(p);
     if (!el) return;
@@ -247,6 +247,7 @@ function showPage(page) {
   document.getElementById('menuBinLoc').classList.toggle('active-page',            page === 'binLocPage');
   document.getElementById('menuMonitoringEkspor').classList.toggle('active-page',  page === 'monitoringEksporPage');
   document.getElementById('menuApps').classList.toggle('active-page',              page === 'appsPage');
+  var menuKpiEl = document.getElementById('menuKpi'); if (menuKpiEl) menuKpiEl.classList.toggle('active-page', page === 'kpiPage');
 
   // Page-specific init
   if (page === 'dashboard') {
@@ -259,6 +260,7 @@ function showPage(page) {
   if (page === 'stockJalurPage') sjInitPage();
   if (page === 'binLocPage')           blInitPage();
   if (page === 'monitoringEksporPage') mekInitPage();
+  if (page === 'kpiPage') kpiInitPage();
   if (page === 'realisasiPage') {
     initRealForm();
     var today   = new Date();
