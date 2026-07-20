@@ -2099,6 +2099,7 @@
     #stockJalurPage .op-zoom-reset{font-size:11px;color:#3182ce;cursor:pointer;font-weight:700;padding:0 4px;}
     #stockJalurPage .op-zoom-reset:hover{text-decoration:underline;}
     #stockJalurPage .op-tbl-scroll{overflow:auto;height:calc(100vh - 320px);}
+    #kpiPage .op-tbl-scroll{overflow:auto;height:calc(100vh - 320px);-webkit-overflow-scrolling:touch;}
     #stockJalurPage .input-table-card{display:flex;flex-direction:column;}
     #stockJalurPage #sjTbl thead th,#stockJalurPage #soTbl thead th{position:sticky;top:0;z-index:10;}
     #stockJalurPage .sj-td,#stockJalurPage .so-td{padding:5px 7px;font-size:12px;border:1px solid #e8edf2;outline:none;vertical-align:middle;min-height:28px;color:#1a202c;}
@@ -5343,10 +5344,10 @@
     <div style="padding:0 14px;">
       <!-- Tab bar -->
       <div style="display:flex;gap:2px;border-bottom:2px solid #e2e8f0;margin-bottom:0;overflow-x:auto;">
-        <button id="kpiTabRitase" onclick="kpiSwitchTab(\'ritase\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-truck-moving"></i> Ritase/Day</button>
-        <button id="kpiTabStay" onclick="kpiSwitchTab(\'stay\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-parking"></i> Waktu Stay</button>
-        <button id="kpiTabLoading" onclick="kpiSwitchTab(\'loading\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-boxes"></i> Waktu Loading</button>
-        <button id="kpiTabInput" onclick="kpiSwitchTab(\'input\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#2c5364;border-bottom:3px solid #2c5364;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-plus-circle"></i> Input Data</button>
+        <button id="kpiTabRitase" onclick="kpiSwitchTab('ritase')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-truck-moving"></i> Ritase/Day</button>
+        <button id="kpiTabStay" onclick="kpiSwitchTab('stay')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-parking"></i> Waktu Stay</button>
+        <button id="kpiTabLoading" onclick="kpiSwitchTab('loading')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-boxes"></i> Waktu Loading</button>
+        <button id="kpiTabInput" onclick="kpiSwitchTab('input')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#2c5364;border-bottom:3px solid #2c5364;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-plus-circle"></i> Input Data</button>
       </div>
 
       <!-- Filter bar — dipakai bersama oleh 3 tab report (Ritase/Stay/Loading) -->
@@ -5399,30 +5400,30 @@
                   <th style="background:#0f2027;color:#fff;min-width:100px;">No. Document</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">No. Kartu</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Tipe Aktivitas</th>
-                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Tiba</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;border-right:2px solid #4a5568;">Tanggal Tiba</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Jam Tiba / Truck In</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Plant Penerima</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Nama Cabang Penerima</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Plant Pengirim</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Nama Plant Pengirim</th>
-                  <th style="background:#0f2027;color:#fff;min-width:100px;">No Referensi</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;border-right:2px solid #4a5568;">No Referensi</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Tipe Material</th>
                   <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal DO</th>
                   <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal GI</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Ekspedisi</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">No. Mobil</th>
-                  <th style="background:#0f2027;color:#fff;min-width:100px;">Jenis Mobil</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;border-right:2px solid #4a5568;">Jenis Mobil</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">LDP</th>
                   <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Estimasi Tiba</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Division Code</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Division Name</th>
-                  <th style="background:#0f2027;color:#fff;min-width:100px;">QTY</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;border-right:2px solid #4a5568;">QTY</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Aktivitas Terakhir</th>
-                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Mulai Bongkar/Muat</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;border-right:2px solid #4a5568;">Tanggal Mulai Bongkar/Muat</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Mulai Bongkar/Muat</th>
                   <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Selesai Bongkar/Muat</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Selesai Bongkar/Muat</th>
-                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Keluar</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;border-right:2px solid #4a5568;">Tanggal Keluar</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Jam Keluar / Truck Out</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Lama Antri</th>
                   <th style="background:#0f2027;color:#fff;min-width:100px;">Durasi Loading/Unloading</th>
