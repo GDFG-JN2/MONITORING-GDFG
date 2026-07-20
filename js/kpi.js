@@ -58,6 +58,8 @@ var KPI_COLS = [
   }
 
   var _kpiRitaseMode = 'all';
+  var _kpiRitaseGroupMode = 'day'; // 'day' | 'shift'
+  var _kpiFilterMode = 'tanggal'; // 'tanggal' | 'week'
 
   function kpiInitPage(){
     var today=new Date();
@@ -69,15 +71,70 @@ var KPI_COLS = [
     var el=document.getElementById('kpiMetaTanggal'); if(el&&!el.value) el.value=ymd;
     var elF=document.getElementById('kpiFilterFrom'); if(elF&&!elF.value) elF.value=ymFrom;
     var elT=document.getElementById('kpiFilterTo');   if(elT&&!elT.value) elT.value=ymd;
+
+    // Default Week/Tahun = minggu berjalan (ISO week, sama seperti Realisasi Planning)
+    var dNow=new Date(); var dow=dNow.getUTCDay()||7;
+    var thu=new Date(dNow); thu.setUTCDate(dNow.getUTCDate()+4-dow);
+    var jan1=new Date(Date.UTC(thu.getUTCFullYear(),0,1));
+    var curWeek=Math.ceil((((thu-jan1)/86400000)+1)/7);
+    var elW=document.getElementById('kpiFilterWeek'); if(elW&&!elW.value) elW.value=curWeek;
+    var elY=document.getElementById('kpiFilterYear'); if(elY&&!elY.value) elY.value=thu.getUTCFullYear();
+
     if(_kpiTbody().rows.length===0) kpiInitRows(20);
     _kpiBindEvents();
     kpiSwitchTab('input');
   }
 
+  function _kpiIsoWeekToRange(year, week){
+    // Senin minggu ke-N tahun tsb (standar ISO week, sama seperti dipakai Realisasi/Planning)
+    var jan4 = new Date(Date.UTC(year,0,4));
+    var jan4Day = jan4.getUTCDay()||7;
+    var week1Mon = new Date(jan4);
+    week1Mon.setUTCDate(jan4.getUTCDate()-jan4Day+1);
+    var mon = new Date(week1Mon);
+    mon.setUTCDate(week1Mon.getUTCDate()+(week-1)*7);
+    var sun = new Date(mon);
+    sun.setUTCDate(mon.getUTCDate()+6);
+    function fmt(d){ return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
+    return {from:fmt(mon), to:fmt(sun)};
+  }
+
+  function kpiToggleFilterMode(mode){
+    _kpiFilterMode = mode;
+    var bT=document.getElementById('kpiFilterModeTgl');
+    var bW=document.getElementById('kpiFilterModeWeek');
+    var pT=document.getElementById('kpiFilterTglPane');
+    var pW=document.getElementById('kpiFilterWeekPane');
+    if(bT) bT.style.background = mode==='tanggal' ? '#2c5364' : '#fff';
+    if(bT) bT.style.color      = mode==='tanggal' ? '#fff'    : '#4a5568';
+    if(bW) bW.style.background = mode==='week' ? '#2c5364' : '#fff';
+    if(bW) bW.style.color      = mode==='week' ? '#fff'    : '#4a5568';
+    if(pT) pT.style.display = mode==='tanggal' ? 'flex' : 'none';
+    if(pW) pW.style.display = mode==='week' ? 'flex' : 'none';
+  }
+
   function kpiLoadFilters(){
+    if(_kpiFilterMode === 'week'){
+      var wk = document.getElementById('kpiFilterWeek');
+      var yr = document.getElementById('kpiFilterYear');
+      var w = wk ? parseInt(wk.value)||1 : 1;
+      var y = yr ? parseInt(yr.value)||new Date().getFullYear() : new Date().getFullYear();
+      return _kpiIsoWeekToRange(y, w);
+    }
     var f = document.getElementById('kpiFilterFrom');
     var t = document.getElementById('kpiFilterTo');
     return {from: f?f.value:'', to: t?t.value:''};
+  }
+
+  function kpiToggleRitaseGroupMode(mode){
+    _kpiRitaseGroupMode = mode;
+    var bDay=document.getElementById('kpiRitaseGroupDay');
+    var bShift=document.getElementById('kpiRitaseGroupShift');
+    if(bDay)   bDay.style.background   = mode==='day'   ? '#0f2027' : '#fff';
+    if(bDay)   bDay.style.color        = mode==='day'   ? '#fff'    : '#4a5568';
+    if(bShift) bShift.style.background = mode==='shift' ? '#0f2027' : '#fff';
+    if(bShift) bShift.style.color      = mode==='shift' ? '#fff'    : '#4a5568';
+    kpiLoadRitase();
   }
 
   function kpiTampilkan(){
@@ -105,7 +162,7 @@ var KPI_COLS = [
     google.script.run
       .withSuccessHandler(function(res){ _kpiRenderRitase(res); })
       .withFailureHandler(function(err){ if(pane) pane.innerHTML='<div style="text-align:center;padding:40px;color:#e53e3e;">Error: '+err.message+'</div>'; })
-      .getKpiRitaseSummary(f.from, f.to, _kpiRitaseMode);
+      .getKpiRitaseSummary(f.from, f.to, _kpiRitaseMode, _kpiRitaseGroupMode);
   }
 
   function _kpiRenderRitase(res){
@@ -114,25 +171,49 @@ var KPI_COLS = [
     if(!res||!res.success){ pane.innerHTML='<div style="text-align:center;padding:40px;color:#e53e3e;">'+(res?res.message:'Gagal memuat')+'</div>'; return; }
     var list=res.perTanggal||[];
     var html='';
-    html+='<div style="display:flex;gap:10px;align-items:center;margin:14px 0;">'
-        +'<button id="kpiRitaseModeAll" onclick="kpiToggleRitaseMode(\'all\')" style="padding:6px 16px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseMode==='all'?'#2c5364':'#fff')+';color:'+(_kpiRitaseMode==='all'?'#fff':'#4a5568')+';">Semua Mobil</button>'
-        +'<button id="kpiRitaseModeBa" onclick="kpiToggleRitaseMode(\'by_ba\')" style="padding:6px 16px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseMode==='by_ba'?'#2c5364':'#fff')+';color:'+(_kpiRitaseMode==='by_ba'?'#fff':'#4a5568')+';">By NOPOL BA</button>'
+
+    // ── Toolbar toggle: Semua Mobil / By NOPOL BA  +  By Hari / By Shift ──
+    html+='<div style="display:flex;gap:20px;align-items:center;margin:16px 0;flex-wrap:wrap;">'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button id="kpiRitaseModeAll" onclick="kpiToggleRitaseMode(\'all\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseMode==='all'?'linear-gradient(135deg,#0f2027,#2c5364)':'#fff')+';color:'+(_kpiRitaseMode==='all'?'#fff':'#4a5568')+';">Semua Mobil</button>'
+        +'<button id="kpiRitaseModeBa" onclick="kpiToggleRitaseMode(\'by_ba\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseMode==='by_ba'?'linear-gradient(135deg,#0f2027,#2c5364)':'#fff')+';color:'+(_kpiRitaseMode==='by_ba'?'#fff':'#4a5568')+';">By NOPOL BA</button>'
+        +'</div>'
+        +'<div style="width:1px;height:22px;background:#e2e8f0;"></div>'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button id="kpiRitaseGroupDay" onclick="kpiToggleRitaseGroupMode(\'day\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseGroupMode==='day'?'#0f2027':'#fff')+';color:'+(_kpiRitaseGroupMode==='day'?'#fff':'#4a5568')+';"><i class="fas fa-calendar-day" style="margin-right:4px;"></i>By Hari</button>'
+        +'<button id="kpiRitaseGroupShift" onclick="kpiToggleRitaseGroupMode(\'shift\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseGroupMode==='shift'?'#0f2027':'#fff')+';color:'+(_kpiRitaseGroupMode==='shift'?'#fff':'#4a5568')+';"><i class="fas fa-clock" style="margin-right:4px;"></i>By Shift</button>'
+        +'</div>'
         +'</div>';
-    html+='<div style="background:#fff;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
-        +'<div><div style="font-size:12px;color:#718096;font-weight:700;text-transform:uppercase;">Rata-rata Ritase/Mobil (Global)</div>'
-        +'<div style="font-size:28px;font-weight:800;color:#2c5364;">'+(res.grandAvg||0).toFixed(2)+'</div></div>'
+
+    // ── Kartu ringkasan global — gradient header ala REALISASI ──
+    html+='<div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);border:1px solid #e2e8f0;margin-bottom:18px;overflow:hidden;">'
+        +'<div style="background:linear-gradient(135deg,#0f2027,#2c5364);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">'
+        +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata Ritase / Mobil (Global)</div>'
+        +'<div style="font-size:30px;font-weight:800;">'+(res.grandAvg||0).toFixed(2)+'</div></div>'
         +'<div>'+_kpiGradeBadge(res.grandGrade)+'</div>'
-        +'<div style="font-size:12px;color:#718096;">Total Ritase: <b>'+res.grandTotal+'</b> &nbsp;|&nbsp; Total Mobil: <b>'+res.grandUnik+'</b></div>'
-        +'</div>';
+        +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Total Ritase</div><div style="font-size:15px;font-weight:800;">'+res.grandTotal+'</div></div>'
+        +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Total Mobil</div><div style="font-size:15px;font-weight:800;">'+res.grandUnik+'</div></div>'
+        +'</div></div>';
+
     if(!list.length){
-      html+='<div style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data untuk rentang tanggal ini</div>';
+      html+='<div style="text-align:center;padding:50px;color:#a0aec0;background:#fff;border-radius:12px;border:1px solid #e2e8f0;"><i class="fas fa-inbox" style="font-size:30px;display:block;margin-bottom:10px;opacity:.3;"></i>Tidak ada data untuk rentang ini</div>';
     } else {
-      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;">';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">';
       list.forEach(function(d){
-        html+='<div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);">'
-            +'<div style="font-size:12px;font-weight:700;color:#2c5364;margin-bottom:8px;">'+_kpiEsc(d.tanggal)+'</div>'
-            +'<div style="font-size:11px;color:#718096;margin-bottom:6px;">Total: <b>'+d.total+'</b> | Unik: <b>'+d.unik+'</b> | Avg: <b>'+d.avgRitase.toFixed(2)+'</b></div>'
-            +'<div style="font-size:11px;line-height:1.8;">'+d.mobilList.map(function(m){ return _kpiEsc(m.mobil)+' <span style="color:#a0aec0;">('+m.count+')</span>'; }).join('<br>')+'</div>'
+        var judul = _kpiEsc(d.tanggal) + (d.shiftNo ? ' &middot; Shift '+d.shiftNo : '');
+        html+='<div style="background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);border:1px solid #e2e8f0;overflow:hidden;">'
+            +'<div style="background:linear-gradient(135deg,#1a3a5c,#2d6a9f);color:#fff;padding:10px 14px;">'
+            +'<div style="font-size:13px;font-weight:800;">'+judul+'</div>'
+            +'<div style="font-size:11px;opacity:.8;margin-top:2px;">Total <b>'+d.total+'</b> &middot; Unik <b>'+d.unik+'</b> &middot; Avg <b>'+d.avgRitase.toFixed(2)+'</b></div>'
+            +'</div>'
+            +'<div style="padding:10px 14px;">'
+            +d.mobilList.map(function(m,i){
+              var bg = i%2===0 ? '#fff' : '#f7fafc';
+              return '<div style="display:flex;justify-content:space-between;padding:5px 6px;background:'+bg+';border-radius:6px;font-size:12px;">'
+                +'<span style="color:#2d3748;font-weight:600;">'+_kpiEsc(m.mobil)+'</span>'
+                +'<span style="color:#2c5364;font-weight:800;">'+m.count+'</span></div>';
+            }).join('')
+            +'</div>'
             +'</div>';
       });
       html+='</div>';
@@ -166,22 +247,31 @@ var KPI_COLS = [
     if(!res||!res.success){ pane.innerHTML='<div style="text-align:center;padding:40px;color:#e53e3e;">'+(res?res.message:'Gagal memuat')+'</div>'; return; }
     var list=res.perPlant||[];
     var html='';
-    html+='<div style="background:#fff;border-radius:12px;padding:18px;margin:14px 0 16px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
-        +'<div><div style="font-size:12px;color:#718096;font-weight:700;text-transform:uppercase;">Rata-rata '+title+' (Global)</div>'
-        +'<div style="font-size:28px;font-weight:800;color:#2c5364;">'+_kpiFmtMin(res.globalAvg)+'</div></div>'
+
+    // ── Kartu ringkasan global — gradient header ala REALISASI ──
+    html+='<div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);border:1px solid #e2e8f0;margin:16px 0 18px;overflow:hidden;">'
+        +'<div style="background:linear-gradient(135deg,#0f2027,#2c5364);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">'
+        +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata '+title+' (Global)</div>'
+        +'<div style="font-size:30px;font-weight:800;">'+_kpiFmtMin(res.globalAvg)+'</div></div>'
         +'<div>'+_kpiGradeBadge(res.globalGrade)+'</div>'
-        +'<div style="font-size:12px;color:#718096;">Jumlah Data: <b>'+res.globalCount+'</b></div>'
-        +'</div>';
+        +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Jumlah Data</div><div style="font-size:15px;font-weight:800;">'+res.globalCount+'</div></div>'
+        +'</div></div>';
+
     if(!list.length){
-      html+='<div style="text-align:center;padding:40px;color:#a0aec0;">Tidak ada data untuk rentang tanggal ini</div>';
+      html+='<div style="text-align:center;padding:50px;color:#a0aec0;background:#fff;border-radius:12px;border:1px solid #e2e8f0;"><i class="fas fa-inbox" style="font-size:30px;display:block;margin-bottom:10px;opacity:.3;"></i>Tidak ada data untuk rentang ini</div>';
     } else {
-      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">';
       list.forEach(function(p){
-        html+='<div style="background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);text-align:center;">'
-            +'<div style="font-size:12px;font-weight:700;color:#718096;text-transform:uppercase;margin-bottom:8px;">Plant '+_kpiEsc(p.plant)+'</div>'
-            +'<div style="font-size:20px;font-weight:800;color:#2c5364;margin-bottom:8px;">'+_kpiFmtMin(p.avgMinutes)+'</div>'
+        html+='<div style="background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);border:1px solid #e2e8f0;overflow:hidden;">'
+            +'<div style="background:linear-gradient(135deg,#1a3a5c,#2d6a9f);color:#fff;padding:10px 14px;">'
+            +'<div style="font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.5px;">Plant</div>'
+            +'<div style="font-size:15px;font-weight:800;">'+_kpiEsc(p.plant)+'</div>'
+            +'</div>'
+            +'<div style="padding:16px 14px;text-align:center;">'
+            +'<div style="font-size:22px;font-weight:800;color:#2c5364;margin-bottom:10px;">'+_kpiFmtMin(p.avgMinutes)+'</div>'
             +_kpiGradeBadge(p.grade)
-            +'<div style="font-size:11px;color:#a0aec0;margin-top:8px;">'+p.count+' data</div>'
+            +'<div style="font-size:11px;color:#a0aec0;margin-top:10px;">'+p.count+' data</div>'
+            +'</div>'
             +'</div>';
       });
       html+='</div>';
