@@ -122,11 +122,11 @@ function applyRoleRestrictions(role){
   if (isPPIC) {
     try {
       ['menuDashboard','menuRealisasi','menuOpname','menuRdc',
-       'menuStockJalur','menuBinLoc','menuApps','menuKarina'].forEach(function(id){
+       'menuStockJalur','menuBinLoc','menuApps','menuKarina','menuKpi'].forEach(function(id){
         var el = document.getElementById(id); if (el) el.style.display = 'none';
       });
       ['dashboard','realisasiPage','opnamePage','rdcPage',
-       'stockJalurPage','binLocPage','appsPage','karinaPage'].forEach(function(id){
+       'stockJalurPage','binLocPage','appsPage','karinaPage','kpiPage'].forEach(function(id){
         var el = document.getElementById(id); if (el) el.style.display = 'none';
       });
       setTimeout(function(){ if(typeof showPage==='function') showPage('monitoringEksporPage'); }, 300);
