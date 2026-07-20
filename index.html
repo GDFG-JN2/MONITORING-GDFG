@@ -21,7 +21,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *{ box-sizing:border-box; }
     html{ height:100%; min-height:100%; background:#f7fafc; }
@@ -2545,6 +2544,10 @@
         <div class="s-icon"><i class="fa-solid fa-ship"></i></div>
         <span>Monitoring Ekspor</span>
       </a>
+      <a id="menuKpi" onclick="showPage('kpiPage')">
+        <div class="s-icon"><i class="fa-solid fa-gauge-high"></i></div>
+        <span>KPI</span>
+      </a>
         <a id="menuApps" onclick="showPage('appsPage')">
         <div class="s-icon"><i class="fa-solid fa-th"></i></div>
         <span>Aplikasi</span>
@@ -4426,9 +4429,6 @@
             <span style="font-size:13px;font-weight:800;"><i class="fas fa-table" style="margin-right:6px;"></i>Data Monitoring RDC</span>
             <div style="display:flex;align-items:center;gap:8px;">
               <span id="rdcSumRowCount" style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">0 DATA</span>
-              <button onclick="rdcDownloadExcel()" id="rdcBtnExcel" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
-                <i class="fas fa-file-excel"></i> Download Excel
-              </button>
               <button onclick="rdcDownloadPdf()" id="rdcBtnPdf" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
                 <i class="fas fa-file-pdf"></i> Download PDF
               </button>
@@ -5332,6 +5332,118 @@
 
 
   </div><!-- /monitoringEksporPage -->
+  <div id="kpiPage" style="display:none">
+    <div class="page-header-bar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+        <div class="page-title"><i class="fa-solid fa-gauge-high"></i> KPI</div>
+      </div>
+    </div>
+
+    <div style="padding:0 14px;">
+      <!-- Tab bar -->
+      <div style="display:flex;gap:2px;border-bottom:2px solid #e2e8f0;margin-bottom:0;overflow-x:auto;">
+        <button id="kpiTabRitase" onclick="kpiSwitchTab(\'ritase\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-truck-moving"></i> Ritase/Day</button>
+        <button id="kpiTabStay" onclick="kpiSwitchTab(\'stay\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-parking"></i> Waktu Stay</button>
+        <button id="kpiTabLoading" onclick="kpiSwitchTab(\'loading\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-boxes"></i> Waktu Loading</button>
+        <button id="kpiTabInput" onclick="kpiSwitchTab(\'input\')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#2c5364;border-bottom:3px solid #2c5364;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-plus-circle"></i> Input Data</button>
+      </div>
+
+      <!-- Filter bar — dipakai bersama oleh 3 tab report (Ritase/Stay/Loading) -->
+      <div id="kpiFilterBar" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 4px;">
+        <div class="fi"><label>Dari</label><input type="date" id="kpiFilterFrom"></div>
+        <div class="fi"><label>Sampai</label><input type="date" id="kpiFilterTo"></div>
+        <button onclick="kpiTampilkan()" style="padding:8px 20px;border-radius:8px;border:none;background:#2c5364;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <i class="fas fa-search"></i> Tampilkan
+        </button>
+      </div>
+
+      <!-- Report panes -->
+      <div id="kpiRitasePane" style="display:none;padding:0 4px;"></div>
+      <div id="kpiStayPane" style="display:none;padding:0 4px;"></div>
+      <div id="kpiLoadingPane" style="display:none;padding:0 4px;"></div>
+
+      <!-- Input Data pane -->
+      <div id="kpiInputPane" style="display:block;">
+        <div class="op-meta-grid" style="grid-template-columns:220px;padding:12px 14px 10px;">
+          <div class="op-meta-field">
+            <label>Tanggal Input</label>
+            <input type="date" id="kpiMetaTanggal">
+          </div>
+        </div>
+
+        <div class="input-table-card" style="border-radius:0;box-shadow:none;border:none;">
+          <div class="op-tbl-hdr">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="op-tbl-title"><i class="fas fa-table" style="margin-right:5px;"></i>Input KPI</span>
+              <span class="op-row-count" id="kpiRowCount">0 BARIS</span>
+            </div>
+            <div class="op-tbl-actions">
+              <button class="op-btn dim" onclick="kpiAddRows(10)"><i class="fas fa-plus"></i> +10 Baris</button>
+              <button class="op-btn dim" onclick="showToast('&#128161; Klik sel lalu Ctrl+V dari Excel','')"><i class="fas fa-paste"></i> Paste Excel</button>
+              <button class="op-btn danger" onclick="kpiClearTable()"><i class="fas fa-trash"></i> Clear</button>
+            </div>
+          </div>
+          <div class="op-zoom-bar">
+            <button class="op-zoom-btn" onclick="kpiZoom(-10)" title="Zoom Out">&#8722;</button>
+            <span class="op-zoom-label" id="kpiZoomLabel">100%</span>
+            <button class="op-zoom-btn" onclick="kpiZoom(+10)" title="Zoom In">+</button>
+            <span class="op-zoom-reset" onclick="kpiZoomReset()">Reset</span>
+            <span style="margin-left:8px;font-size:11px;color:#a0aec0;">Scroll horizontal untuk lihat semua kolom (32 kolom)</span>
+          </div>
+          <div class="op-tbl-scroll" id="kpiTblScroll">
+            <table class="input-tbl kpi-itbl" id="kpiInputTbl" style="min-width:3400px;" tabindex="0">
+              <thead>
+                <tr>
+                  <th class="th-no" style="background:#0f2027;color:#fff;text-align:center;width:36px;">#</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">No. Document</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">No. Kartu</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Tipe Aktivitas</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Tiba</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Jam Tiba / Truck In</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Plant Penerima</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Nama Cabang Penerima</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Plant Pengirim</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Nama Plant Pengirim</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">No Referensi</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Tipe Material</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal DO</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal GI</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Ekspedisi</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">No. Mobil</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Jenis Mobil</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">LDP</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Estimasi Tiba</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Division Code</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Division Name</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">QTY</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Aktivitas Terakhir</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Mulai Bongkar/Muat</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Mulai Bongkar/Muat</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Selesai Bongkar/Muat</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Selesai Bongkar/Muat</th>
+                  <th style="background:#0f2027;color:#fff;min-width:110px;">Tanggal Keluar</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Jam Keluar / Truck Out</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Lama Antri</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Durasi Loading/Unloading</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Durasi Truck In / Truck Out</th>
+                  <th style="background:#0f2027;color:#fff;min-width:100px;">Pending Bongkar</th>
+                  <th style="background:#0f2027;width:28px;border:none;"></th>
+                </tr>
+              </thead>
+              <tbody id="kpiInputTbody"></tbody>
+            </table>
+          </div>
+          <div class="op-save-bar">
+            <button class="op-btn dim" style="background:#e2e8f0;color:#4a5568;padding:9px 20px;border-radius:8px;" onclick="kpiClearTable()">Reset</button>
+            <button class="op-btn success op-btn-save" onclick="kpiSaveData()"><i class="fas fa-save" style="margin-right:5px;"></i>Simpan Data</button>
+          </div>
+        </div>
+      </div><!-- /kpiInputPane -->
+
+    </div>
+  </div><!-- /kpiPage -->
+
   <div id="appsPage" style="display:none;">
 
     <!-- Header -->
@@ -5408,6 +5520,7 @@
   <script src="js/stockjalur.js"></script>
   <script src="js/binloc.js"></script>
   <script src="js/monitoringekspor.js"></script>
+  <script src="js/kpi.js"></script>
 
   <!-- Service Worker Registration -->
   <script>
