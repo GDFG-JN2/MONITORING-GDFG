@@ -296,12 +296,26 @@ var KPI_COLS = [
     tdNo.style.cssText='text-align:center;color:#a0aec0;font-size:11px;font-weight:700;background:#f8fafc;width:32px;user-select:none;';
     tr.appendChild(tdNo);
 
+    // Kolom yang butuh garis pemisah tebal (batas grup logis) — dokumen | plant | material | mobil | waktu bongkar | waktu keluar
+    var kpiGrpSepKeys = {tanggal_tiba:1, no_referensi:1, jenis_mobil:1, qty:1, tanggal_mulai_bongkar:1, tanggal_keluar:1};
+    // Kolom tanggal — lebih sempit dari kolom teks bebas
+    var kpiDateKeys = {tanggal_tiba:1, tanggal_do:1, tanggal_gi:1, tanggal_estimasi_tiba:1,
+                        tanggal_mulai_bongkar:1, tanggal_selesai_bongkar:1, tanggal_keluar:1};
+    // Kolom angka pendek
+    var kpiNumKeys = {qty:1, lama_antri:1, durasi_loading:1, durasi_truck_inout:1};
+
     KPI_COLS.forEach(function(col){
       var td=document.createElement('td');
       td.setAttribute('data-key',col.key);
       td.contentEditable='true';
-      td.style.padding='5px 7px';
-      td.style.minWidth='90px';
+      td.style.padding='6px 8px';
+      td.style.fontSize='12px';
+      if(kpiDateKeys[col.key])      td.style.minWidth='95px';
+      else if(kpiNumKeys[col.key])  td.style.minWidth='75px';
+      else                          td.style.minWidth='130px';
+      if(kpiGrpSepKeys[col.key]){
+        td.style.borderRight='2px solid #cbd5e0';
+      }
       if(data[col.key]) td.textContent=data[col.key];
 
       td.addEventListener('focus', function(){
@@ -371,6 +385,7 @@ var KPI_COLS = [
     tdDel.addEventListener('click',function(){ tr.parentNode&&tr.parentNode.removeChild(tr); _kpiRenumber(); kpiUpdateRowCount(); });
     tr.appendChild(tdDel);
 
+    if((rowIdx-1)%2===1) tr.style.background='#f8fafc';
     tbody.appendChild(tr);
   }
 
