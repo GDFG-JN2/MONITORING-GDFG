@@ -3,7 +3,7 @@
 // Ganti CACHE_VERSION setiap kali ada update file
 // ============================================================
 
-const CACHE_VERSION  = 'v2.5.3';
+const CACHE_VERSION  = 'v2.5.4';
 const CACHE_NAME     = 'monitoring-gdfg-' + CACHE_VERSION;
 
 // File yang di-cache saat install
@@ -21,6 +21,7 @@ const PRECACHE_URLS = [
   './js/stockjalur.js',
   './js/binloc.js',
   './js/monitoringekspor.js',
+  './js/kpi.js',
 ];
 
 // ── INSTALL: cache semua file ──────────────────────────────
