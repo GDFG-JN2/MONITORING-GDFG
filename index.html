@@ -5351,9 +5351,19 @@
       </div>
 
       <!-- Filter bar — dipakai bersama oleh 3 tab report (Ritase/Stay/Loading) -->
-      <div id="kpiFilterBar" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 4px;">
-        <div class="fi"><label>Dari</label><input type="date" id="kpiFilterFrom"></div>
-        <div class="fi"><label>Sampai</label><input type="date" id="kpiFilterTo"></div>
+      <div id="kpiFilterBar" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:14px 4px;">
+        <div style="display:flex;gap:6px;">
+          <button id="kpiFilterModeTgl" onclick="kpiToggleFilterMode('tanggal')" style="padding:7px 16px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:#2c5364;color:#fff;"><i class="fas fa-calendar" style="margin-right:4px;"></i>Tanggal</button>
+          <button id="kpiFilterModeWeek" onclick="kpiToggleFilterMode('week')" style="padding:7px 16px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:#fff;color:#4a5568;"><i class="fas fa-calendar-week" style="margin-right:4px;"></i>Week</button>
+        </div>
+        <div id="kpiFilterTglPane" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="fi"><label>Dari</label><input type="date" id="kpiFilterFrom"></div>
+          <div class="fi"><label>Sampai</label><input type="date" id="kpiFilterTo"></div>
+        </div>
+        <div id="kpiFilterWeekPane" style="display:none;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="fi"><label>Week</label><input type="number" id="kpiFilterWeek" min="1" max="53" style="width:70px;"></div>
+          <div class="fi"><label>Tahun</label><input type="number" id="kpiFilterYear" min="2020" max="2100" style="width:90px;"></div>
+        </div>
         <button onclick="kpiTampilkan()" style="padding:8px 20px;border-radius:8px;border:none;background:#2c5364;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">
           <i class="fas fa-search"></i> Tampilkan
         </button>
