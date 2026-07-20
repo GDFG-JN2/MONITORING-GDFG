@@ -5334,39 +5334,48 @@
 
   </div><!-- /monitoringEksporPage -->
   <div id="kpiPage" style="display:none">
-    <div class="page-header-bar">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
-        <div class="page-title"><i class="fa-solid fa-gauge-high"></i> KPI</div>
+    <div class="gdrm-header">
+      <h2>
+        <span style="cursor:pointer;margin-right:8px;font-size:17px" onclick="toggleSidebar()">
+          <i class="fa-solid fa-bars"></i>
+        </span>
+        <i class="fa-solid fa-gauge-high"></i> KPI
+      </h2>
+      <div class="gdrm-header-btns">
+        <button class="btn-hdr" onclick="showPage('dashboard')"><i class="fas fa-arrow-left"></i> <span class="btn-hdr-text">Kembali</span></button>
       </div>
     </div>
 
     <div style="padding:0 14px;">
-      <!-- Tab bar -->
-      <div style="display:flex;gap:2px;border-bottom:2px solid #e2e8f0;margin-bottom:0;overflow-x:auto;">
-        <button id="kpiTabRitase" onclick="kpiSwitchTab('ritase')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-truck-moving"></i> Ritase/Day</button>
-        <button id="kpiTabStay" onclick="kpiSwitchTab('stay')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-parking"></i> Waktu Stay</button>
-        <button id="kpiTabLoading" onclick="kpiSwitchTab('loading')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#718096;border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-boxes"></i> Waktu Loading</button>
-        <button id="kpiTabInput" onclick="kpiSwitchTab('input')" style="padding:10px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#2c5364;border-bottom:3px solid #2c5364;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"><i class="fas fa-plus-circle"></i> Input Data</button>
+      <!-- Tab bar — sama persis class-nya dengan Realisasi SPE -->
+      <div class="real-tabs">
+        <button id="kpiTabRitase" class="real-tab" onclick="kpiSwitchTab('ritase')"><i class="fas fa-truck-moving"></i> Ritase/Day</button>
+        <button id="kpiTabStay" class="real-tab" onclick="kpiSwitchTab('stay')"><i class="fas fa-parking"></i> Waktu Stay</button>
+        <button id="kpiTabLoading" class="real-tab" onclick="kpiSwitchTab('loading')"><i class="fas fa-boxes"></i> Waktu Loading</button>
+        <button id="kpiTabInput" class="real-tab active" onclick="kpiSwitchTab('input')"><i class="fas fa-plus-circle"></i> Input Data</button>
       </div>
 
       <!-- Filter bar — dipakai bersama oleh 3 tab report (Ritase/Stay/Loading) -->
-      <div id="kpiFilterBar" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:14px 4px;">
-        <div style="display:flex;gap:6px;">
-          <button id="kpiFilterModeTgl" onclick="kpiToggleFilterMode('tanggal')" style="padding:7px 16px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:#2c5364;color:#fff;"><i class="fas fa-calendar" style="margin-right:4px;"></i>Tanggal</button>
-          <button id="kpiFilterModeWeek" onclick="kpiToggleFilterMode('week')" style="padding:7px 16px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:#fff;color:#4a5568;"><i class="fas fa-calendar-week" style="margin-right:4px;"></i>Week</button>
+      <div id="kpiFilterBar" style="padding:12px 0 0;">
+        <!-- Mode toggle: Tanggal / Week — class sama dengan Realisasi -->
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <button id="kpiFilterModeTgl" class="sum-view-btn active" onclick="kpiToggleFilterMode('tanggal')"><i class="fas fa-calendar-day"></i> Tanggal</button>
+          <button id="kpiFilterModeWeek" class="sum-view-btn" onclick="kpiToggleFilterMode('week')"><i class="fas fa-calendar-week"></i> Week</button>
         </div>
-        <div id="kpiFilterTglPane" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-          <div class="fi"><label>Dari</label><input type="date" id="kpiFilterFrom"></div>
-          <div class="fi"><label>Sampai</label><input type="date" id="kpiFilterTo"></div>
+        <div id="kpiFilterTglPane" class="real-filter-bar">
+          <label>Dari</label>
+          <input type="date" id="kpiFilterFrom">
+          <label>Sampai</label>
+          <input type="date" id="kpiFilterTo">
+          <button class="btn-filter" onclick="kpiTampilkan()"><i class="fas fa-search"></i> Tampilkan</button>
         </div>
-        <div id="kpiFilterWeekPane" style="display:none;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-          <div class="fi"><label>Week</label><input type="number" id="kpiFilterWeek" min="1" max="53" style="width:70px;"></div>
-          <div class="fi"><label>Tahun</label><input type="number" id="kpiFilterYear" min="2020" max="2100" style="width:90px;"></div>
+        <div id="kpiFilterWeekPane" class="real-filter-bar" style="display:none;">
+          <label>Week</label>
+          <input type="number" id="kpiFilterWeek" min="1" max="53" style="width:70px;border:2px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;">
+          <label>Tahun</label>
+          <input type="number" id="kpiFilterYear" min="2020" max="2100" style="width:90px;border:2px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;">
+          <button class="btn-filter" onclick="kpiTampilkan()"><i class="fas fa-search"></i> Tampilkan</button>
         </div>
-        <button onclick="kpiTampilkan()" style="padding:8px 20px;border-radius:8px;border:none;background:#2c5364;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <i class="fas fa-search"></i> Tampilkan
-        </button>
       </div>
 
       <!-- Report panes -->
