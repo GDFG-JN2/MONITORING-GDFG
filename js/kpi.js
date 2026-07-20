@@ -105,10 +105,8 @@ var KPI_COLS = [
     var bW=document.getElementById('kpiFilterModeWeek');
     var pT=document.getElementById('kpiFilterTglPane');
     var pW=document.getElementById('kpiFilterWeekPane');
-    if(bT) bT.style.background = mode==='tanggal' ? '#2c5364' : '#fff';
-    if(bT) bT.style.color      = mode==='tanggal' ? '#fff'    : '#4a5568';
-    if(bW) bW.style.background = mode==='week' ? '#2c5364' : '#fff';
-    if(bW) bW.style.color      = mode==='week' ? '#fff'    : '#4a5568';
+    if(bT) bT.classList.toggle('active', mode==='tanggal');
+    if(bW) bW.classList.toggle('active', mode==='week');
     if(pT) pT.style.display = mode==='tanggal' ? 'flex' : 'none';
     if(pW) pW.style.display = mode==='week' ? 'flex' : 'none';
   }
@@ -301,10 +299,7 @@ var KPI_COLS = [
     };
     Object.keys(panes).forEach(function(k){
       if(panes[k]) panes[k].style.display = (k===tab) ? 'block' : 'none';
-      if(btns[k]){
-        btns[k].style.color = (k===tab) ? '#2c5364' : '#718096';
-        btns[k].style.borderBottomColor = (k===tab) ? '#2c5364' : 'transparent';
-      }
+      if(btns[k]) btns[k].classList.toggle('active', k===tab);
     });
     var filterBar = document.getElementById('kpiFilterBar');
     if(filterBar) filterBar.style.display = (tab==='input') ? 'none' : 'flex';
