@@ -48,7 +48,7 @@
     'saveRdcData':         function(a){ return a[0]||{}; },
     'saveKpiData':          function(a){ return a[0]||{}; },
     'getKpiData':           function(a){ return {from:a[0]||'', to:a[1]||''}; },
-    'getKpiRitaseSummary':  function(a){ return {from:a[0]||'', to:a[1]||'', mode:a[2]||'all'}; },
+    'getKpiRitaseSummary':  function(a){ return {from:a[0]||'', to:a[1]||'', mode:a[2]||'all', groupMode:a[3]||'day'}; },
     'getKpiStaySummary':    function(a){ return {from:a[0]||'', to:a[1]||''}; },
     'getKpiLoadingSummary': function(a){ return {from:a[0]||'', to:a[1]||''}; },
     'getRdcData':          function(a){ return {from:a[0]||'', to:a[1]||''}; },
