@@ -46,10 +46,72 @@ var KPI_COLS = [
 
   // ── Warna grading A-E ──
   var KPI_GRADE_COLOR = {A:'#00b050',B:'#0066ff',C:'#ffd400',D:'#ff9900',E:'#ff0000'};
-  function _kpiGradeBadge(g){
+  function _kpiGradeBadge(g, type, subKey){
     var col = KPI_GRADE_COLOR[g] || '#a0aec0';
     var txtCol = (g==='C') ? '#7a5c00' : '#fff';
-    return '<span style="display:inline-block;padding:3px 12px;border-radius:20px;background:'+col+';color:'+txtCol+';font-weight:800;font-size:13px;">'+(g||'-')+'</span>';
+    var clickable = !!type;
+    var onclickAttr = clickable ? (' onclick="kpiShowSemesterPopup(\''+type+'\',\''+(subKey||'')+'\')" title="Klik untuk lihat nilai per semester"') : '';
+    var cursorStyle = clickable ? 'cursor:pointer;' : '';
+    return '<span'+onclickAttr+' style="display:inline-block;padding:3px 12px;border-radius:20px;background:'+col+';color:'+txtCol+';font-weight:800;font-size:13px;'+cursorStyle+'">'+(g||'-')+'</span>';
+  }
+
+  // ── Popup nilai Semester 1 (Jan-Jun) & Semester 2 (Jul-Des) ──
+  function kpiShowSemesterPopup(type, subKey){
+    var year = window._kpiCurrentYear || new Date().getFullYear();
+    var old=document.getElementById('kpiSemesterOverlay'); if(old) old.remove();
+    var loadingHtml = '<div id="kpiSemesterOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;">'
+      +'<div style="background:#fff;border-radius:12px;padding:30px 40px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;color:#2c5364;"></i></div></div>';
+    document.body.insertAdjacentHTML('beforeend', loadingHtml);
+
+    google.script.run
+      .withSuccessHandler(function(res){ _kpiRenderSemesterPopup(res, type, subKey); })
+      .withFailureHandler(function(err){
+        var ov=document.getElementById('kpiSemesterOverlay');
+        if(ov) ov.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;color:#e53e3e;">Error: '+err.message+'</div>';
+      })
+      .getKpiSemesterGrade(type, subKey, year);
+  }
+
+  function _kpiRenderSemesterPopup(res, type, subKey){
+    var ov=document.getElementById('kpiSemesterOverlay');
+    if(!ov) return;
+    if(!res||!res.success){ ov.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;color:#e53e3e;">'+(res?res.message:'Gagal memuat')+'</div>'; return; }
+
+    var isDuration = (type==='stay' || type==='loading');
+    function fmtVal(x){ return isDuration ? _kpiFmtMin(x.avg) : x.avg.toFixed(2); }
+
+    var titleMap={ritase:'Rata-rata Ritase / Mobil', stay:'Rata-rata Waktu Stay', loading:'Rata-rata Waktu Loading'};
+    var subLabel = '';
+    if(type==='ritase') subLabel = subKey==='by_ba' ? ' — By NOPOL BA' : ' — Semua Mobil';
+    else if(subKey) subLabel = ' — Plant '+_kpiEsc(subKey);
+
+    ov.innerHTML =
+      '<div onclick="if(event.target===this) kpiCloseSemesterPopup()" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;">'
+      +'<div style="background:#fff;border-radius:12px;max-width:480px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+      +'<div style="background:linear-gradient(135deg,#0f2027,#2c5364);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">'
+      +'<div><div style="font-size:13px;font-weight:800;">'+(titleMap[type]||'')+subLabel+'</div><div style="font-size:11px;opacity:.7;margin-top:2px;">Tahun '+res.year+'</div></div>'
+      +'<button onclick="kpiCloseSemesterPopup()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;">&times;</button>'
+      +'</div>'
+      +'<div style="padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
+      +'<div style="background:#f7fafc;border-radius:10px;padding:16px 10px;text-align:center;">'
+      +'<div style="font-size:11px;color:#718096;font-weight:700;text-transform:uppercase;line-height:1.4;">Semester 1<br><span style="font-weight:600;opacity:.7;">(Jan &ndash; Jun)</span></div>'
+      +'<div style="font-size:20px;font-weight:800;color:#2c5364;margin:10px 0;">'+fmtVal(res.sem1)+'</div>'
+      +_kpiGradeBadge(res.sem1.grade)
+      +'<div style="font-size:10px;color:#a0aec0;margin-top:8px;">'+res.sem1.count+' data</div>'
+      +'</div>'
+      +'<div style="background:#f7fafc;border-radius:10px;padding:16px 10px;text-align:center;">'
+      +'<div style="font-size:11px;color:#718096;font-weight:700;text-transform:uppercase;line-height:1.4;">Semester 2<br><span style="font-weight:600;opacity:.7;">(Jul &ndash; Des)</span></div>'
+      +'<div style="font-size:20px;font-weight:800;color:#2c5364;margin:10px 0;">'+fmtVal(res.sem2)+'</div>'
+      +_kpiGradeBadge(res.sem2.grade)
+      +'<div style="font-size:10px;color:#a0aec0;margin-top:8px;">'+res.sem2.count+' data</div>'
+      +'</div>'
+      +'</div>'
+      +'</div></div>';
+  }
+
+  function kpiCloseSemesterPopup(){
+    var ov=document.getElementById('kpiSemesterOverlay');
+    if(ov) ov.remove();
   }
   function _kpiFmtMin(min){
     if(min===null||min===undefined||isNaN(min)) return '-';
@@ -128,10 +190,13 @@ var KPI_COLS = [
     _kpiRitaseGroupMode = mode;
     var bDay=document.getElementById('kpiRitaseGroupDay');
     var bShift=document.getElementById('kpiRitaseGroupShift');
-    if(bDay)   bDay.style.background   = mode==='day'   ? '#0f2027' : '#fff';
-    if(bDay)   bDay.style.color        = mode==='day'   ? '#fff'    : '#4a5568';
-    if(bShift) bShift.style.background = mode==='shift' ? '#0f2027' : '#fff';
-    if(bShift) bShift.style.color      = mode==='shift' ? '#fff'    : '#4a5568';
+    var bAllShift=document.getElementById('kpiRitaseGroupAllShift');
+    if(bDay)      bDay.style.background      = mode==='day'      ? '#0f2027' : '#fff';
+    if(bDay)      bDay.style.color           = mode==='day'      ? '#fff'    : '#4a5568';
+    if(bShift)    bShift.style.background    = mode==='shift'    ? '#0f2027' : '#fff';
+    if(bShift)    bShift.style.color         = mode==='shift'    ? '#fff'    : '#4a5568';
+    if(bAllShift) bAllShift.style.background = mode==='allshift' ? '#0f2027' : '#fff';
+    if(bAllShift) bAllShift.style.color      = mode==='allshift' ? '#fff'    : '#4a5568';
     kpiLoadRitase();
   }
 
@@ -155,6 +220,7 @@ var KPI_COLS = [
 
   function kpiLoadRitase(){
     var f=kpiLoadFilters();
+    window._kpiCurrentYear = f.to ? parseInt(f.to.substring(0,4)) : new Date().getFullYear();
     var pane=document.getElementById('kpiRitasePane');
     if(pane) pane.innerHTML='<div style="text-align:center;padding:60px;color:#a0aec0;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i></div>';
     google.script.run
@@ -178,8 +244,9 @@ var KPI_COLS = [
         +'</div>'
         +'<div style="width:1px;height:22px;background:#e2e8f0;"></div>'
         +'<div style="display:flex;gap:8px;">'
-        +'<button id="kpiRitaseGroupDay" onclick="kpiToggleRitaseGroupMode(\'day\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseGroupMode==='day'?'#0f2027':'#fff')+';color:'+(_kpiRitaseGroupMode==='day'?'#fff':'#4a5568')+';"><i class="fas fa-calendar-day" style="margin-right:4px;"></i>By Hari</button>'
-        +'<button id="kpiRitaseGroupShift" onclick="kpiToggleRitaseGroupMode(\'shift\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseGroupMode==='shift'?'#0f2027':'#fff')+';color:'+(_kpiRitaseGroupMode==='shift'?'#fff':'#4a5568')+';"><i class="fas fa-clock" style="margin-right:4px;"></i>By Shift</button>'
+        +'<button id="kpiRitaseGroupDay" onclick="kpiToggleRitaseGroupMode(\'day\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseGroupMode==='day'?'#0f2027':'#fff')+';color:'+(_kpiRitaseGroupMode==='day'?'#fff':'#4a5568')+';" title="Cutoff hari kalender 00:00-23:59"><i class="fas fa-calendar-day" style="margin-right:4px;"></i>By Hari</button>'
+        +'<button id="kpiRitaseGroupAllShift" onclick="kpiToggleRitaseGroupMode(\'allshift\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseGroupMode==='allshift'?'#0f2027':'#fff')+';color:'+(_kpiRitaseGroupMode==='allshift'?'#fff':'#4a5568')+';" title="Cutoff hari produksi 07:00-06:59 (gabung semua shift)"><i class="fas fa-layer-group" style="margin-right:4px;"></i>By All Shift</button>'
+        +'<button id="kpiRitaseGroupShift" onclick="kpiToggleRitaseGroupMode(\'shift\')" style="padding:7px 18px;border-radius:20px;border:1px solid #cbd5e0;cursor:pointer;font-size:12px;font-weight:700;background:'+(_kpiRitaseGroupMode==='shift'?'#0f2027':'#fff')+';color:'+(_kpiRitaseGroupMode==='shift'?'#fff':'#4a5568')+';" title="Pecah per shift, cutoff 06:59"><i class="fas fa-clock" style="margin-right:4px;"></i>By Shift</button>'
         +'</div>'
         +'</div>';
 
@@ -188,7 +255,7 @@ var KPI_COLS = [
         +'<div style="background:linear-gradient(135deg,#0f2027,#2c5364);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">'
         +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata Ritase / Mobil (Global)</div>'
         +'<div style="font-size:30px;font-weight:800;">'+(res.grandAvg||0).toFixed(2)+'</div></div>'
-        +'<div>'+_kpiGradeBadge(res.grandGrade)+'</div>'
+        +'<div>'+_kpiGradeBadge(res.grandGrade, 'ritase', _kpiRitaseMode)+'</div>'
         +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Total Ritase</div><div style="font-size:15px;font-weight:800;">'+res.grandTotal+'</div></div>'
         +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Total Mobil</div><div style="font-size:15px;font-weight:800;">'+res.grandUnik+'</div></div>'
         +'</div></div>';
@@ -221,25 +288,27 @@ var KPI_COLS = [
 
   function kpiLoadStay(){
     var f=kpiLoadFilters();
+    window._kpiCurrentYear = f.to ? parseInt(f.to.substring(0,4)) : new Date().getFullYear();
     var pane=document.getElementById('kpiStayPane');
     if(pane) pane.innerHTML='<div style="text-align:center;padding:60px;color:#a0aec0;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i></div>';
     google.script.run
-      .withSuccessHandler(function(res){ _kpiRenderPlantSummary(res,'kpiStayPane','Waktu Stay'); })
+      .withSuccessHandler(function(res){ _kpiRenderPlantSummary(res,'kpiStayPane','Waktu Stay','stay'); })
       .withFailureHandler(function(err){ if(pane) pane.innerHTML='<div style="text-align:center;padding:40px;color:#e53e3e;">Error: '+err.message+'</div>'; })
       .getKpiStaySummary(f.from, f.to);
   }
 
   function kpiLoadLoading(){
     var f=kpiLoadFilters();
+    window._kpiCurrentYear = f.to ? parseInt(f.to.substring(0,4)) : new Date().getFullYear();
     var pane=document.getElementById('kpiLoadingPane');
     if(pane) pane.innerHTML='<div style="text-align:center;padding:60px;color:#a0aec0;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i></div>';
     google.script.run
-      .withSuccessHandler(function(res){ _kpiRenderPlantSummary(res,'kpiLoadingPane','Waktu Loading'); })
+      .withSuccessHandler(function(res){ _kpiRenderPlantSummary(res,'kpiLoadingPane','Waktu Loading','loading'); })
       .withFailureHandler(function(err){ if(pane) pane.innerHTML='<div style="text-align:center;padding:40px;color:#e53e3e;">Error: '+err.message+'</div>'; })
       .getKpiLoadingSummary(f.from, f.to);
   }
 
-  function _kpiRenderPlantSummary(res, paneId, title){
+  function _kpiRenderPlantSummary(res, paneId, title, apiType){
     var pane=document.getElementById(paneId);
     if(!pane) return;
     if(!res||!res.success){ pane.innerHTML='<div style="text-align:center;padding:40px;color:#e53e3e;">'+(res?res.message:'Gagal memuat')+'</div>'; return; }
@@ -251,7 +320,7 @@ var KPI_COLS = [
         +'<div style="background:linear-gradient(135deg,#0f2027,#2c5364);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">'
         +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata '+title+' (Global)</div>'
         +'<div style="font-size:30px;font-weight:800;">'+_kpiFmtMin(res.globalAvg)+'</div></div>'
-        +'<div>'+_kpiGradeBadge(res.globalGrade)+'</div>'
+        +'<div>'+_kpiGradeBadge(res.globalGrade, apiType, '')+'</div>'
         +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Jumlah Data</div><div style="font-size:15px;font-weight:800;">'+res.globalCount+'</div></div>'
         +'</div></div>';
 
@@ -267,7 +336,7 @@ var KPI_COLS = [
             +'</div>'
             +'<div style="padding:16px 14px;text-align:center;">'
             +'<div style="font-size:22px;font-weight:800;color:#2c5364;margin-bottom:10px;">'+_kpiFmtMin(p.avgMinutes)+'</div>'
-            +_kpiGradeBadge(p.grade)
+            +_kpiGradeBadge(p.grade, apiType, p.plant)
             +'<div style="font-size:11px;color:#a0aec0;margin-top:10px;">'+p.count+' data</div>'
             +'</div>'
             +'</div>';
