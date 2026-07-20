@@ -46,6 +46,11 @@
     'loadOpnamePattern':   function(a){ return {username:a[0]}; },
     // RDC
     'saveRdcData':         function(a){ return a[0]||{}; },
+    'saveKpiData':          function(a){ return a[0]||{}; },
+    'getKpiData':           function(a){ return {from:a[0]||'', to:a[1]||''}; },
+    'getKpiRitaseSummary':  function(a){ return {from:a[0]||'', to:a[1]||'', mode:a[2]||'all'}; },
+    'getKpiStaySummary':    function(a){ return {from:a[0]||'', to:a[1]||''}; },
+    'getKpiLoadingSummary': function(a){ return {from:a[0]||'', to:a[1]||''}; },
     'getRdcData':          function(a){ return {from:a[0]||'', to:a[1]||''}; },
     'saveRdcCatatan':      function(a){ return a[0]||{}; },
     'getRdcTim':           function(a){ return {slDt:a[0]}; },
@@ -66,9 +71,6 @@
     'getBinMovement':      function(a){ return a[0]||{}; },
     'getBinFifoAllocation':function(a){ return {sku:a[0], qty:a[1]}; },
     'updateMekAntrianRow': function(a){ return a[0]||{}; },
-    // Stock Jalur Log
-    'saveInputJalurLog':  function(a){ return {rows: a[0]||[]}; },
-    'saveOutputJalurLog': function(a){ return {rows: a[0]||[]}; },
   };
 
   var handler = {
