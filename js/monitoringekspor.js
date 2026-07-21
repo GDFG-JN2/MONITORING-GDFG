@@ -1665,9 +1665,9 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       // dalam container SKU lain di SO yang sama (1 truk bawa >1 SKU) ──
       if (r.status === 'gabung' && r.mergeInfo) {
         ket += '<span style="background:#bee3f8;color:#2c5282;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Digabung dgn '+_mekEsc(r.mergeInfo.container||r.mergeInfo.nopol||'-')+'</span>'
-             + '<button onclick="event.stopPropagation();mekShowMergePopup(\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.sku||'')+'\')" title="Ubah/batalkan penggabungan" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:1px 3px;font-size:11px;">✏️</button>';
+             + '<button onclick="event.stopPropagation();mekShowMergePopup(\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.sku||'')+'\',\''+_mekEsc(r.planTgl||'')+'\')" title="Ubah/batalkan penggabungan" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:1px 3px;font-size:11px;">✏️</button>';
       } else if (r.isFirstRow && r.status === 'belum' && noSoClean) {
-        ket += '<button onclick="event.stopPropagation();mekShowMergePopup(\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.sku||'')+'\')" style="background:#edf2f7;border:1px solid #cbd5e0;color:#4a5568;cursor:pointer;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;">🔗 Tandai Digabung</button>';
+        ket += '<button onclick="event.stopPropagation();mekShowMergePopup(\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.sku||'')+'\',\''+_mekEsc(r.planTgl||'')+'\')" style="background:#edf2f7;border:1px solid #cbd5e0;color:#4a5568;cursor:pointer;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;">🔗 Tandai Digabung</button>';
       }
       var editBtn = hasDoc
         ? '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.tglDaftar||'')+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.noContainer||'')+'\',\''+_mekEsc(r.ekspedisi||'')+'\')" title="Edit No Pol / No Container / Ekspedisi" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>'
@@ -3058,15 +3058,17 @@ function mekShowRowDetail(trEl) {
 // ── Popup info truk DITOLAK per SO ──────────────────────────────
 // ── Popup "Tandai Digabung" — SO yang sama, container sudah keluar tapi
 // SKU lain masih tercatat "Belum" karena sebenarnya digabung ke container itu ──
-function mekShowMergePopup(noSo, sku) {
-  // Ambil semua container lain yang sudah ada NO POL / NO CONTAINER di SO yang sama,
-  // dari data yang sedang dimuat (_mekCapEmailData / _mekCapData tergantung mode aktif)
+function mekShowMergePopup(noSo, sku, planTgl) {
+  // Ambil semua container lain yang sudah ada NO POL / NO CONTAINER di SO+TANGGAL PLANNING
+  // yang sama persis — supaya kalau SO yang sama muncul lagi di planning minggu lain,
+  // tidak ketuker kandidatnya.
   var src = (_mekCapMode === 'email') ? _mekCapEmailData : _mekCapData;
   var candidates = [];
   var seen = {};
   (src || []).forEach(function(r) {
     var rNoSo = _mekStripLeadingZero(r.noSo || '');
     if (rNoSo !== noSo) return;
+    if ((r.planTgl||'') !== (planTgl||'')) return;
     if (!r.nopol && !r.noContainer) return;
     var key = (r.nopol||'') + '|' + (r.noContainer||'');
     if (seen[key]) return;
@@ -3087,7 +3089,7 @@ function mekShowMergePopup(noSo, sku) {
           '<button onclick="mekCloseMergePopup()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;">&times;</button>' +
         '</div>' +
         '<div style="padding:18px;">' +
-          '<div style="font-size:12px;color:#718096;margin-bottom:12px;">SO <b>'+_mekEsc(noSo)+'</b> — SKU <b>'+_mekEsc(sku)+'</b> tercatat "Belum", tapi sebenarnya sudah dikirim tergabung di container SKU lain. Pilih container yang jadi tujuan gabungnya:</div>' +
+          '<div style="font-size:12px;color:#718096;margin-bottom:12px;">SO <b>'+_mekEsc(noSo)+'</b> (planning '+_mekEsc(_mekFmtTglDisplay(planTgl))+') — SKU <b>'+_mekEsc(sku)+'</b> tercatat "Belum", tapi sebenarnya sudah dikirim tergabung di container SKU lain. Pilih container yang jadi tujuan gabungnya:</div>' +
           (candidates.length
             ? '<select id="mekMergeSelect" style="width:100%;padding:8px 10px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;margin-bottom:10px;">'+options+'</select>'
             : '<div style="font-size:12px;color:#c53030;margin-bottom:10px;">Belum ada container lain tercatat di SO ini. Isi manual di bawah.</div>'
@@ -3097,7 +3099,7 @@ function mekShowMergePopup(noSo, sku) {
           '<textarea id="mekMergeCatatan" placeholder="Catatan (opsional)" style="width:100%;padding:8px 10px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;min-height:50px;margin-bottom:14px;"></textarea>' +
           '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
             '<button onclick="mekCloseMergePopup()" style="padding:8px 16px;border-radius:8px;border:1px solid #cbd5e0;background:#fff;color:#4a5568;cursor:pointer;font-size:12px;font-weight:600;">Batal</button>' +
-            '<button id="mekMergeSaveBtn" onclick="mekSaveMergeOverride(\''+_mekEsc(noSo)+'\',\''+_mekEsc(sku)+'\')" style="padding:8px 16px;border-radius:8px;border:none;background:#2c5282;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">Simpan</button>' +
+            '<button id="mekMergeSaveBtn" onclick="mekSaveMergeOverride(\''+_mekEsc(noSo)+'\',\''+_mekEsc(sku)+'\',\''+_mekEsc(planTgl||'')+'\')" style="padding:8px 16px;border-radius:8px;border:none;background:#2c5282;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">Simpan</button>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -3114,7 +3116,7 @@ function mekCloseMergePopup() {
   if (el) el.remove();
 }
 
-function mekSaveMergeOverride(noSo, sku) {
+function mekSaveMergeOverride(noSo, sku, planTgl) {
   var sel = document.getElementById('mekMergeSelect');
   var candidates = window._mekMergeCandidates || [];
   var nopol = '', container = '';
@@ -3131,13 +3133,17 @@ function mekSaveMergeOverride(noSo, sku) {
     showToast('Pilih container atau isi manual dulu', 'error');
     return;
   }
+  if (!planTgl) {
+    showToast('Tanggal planning tidak diketahui — tidak bisa disimpan', 'error');
+    return;
+  }
 
   var catatan = (document.getElementById('mekMergeCatatan')||{}).value || '';
   var btn = document.getElementById('mekMergeSaveBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
 
   API.run('saveMekMergeOverride', {
-    noSo: noSo, sku: sku, mergedIntoNopol: nopol, mergedIntoContainer: container, catatan: catatan
+    noSo: noSo, sku: sku, tanggalPlanning: planTgl, mergedIntoNopol: nopol, mergedIntoContainer: container, catatan: catatan
   }, function(res) {
     if (res && res.success) {
       showToast('Berhasil ditandai digabung', 'success');
