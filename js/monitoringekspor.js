@@ -1616,15 +1616,17 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   dateOrder.forEach(function(planTgl){
     var rows=byDate[planTgl];
     // Hitung summary per tanggal dari rows yang sudah filtered
-    var sum = {total:0, keluar:0, loading:0, daftar:0, belum:0, pendingan:0};
+    var sum = {total:0, keluar:0, loading:0, daftar:0, belum:0, pendingan:0, gabung:0};
     rows.forEach(function(r){
       sum.total++;
       if(r.status==='keluar') sum.keluar++;
+      else if(r.status==='gabung') sum.gabung++;   // sudah selesai (tergabung ke container lain) — TIDAK dihitung belum
       else if(r.status==='loading'||r.status==='daftar') sum.loading++;
       else sum.belum++;
       if(r.isPendingan) sum.pendingan++;
     });
-    var pct = sum.total ? Math.round(sum.keluar/sum.total*100) : 0;
+    // % keluar: gabung dihitung sebagai "selesai" juga (bukan cuma status keluar literal)
+    var pct = sum.total ? Math.round((sum.keluar+sum.gabung)/sum.total*100) : 0;
 
     html+='<tr style="background:#1a3a5c;"><td colspan="15" style="padding:0;">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;color:#fff;font-size:12px;font-weight:700;flex-wrap:wrap;gap:4px;">' +
@@ -1635,6 +1637,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       ((sum.loading+sum.daftar)?'<span style="background:#ed8936;border-radius:10px;padding:2px 10px;font-size:11px;">'+(sum.loading+sum.daftar)+' proses</span>':'') +
       (sum.belum?'<span style="background:#fc8181;border-radius:10px;padding:2px 10px;font-size:11px;">'+sum.belum+' belum</span>':'') +
       (sum.pendingan?'<span style="background:#f6d860;color:#744210;border-radius:10px;padding:2px 10px;font-size:11px;">'+sum.pendingan+' pendingan</span>':'') +
+      (sum.gabung?'<span style="background:#bee3f8;color:#2c5282;border-radius:10px;padding:2px 10px;font-size:11px;">'+sum.gabung+' digabung</span>':'') +
       '</div>' +
       '<span style="font-size:11px;opacity:.8;white-space:nowrap;">'+pct+'% keluar</span>' +
       '</div></td></tr>';
@@ -1703,7 +1706,7 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
   // Update summary cards (By Planning email)
   // Update summary cards (By Planning) — dari filtered supaya ikut filter aktif
   var nopolFilter = ((document.getElementById('mekCapNopol')||{}).value||'').toLowerCase().trim();
-  var _tc=0,_kc=0,_lc=0,_dc=0,_ss={};
+  var _tc=0,_kc=0,_lc=0,_dc=0,_gc=0,_ss={};
   var _planMap={}, _capMap={};
   // Pass 1: hitung totalCont dan init cap
   filtered.forEach(function(r){
@@ -1716,24 +1719,27 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       _capMap[_key]  = jml;  // slot tersedia
     }
   });
-  // Pass 2: hitung kc/lc/dc dengan cap max jumlahCont per planning
+  // Pass 2: hitung kc/lc/dc/gc dengan cap max jumlahCont per planning
   filtered.forEach(function(r){
     var _key = (r.noSo && r.noSo !== 'undefined' ? r.noSo : ('sku:'+r.sku)) + '|' + r.sku + '|' + r.planTgl;
     if (nopolFilter && (r.nopol||'').toLowerCase().indexOf(nopolFilter)<0) return;
     if (!_capMap[_key] || _capMap[_key] <= 0) return;  // sudah penuh, tidak hitung
     if(r.status==='keluar')  { _kc++; _capMap[_key]--; }
+    else if(r.status==='gabung'){ _gc++; _capMap[_key]--; } // sudah selesai (tergabung) — jangan ikut "belum"
     else if(r.status==='loading'){ _lc++; _capMap[_key]--; }
     else if(r.status==='daftar' ){ _dc++; _capMap[_key]--; }
   });
-  var _dtg = _kc+_lc+_dc;
+  var _dtg = _kc+_lc+_dc+_gc;
   var _bc  = Math.max(0, _tc - _dtg);
   _mekSetCard('mekCapCardTotal',_tc);
   _mekSetCard('mekCapCardDatang',_dtg);
   _mekSetCard('mekCapCardKeluar',_kc);
   _mekSetCard('mekCapCardDaftar',_lc+_dc);
   _mekSetCard('mekCapCardBelum',_bc);
+  var _cardGabung = document.getElementById('mekCapCardGabung');
+  if(_cardGabung) _cardGabung.textContent = _gc;
   var _pe=document.getElementById('mekCapCardPct');
-  if(_pe) _pe.textContent=_tc?Math.round(_kc/_tc*100)+'%':'—';
+  if(_pe) _pe.textContent=_tc?Math.round((_kc+_gc)/_tc*100)+'%':'—';
 }
 
 // ======================================================
