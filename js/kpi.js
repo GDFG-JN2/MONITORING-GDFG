@@ -253,7 +253,7 @@ var KPI_COLS = [
     // ── Kartu ringkasan global — gradient header ala REALISASI ──
     html+='<div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);border:1px solid #e2e8f0;margin-bottom:18px;overflow:hidden;">'
         +'<div style="background:linear-gradient(135deg,#0f2027,#2c5364);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">'
-        +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata Ritase / Mobil (Global)</div>'
+        +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata Ritase / Mobil</div>'
         +'<div style="font-size:30px;font-weight:800;">'+(res.grandAvg||0).toFixed(2)+'</div></div>'
         +'<div>'+_kpiGradeBadge(res.grandGrade, 'ritase', _kpiRitaseMode)+'</div>'
         +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Total Ritase</div><div style="font-size:15px;font-weight:800;">'+res.grandTotal+'</div></div>'
@@ -318,7 +318,7 @@ var KPI_COLS = [
     // ── Kartu ringkasan global — gradient header ala REALISASI ──
     html+='<div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);border:1px solid #e2e8f0;margin:16px 0 18px;overflow:hidden;">'
         +'<div style="background:linear-gradient(135deg,#0f2027,#2c5364);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">'
-        +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata '+title+' (Global)</div>'
+        +'<div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px;">Rata-rata '+title+'</div>'
         +'<div style="font-size:30px;font-weight:800;">'+_kpiFmtMin(res.globalAvg)+'</div></div>'
         +'<div>'+_kpiGradeBadge(res.globalGrade, apiType, '')+'</div>'
         +'<div style="text-align:right;"><div style="font-size:10px;opacity:.65;">Jumlah Data</div><div style="font-size:15px;font-weight:800;">'+res.globalCount+'</div></div>'
