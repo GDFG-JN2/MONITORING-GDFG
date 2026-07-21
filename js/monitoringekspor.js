@@ -1555,6 +1555,7 @@ function _mekCapBadge(status, raw) {
   var r = (raw||status||'').toUpperCase();
   var sp = function(bg,cl,txt){ return '<span style="background:'+bg+';color:'+cl+';border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;">'+txt+'</span>'; };
   if (status==='keluar'  || r==='KELUAR')           return sp('#c6f6d5','#276749','Keluar');
+  if (status==='gabung')                             return sp('#bee3f8','#2c5282','Digabung');
   if (status==='ditolak' || r==='DITOLAK')           return sp('#e53e3e','#fff','Ditolak');
   if (r==='TREATMENT')                               return sp('#d6bcfa','#44337a','Treatment');
   if (r==='MENUNGGU_SPM' || r==='MENUNGGU SPM')      return sp('#fefcbf','#744210','Menunggu SPE');
@@ -1660,6 +1661,14 @@ function _mekRenderCapaianEmail(data, skuFilter, docFilter, tujFilter) {
       if (r.outOfPlanWeek) ket += '<span style="background:#e9d8fd;color:#553c9a;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;">Dikirim di luar planning week '+r.outOfPlanWeek+'</span>';
       var noSoClean  = _mekStripLeadingZero(r.noSo||'');
       var hasDoc = !!noSoClean && !!(r.nopol||'').trim() && r.status !== 'belum';
+      // ── Tandai Digabung — untuk baris "Belum" yang sebenarnya sudah dikirim tergabung
+      // dalam container SKU lain di SO yang sama (1 truk bawa >1 SKU) ──
+      if (r.status === 'gabung' && r.mergeInfo) {
+        ket += '<span style="background:#bee3f8;color:#2c5282;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:3px;">Digabung dgn '+_mekEsc(r.mergeInfo.container||r.mergeInfo.nopol||'-')+'</span>'
+             + '<button onclick="event.stopPropagation();mekShowMergePopup(\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.sku||'')+'\')" title="Ubah/batalkan penggabungan" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:1px 3px;font-size:11px;">✏️</button>';
+      } else if (r.isFirstRow && r.status === 'belum' && noSoClean) {
+        ket += '<button onclick="event.stopPropagation();mekShowMergePopup(\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.sku||'')+'\')" style="background:#edf2f7;border:1px solid #cbd5e0;color:#4a5568;cursor:pointer;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;">🔗 Tandai Digabung</button>';
+      }
       var editBtn = hasDoc
         ? '<button onclick="event.stopPropagation();mekStartEditRow(this,\''+_mekEsc(noSoClean)+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.tglDaftar||'')+'\',\''+_mekEsc(r.nopol||'')+'\',\''+_mekEsc(r.noContainer||'')+'\',\''+_mekEsc(r.ekspedisi||'')+'\')" title="Edit No Pol / No Container / Ekspedisi" style="background:none;border:none;color:#a0aec0;cursor:pointer;padding:2px 4px;font-size:11px;">✏️</button>'
         : '';
@@ -3047,6 +3056,103 @@ function mekShowRowDetail(trEl) {
 }
 
 // ── Popup info truk DITOLAK per SO ──────────────────────────────
+// ── Popup "Tandai Digabung" — SO yang sama, container sudah keluar tapi
+// SKU lain masih tercatat "Belum" karena sebenarnya digabung ke container itu ──
+function mekShowMergePopup(noSo, sku) {
+  // Ambil semua container lain yang sudah ada NO POL / NO CONTAINER di SO yang sama,
+  // dari data yang sedang dimuat (_mekCapEmailData / _mekCapData tergantung mode aktif)
+  var src = (_mekCapMode === 'email') ? _mekCapEmailData : _mekCapData;
+  var candidates = [];
+  var seen = {};
+  (src || []).forEach(function(r) {
+    var rNoSo = _mekStripLeadingZero(r.noSo || '');
+    if (rNoSo !== noSo) return;
+    if (!r.nopol && !r.noContainer) return;
+    var key = (r.nopol||'') + '|' + (r.noContainer||'');
+    if (seen[key]) return;
+    seen[key] = true;
+    candidates.push({ nopol: r.nopol || '', container: r.noContainer || '', sku: r.sku || '' });
+  });
+
+  var options = candidates.map(function(c, i) {
+    return '<option value="'+i+'">'+_mekEsc(c.nopol||'-')+' / '+_mekEsc(c.container||'-')+' (SKU '+_mekEsc(c.sku)+')</option>';
+  }).join('');
+
+  var html =
+    '<div id="mekMergeOverlay" onclick="if(event.target===this) mekCloseMergePopup()" ' +
+    'style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;">' +
+      '<div style="background:#fff;border-radius:12px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">' +
+        '<div style="background:#2c5282;color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">' +
+          '<div style="font-weight:700;font-size:14px;"><i class="fas fa-link" style="margin-right:8px;"></i>Tandai Container Digabung</div>' +
+          '<button onclick="mekCloseMergePopup()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;">&times;</button>' +
+        '</div>' +
+        '<div style="padding:18px;">' +
+          '<div style="font-size:12px;color:#718096;margin-bottom:12px;">SO <b>'+_mekEsc(noSo)+'</b> — SKU <b>'+_mekEsc(sku)+'</b> tercatat "Belum", tapi sebenarnya sudah dikirim tergabung di container SKU lain. Pilih container yang jadi tujuan gabungnya:</div>' +
+          (candidates.length
+            ? '<select id="mekMergeSelect" style="width:100%;padding:8px 10px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;margin-bottom:10px;">'+options+'</select>'
+            : '<div style="font-size:12px;color:#c53030;margin-bottom:10px;">Belum ada container lain tercatat di SO ini. Isi manual di bawah.</div>'
+          ) +
+          '<input id="mekMergeManualNopol" placeholder="No Pol (kalau pilih manual)" style="width:100%;padding:8px 10px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;margin-bottom:8px;" '+(candidates.length?'value=""':'')+'>' +
+          '<input id="mekMergeManualContainer" placeholder="No Container (kalau pilih manual)" style="width:100%;padding:8px 10px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;margin-bottom:8px;">' +
+          '<textarea id="mekMergeCatatan" placeholder="Catatan (opsional)" style="width:100%;padding:8px 10px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;min-height:50px;margin-bottom:14px;"></textarea>' +
+          '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+            '<button onclick="mekCloseMergePopup()" style="padding:8px 16px;border-radius:8px;border:1px solid #cbd5e0;background:#fff;color:#4a5568;cursor:pointer;font-size:12px;font-weight:600;">Batal</button>' +
+            '<button id="mekMergeSaveBtn" onclick="mekSaveMergeOverride(\''+_mekEsc(noSo)+'\',\''+_mekEsc(sku)+'\')" style="padding:8px 16px;border-radius:8px;border:none;background:#2c5282;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">Simpan</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  var existing = document.getElementById('mekMergeOverlay');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+  window._mekMergeCandidates = candidates;
+}
+
+function mekCloseMergePopup() {
+  var el = document.getElementById('mekMergeOverlay');
+  if (el) el.remove();
+}
+
+function mekSaveMergeOverride(noSo, sku) {
+  var sel = document.getElementById('mekMergeSelect');
+  var candidates = window._mekMergeCandidates || [];
+  var nopol = '', container = '';
+  if (sel && candidates[sel.value]) {
+    nopol = candidates[sel.value].nopol;
+    container = candidates[sel.value].container;
+  }
+  var manualNopol = (document.getElementById('mekMergeManualNopol')||{}).value || '';
+  var manualContainer = (document.getElementById('mekMergeManualContainer')||{}).value || '';
+  if (manualNopol.trim())     nopol = manualNopol.trim();
+  if (manualContainer.trim()) container = manualContainer.trim();
+
+  if (!nopol && !container) {
+    showToast('Pilih container atau isi manual dulu', 'error');
+    return;
+  }
+
+  var catatan = (document.getElementById('mekMergeCatatan')||{}).value || '';
+  var btn = document.getElementById('mekMergeSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+  API.run('saveMekMergeOverride', {
+    noSo: noSo, sku: sku, mergedIntoNopol: nopol, mergedIntoContainer: container, catatan: catatan
+  }, function(res) {
+    if (res && res.success) {
+      showToast('Berhasil ditandai digabung', 'success');
+      mekCloseMergePopup();
+      if (typeof mekLoadCapaian === 'function') mekLoadCapaian();
+    } else {
+      showToast('Gagal: '+(res ? res.message : 'Gagal menyimpan'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
+    }
+  }, function(err) {
+    showToast('Koneksi gagal: '+err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
+  });
+}
+
 function mekShowDitolakPopup(rowidx) {
   var list = _mekDitolakData[rowidx] || [];
   if (!list.length) return;
