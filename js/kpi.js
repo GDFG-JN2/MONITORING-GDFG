@@ -655,25 +655,57 @@ var KPI_COLS = [
       if(!tbl.contains(e.target)) _kpiClearSel();
     });
 
-    // Paste (Ctrl+V dari Excel) — support hingga 32 kolom per baris
+    // Paste (Excel ATAU tabel dari halaman web) — support hingga 32 kolom per baris
+    // Prioritas: parse dari text/html (struktur tabel asli, akurat utk web maupun Excel).
+    // Fallback: text/plain tab-split (kalau tidak ada HTML sama sekali, misal dari Notepad).
+    function _kpiParseClipboardGrid(cd){
+      var html = cd.getData('text/html');
+      if(html && /<table|<tr/i.test(html)){
+        try{
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var trEls = doc.querySelectorAll('tr');
+          if(trEls.length){
+            var grid = [];
+            trEls.forEach(function(tr){
+              var cellsEl = tr.querySelectorAll('td,th');
+              var rowArr = [];
+              cellsEl.forEach(function(cellEl){
+                // innerText-like: ambil textContent, normalize whitespace/newline internal jadi spasi
+                var v = (cellEl.textContent||'').replace(/[\r\n]+/g,' ').replace(/\u00a0/g,' ').trim();
+                rowArr.push(v);
+              });
+              if(rowArr.length) grid.push(rowArr);
+            });
+            if(grid.length) return grid;
+          }
+        }catch(errParse){ /* fall through ke plain text */ }
+      }
+      // Fallback: plain text, asumsi tab-separated (Excel style)
+      var text = cd.getData('text');
+      if(!text) return null;
+      var lines = text.split(/\r?\n/); if(lines[lines.length-1]==='') lines.pop();
+      if(!lines.length) return null;
+      return lines.map(function(lineStr){ return lineStr.split('\t'); });
+    }
+
     tbl.addEventListener('paste',function(e){
       var active=document.activeElement;
       var td=active&&active.getAttribute&&active.getAttribute('data-key')&&active.closest('#kpiInputTbody')&&active;
       if(!td) return;
-      var text=(e.clipboardData||window.clipboardData).getData('text');
-      if(!text) return;
-      var lines=text.split(/\r?\n/); if(lines[lines.length-1]==='') lines.pop();
-      if(lines.length<=1&&lines[0]&&!lines[0].includes('\t')) return;
+      var cd = e.clipboardData||window.clipboardData;
+      var grid = _kpiParseClipboardGrid(cd);
+      if(!grid || !grid.length) return;
+      // Kalau cuma 1 baris & 1 kolom (bukan multi-cell paste beneran), biarkan browser handle normal
+      if(grid.length<=1 && grid[0].length<=1) return;
       e.preventDefault();
       var startR=_kpiTrIdx(td.closest('tr')), startC=_kpiTcIdx(td);
-      lines.forEach(function(lineStr,li){
-        var cells=lineStr.split('\t');
+      grid.forEach(function(cells,li){
         while(_kpiTbody().rows.length<=startR+li){ _kpiAppendRow({}); kpiUpdateRowCount(); }
         var trow=_kpiTbody().rows[startR+li];
         cells.forEach(function(val,ci){
           var colIdx=startC+ci; if(colIdx>=KPI_NCOLS) return;
           var tcell=trow.querySelector('[data-key="'+KPI_COLS[colIdx].key+'"]');
-          if(tcell) tcell.textContent=val.trim();
+          if(tcell) tcell.textContent=String(val).trim();
         });
       });
     });
